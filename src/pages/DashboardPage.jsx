@@ -690,37 +690,70 @@ function NormalDashboard({ data, onRefresh, loading }) {
       </div>
 
       {/* Produk Terlaris */}
-      {data?.topProductsToday?.length > 0 && (
-        <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-2xl border border-amber-100/60 p-5 mb-5">
-          <SectionHeader title="Produk Terlaris Hari Ini" subtitle="Berdasarkan jumlah terjual" icon={Sparkles} iconColor="text-amber-500" />
-          <div className="space-y-3">
-            {data.topProductsToday.map((p, i) => {
-              const MEDALS = ['🥇','🥈','🥉','4️⃣','5️⃣'];
-              const maxQty = data.topProductsToday[0]?.totalQty || 1;
-              const barW   = Math.round((p.totalQty / maxQty) * 100);
-              return (
-                <div key={p._id} className="flex items-center gap-3">
-                  <span className="text-lg w-7 text-center shrink-0">{MEDALS[i]}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-sm font-semibold text-slate-700 truncate">{p.productName}</p>
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-lg">{p.totalQty}x</span>
-                        <span className="text-xs text-slate-500 hidden sm:inline">{R(p.totalOmset)}</span>
-                        <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-lg">+{R(p.totalLaba)}</span>
+      {data?.topProductsToday?.length > 0 && (() => {
+        const MEDALS = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+        const fisikList   = data.topProductsToday.filter(p => p.type === 'fisik');
+        const digitalList = data.topProductsToday.filter(p => p.type === 'digital' || p.type === 'jasa');
+
+        const renderList = (list, barColor, barFrom, barTo) => {
+          if (!list.length) return (
+            <div className="text-center py-4 text-slate-400 text-xs">Tidak ada transaksi</div>
+          );
+          const maxQty = list[0]?.totalQty || 1;
+          return (
+            <div className="space-y-3">
+              {list.map((p, i) => {
+                const barW = Math.round((p.totalQty / maxQty) * 100);
+                return (
+                  <div key={p._id} className="flex items-center gap-3">
+                    <span className="text-lg w-7 text-center shrink-0">{MEDALS[i]}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-sm font-semibold text-slate-700 truncate">{p.productName}</p>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${barColor}`}>{p.totalQty}x</span>
+                          <span className="text-xs text-slate-500 hidden sm:inline">{R(p.totalOmset)}</span>
+                          <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-lg">+{R(p.totalLaba)}</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full bg-gradient-to-r ${barFrom} ${barTo} transition-all duration-700`}
+                          style={{width:`${barW}%`}} />
                       </div>
                     </div>
-                    <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-700"
-                        style={{width:`${barW}%`}} />
-                    </div>
                   </div>
+                );
+              })}
+            </div>
+          );
+        };
+
+        return (
+          <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-2xl border border-amber-100/60 p-5 mb-5">
+            <SectionHeader title="Produk Terlaris Hari Ini" subtitle="Berdasarkan jumlah terjual" icon={Sparkles} iconColor="text-amber-500" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
+              {/* Produk Fisik */}
+              <div className="bg-white/70 rounded-xl p-4 border border-blue-100/60">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">📦</span>
+                  <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Produk Fisik</p>
+                  <span className="ml-auto text-xs font-bold bg-blue-100 text-blue-600 px-2 py-0.5 rounded-lg">{fisikList.length} produk</span>
                 </div>
-              );
-            })}
+                {renderList(fisikList, 'text-blue-600 bg-blue-100', 'from-blue-400', 'to-blue-500')}
+              </div>
+              {/* Produk Digital */}
+              <div className="bg-white/70 rounded-xl p-4 border border-purple-100/60">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">⚡</span>
+                  <p className="text-xs font-bold text-purple-700 uppercase tracking-wide">Produk Digital</p>
+                  <span className="ml-auto text-xs font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-lg">{digitalList.length} produk</span>
+                </div>
+                {renderList(digitalList, 'text-purple-600 bg-purple-100', 'from-purple-400', 'to-purple-500')}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Widget Performa per Kategori */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-5">
