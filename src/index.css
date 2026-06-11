@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body { @apply text-slate-800 font-sans antialiased; background: linear-gradient(145deg, #f5c0e8 0%, #fbe8f6 45%, #edb8e0 100%) fixed; min-height: 100vh; margin: 0; padding: 0; }
+  /* FIXED: Reset body untuk halaman login & register agar background tidak override */
+  body:has(.login-root) { background: #06010f !important; }
+  .dark body { @apply bg-slate-900 text-slate-100; background: #0f172a; }
+
+  html.dark { @apply bg-slate-900; }
+
+  /* Mencegah zoom saat tap input di iOS */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* Safe area untuk notch/home bar */
+  :root {
+    --safe-top:    env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left:   env(safe-area-inset-left, 0px);
+    --safe-right:  env(safe-area-inset-right, 0px);
+  }
+}
+
+@layer components {
+  /* ─── Card ─────────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-slate-100 p-5;
+    @apply dark:bg-slate-800 dark:border-slate-700;
+  }
+
+  /* ─── Buttons ───────────────────────────────────────────── */
+  .btn { @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none; }
+  .btn-primary { @apply btn bg-blue-600 text-white hover:bg-blue-700; }
+  .btn-outline {
+    @apply btn border border-slate-200 text-slate-700 hover:bg-slate-50;
+    @apply dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700;
+  }
+  .btn-danger  { @apply btn bg-red-600 text-white hover:bg-red-700; }
+  .btn-success { @apply btn bg-green-600 text-white hover:bg-green-700; }
+
+  /* ─── Input ─────────────────────────────────────────────── */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition placeholder:text-slate-400;
+    @apply dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:ring-blue-400;
+  }
+
+  .label { @apply block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 dark:text-slate-400; }
+
+  /* ─── Badge ─────────────────────────────────────────────── */
+  .badge        { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold; }
+  .badge-blue   { @apply badge bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300; }
+  .badge-green  { @apply badge bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300; }
+  .badge-red    { @apply badge bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300; }
+  .badge-yellow { @apply badge bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300; }
+  .badge-purple { @apply badge bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300; }
+  .badge-gray   { @apply badge bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300; }
+
+  /* ─── Table ─────────────────────────────────────────────── */
+  .table-wrap { @apply overflow-x-auto rounded-2xl border border-slate-100 shadow-sm dark:border-slate-700; }
+  .table      { @apply w-full text-sm; }
+  .table thead tr { @apply bg-slate-50 border-b border-slate-100 dark:bg-slate-800 dark:border-slate-700; }
+  .table th   { @apply px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap dark:text-slate-400; }
+  .table td   { @apply px-4 py-3.5 text-slate-700 whitespace-nowrap dark:text-slate-300; }
+  .table tbody tr { @apply border-b border-slate-50 hover:bg-slate-50 transition-colors dark:border-slate-700 dark:hover:bg-slate-700/50; }
+  .table tbody { @apply bg-white dark:bg-slate-800; }
+
+  /* ─── Sidebar ───────────────────────────────────────────── */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+    color: rgba(221, 214, 254, 0.85);
+  }
+  .sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+  }
+  .sidebar-link.active {
+    background: rgba(255, 255, 255, 0.18) !important;
+    color: white !important;
+    font-weight: 600;
+  }
+
+  /* ─── Modal ─────────────────────────────────────────────── */
+  .modal-backdrop { @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4; }
+  .modal { @apply bg-white rounded-2xl shadow-2xl w-full max-h-screen overflow-y-auto dark:bg-slate-800; }
+
+  /* ─── Bottom Nav (Mobile) ──────────────────────────────── */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-100;
+    @apply dark:bg-slate-800 dark:border-slate-700;
+    padding-bottom: calc(0.5rem + var(--safe-bottom));
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.07);
+  }
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center gap-0.5 py-2 px-1
+           text-slate-400 transition-all duration-150 relative rounded-xl;
+    @apply dark:text-slate-500;
+    min-width: 0;
+    flex: 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-item.active { @apply text-blue-600 dark:text-blue-400; }
+  .bottom-nav-item span { @apply text-[10px] font-semibold leading-none truncate; }
+  .bottom-nav-item .active-dot { @apply absolute top-1 w-1 h-1 rounded-full bg-blue-600 dark:bg-blue-400; }
+
+  /* ─── Card mobile lebih compact ───────────────────────── */
+  @media (max-width: 640px) {
+    .card { @apply p-4 rounded-xl; }
+    .table th, .table td { @apply px-2.5 py-2; font-size: 11px; }
+    .table th { font-size: 10px; }
+    /* Modal lebih baik di mobile */
+    .modal-content { @apply rounded-t-2xl rounded-b-none; margin: 0; max-height: 90vh; }
+    /* PageHeader lebih compact */
+    .page-header { @apply mb-4; }
+    /* Label lebih kecil */
+    .label { @apply text-xs; }
+    /* Input lebih compact */
+    .input, .select { @apply text-sm; }
+    /* Badge lebih kecil */
+    .badge { @apply text-[10px] px-2 py-0.5; }
+  }
+
+  /* ─── Touch-friendly buttons ──────────────────────────── */
+  @media (max-width: 640px) {
+    .btn { min-height: 40px; }
+    .input { min-height: 44px; }
+    /* Jarak antar section lebih rapat di mobile */
+    .mb-6 { margin-bottom: 1rem !important; }
+    .mb-4 { margin-bottom: 0.75rem !important; }
+    /* Grid stat cards di mobile 2 kolom */
+    .stat-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+
+  /* ─── Main content offset saat bottom nav muncul ────── */
+  .mobile-pb { padding-bottom: calc(5rem + var(--safe-bottom)); }
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+.dark ::-webkit-scrollbar-track { background: #1e293b; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+/* ─── Print ─────────────────────────────────────────────────── */
+@media print {
+  .no-print { display: none !important; }
+  html, body {
+    width: 58mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  @page { size: 58mm auto; margin: 0mm; }
+  .print-container {
+    width: 58mm !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 9pt !important;
+    line-height: 1.3 !important;
+    color: #000 !important;
+    padding: 2mm !important;
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fadeInUp 0.3s ease forwards; }
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-slide-up { animation: slideUp 0.25s ease forwards; }

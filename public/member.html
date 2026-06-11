@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Member Portal - KonterA</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #86198F 0%, #C026D3 50%, #7C3AED 100%); min-height: 100vh; }
+
+  .container { max-width: 420px; margin: 0 auto; padding: 20px 16px; }
+
+  /* Header */
+  .header { text-align: center; padding: 32px 0 24px; color: white; }
+  .header .logo { font-size: 40px; margin-bottom: 8px; }
+  .header h1 { font-size: 22px; font-weight: 800; }
+  .header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+
+  /* Card */
+  .card { background: white; border-radius: 20px; padding: 24px; margin-bottom: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+
+  /* Login */
+  .login-card { }
+  .login-card h2 { font-size: 18px; font-weight: 700; color: #1E1B4B; margin-bottom: 6px; }
+  .login-card p { font-size: 13px; color: #6B7280; margin-bottom: 20px; }
+  .input-group { margin-bottom: 16px; }
+  .input-group label { display: block; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .input-group input { width: 100%; padding: 13px 16px; border: 1.5px solid #E5E7EB; border-radius: 12px; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .input-group input:focus { border-color: #C026D3; box-shadow: 0 0 0 3px rgba(192,38,211,0.1); }
+  .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: linear-gradient(135deg, #86198F, #C026D3); color: white; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-outline { background: white; border: 1.5px solid #E5E7EB; color: #6B7280; margin-top: 10px; }
+
+  /* Member info */
+  .member-header { background: linear-gradient(135deg, #86198F, #C026D3); border-radius: 20px; padding: 20px; margin-bottom: 16px; color: white; }
+  .member-header .name { font-size: 20px; font-weight: 800; margin-bottom: 2px; }
+  .member-header .since { font-size: 12px; opacity: 0.75; margin-bottom: 16px; }
+  .poin-box { background: rgba(255,255,255,0.15); border-radius: 14px; padding: 16px; text-align: center; }
+  .poin-box .poin-num { font-size: 42px; font-weight: 900; line-height: 1; }
+  .poin-box .poin-label { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: white; border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .stat-card .stat-val { font-size: 20px; font-weight: 800; color: #1E1B4B; }
+  .stat-card .stat-label { font-size: 11px; color: #6B7280; margin-top: 2px; }
+
+  /* Section */
+  .section-title { font-size: 14px; font-weight: 700; color: #1E1B4B; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+  /* Riwayat poin */
+  .log-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #F3F4F6; }
+  .log-item:last-child { border-bottom: none; }
+  .log-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .log-icon.earn { background: #D1FAE5; }
+  .log-icon.redeem { background: #FEE2E2; }
+  .log-icon.manual { background: #DBEAFE; }
+  .log-icon.expire { background: #F3F4F6; }
+  .log-desc { flex: 1; margin: 0 10px; }
+  .log-desc .desc { font-size: 13px; color: #374151; font-weight: 500; }
+  .log-desc .date { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+  .log-poin { font-size: 15px; font-weight: 700; }
+  .log-poin.plus { color: #10B981; }
+  .log-poin.minus { color: #EF4444; }
+
+  /* Rewards */
+  .reward-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #F9FAFB; border-radius: 14px; margin-bottom: 10px; }
+  .reward-icon { font-size: 28px; margin-right: 12px; }
+  .reward-info { flex: 1; }
+  .reward-name { font-size: 14px; font-weight: 700; color: #1E1B4B; }
+  .reward-poin { font-size: 12px; color: #C026D3; font-weight: 600; margin-top: 2px; }
+  .reward-stock { font-size: 11px; color: #9CA3AF; }
+  .reward-status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .reward-status.cukup { background: #D1FAE5; color: #065F46; }
+  .reward-status.kurang { background: #FEE2E2; color: #991B1B; }
+  .reward-img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; margin-right: 12px; flex-shrink: 0; background: #F3F4F6; }
+  .reward-emoji { font-size: 28px; margin-right: 12px; flex-shrink: 0; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+
+  /* Loading & Error */
+  .loading { text-align: center; padding: 40px; color: white; }
+  .loading .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { background: #FEE2E2; color: #991B1B; border-radius: 10px; padding: 12px; font-size: 13px; text-align: center; margin-top: 12px; }
+  .hidden { display: none; }
+
+  /* Riwayat Belanja */
+  .tx-item { padding: 12px 0; border-bottom: 1px solid #F3F4F6; }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .tx-invoice { font-size: 12px; font-weight: 700; color: #C026D3; }
+  .tx-date { font-size: 11px; color: #9CA3AF; }
+  .tx-total { font-size: 15px; font-weight: 800; color: #1E1B4B; margin-bottom: 3px; }
+  .tx-items { font-size: 12px; color: #6B7280; margin-bottom: 3px; }
+  .tx-poin { font-size: 11px; font-weight: 600; color: #10B981; }
+
+  /* Footer */
+  .footer { text-align: center; color: rgba(255,255,255,0.5); font-size: 11px; padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">⭐</div>
+    <h1>Member Portal</h1>
+    <p>Lihat poin & hadiah kamu</p>
+  </div>
+
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen">
+    <div class="card login-card">
+      <h2>Masuk sebagai Member</h2>
+      <p>Masukkan nomor WhatsApp yang terdaftar</p>
+      <div class="input-group">
+        <label>Nomor WhatsApp</label>
+        <input type="tel" id="phoneInput" placeholder="Contoh: 08123456789" inputmode="numeric">
+      </div>
+      <div id="loginError" class="error-msg hidden"></div>
+      <button class="btn btn-primary" onclick="doLogin()">🔍 Cek Poin Saya</button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loadingScreen" class="hidden">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Memuat data...</p>
+    </div>
+  </div>
+
+  <!-- MEMBER SCREEN -->
+  <div id="memberScreen" class="hidden">
+    <!-- Member Header -->
+    <div class="member-header">
+      <div class="name" id="memberName">-</div>
+      <div class="since" id="memberSince">-</div>
+      <div class="poin-box">
+        <div class="poin-num" id="memberPoints">0</div>
+        <div class="poin-label">⭐ Poin Tersedia</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-val" id="totalTx">0</div>
+        <div class="stat-label">Total Transaksi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="totalSpent">-</div>
+        <div class="stat-label">Total Belanja</div>
+      </div>
+    </div>
+
+    <!-- Rewards -->
+    <div class="card" id="rewardSection">
+      <div class="section-title">🎁 Hadiah yang Bisa Ditukar</div>
+      <div id="rewardList"></div>
+    </div>
+
+    <!-- Riwayat Belanja -->
+    <div class="card">
+      <div class="section-title">🛍️ Riwayat Belanja</div>
+      <div id="txList"></div>
+    </div>
+
+    <!-- Riwayat Poin -->
+    <div class="card">
+      <div class="section-title">📋 Riwayat Poin</div>
+      <div id="logList"></div>
+    </div>
+
+    <button class="btn btn-outline" onclick="logout()">← Keluar</button>
+  </div>
+
+  <div class="footer">KonterA POS System © 2025</div>
+</div>
+
+<script>
+const API = '/api/member';
+let memberId = localStorage.getItem('memberId');
+
+function fmt(n) {
+  return 'Rp ' + Number(n||0).toLocaleString('id-ID');
+}
+function fmtDate(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+}
+function fmtDateShort(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function show(id) {
+  ['loginScreen','loadingScreen','memberScreen'].forEach(s => {
+    document.getElementById(s).classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+}
+
+async function doLogin() {
+  const phone = document.getElementById('phoneInput').value.trim();
+  if (!phone) return;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+  show('loadingScreen');
+  try {
+    const res = await fetch(API + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      show('loginScreen');
+      errEl.textContent = data.message || 'Nomor tidak ditemukan';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    memberId = data.data._id;
+    localStorage.setItem('memberId', memberId);
+    await loadMemberInfo();
+  } catch(e) {
+    show('loginScreen');
+    errEl.textContent = 'Gagal terhubung ke server';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function loadMemberInfo() {
+  show('loadingScreen');
+  try {
+    const res = await fetch(API + '/info/' + memberId);
+    const data = await res.json();
+    if (!data.success) { logout(); return; }
+
+    const { member, logs, rewards, storeName } = data.data;
+
+    // Fetch riwayat belanja
+    let transactions = [];
+    try {
+      const txRes = await fetch(API + '/transactions/' + memberId);
+      if (txRes.ok) {
+        const txData = await txRes.json();
+        if (txData.success && Array.isArray(txData.data)) transactions = txData.data;
+      }
+    } catch(e) { console.error('Fetch tx error:', e); }
+
+    document.getElementById('memberName').textContent = '👤 ' + member.name;
+    document.getElementById('memberSince').textContent = storeName + ' · Member sejak ' + fmtDate(member.memberSince);
+    document.getElementById('memberPoints').textContent = (member.points||0).toLocaleString('id-ID');
+    document.getElementById('totalTx').textContent = member.totalTransactions || 0;
+    document.getElementById('totalSpent').textContent = fmt(member.totalSpent);
+
+    // Rewards
+    const rewardList = document.getElementById('rewardList');
+    if (rewards && rewards.length > 0) {
+      rewardList.innerHTML = rewards.map(r => {
+        const cukup = member.points >= r.pointsRequired;
+        const imgEl = r.image
+          ? `<img src="${r.image}" class="reward-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="reward-emoji" style="display:none">🎁</div>`
+          : `<div class="reward-emoji">🎁</div>`;
+        return `<div class="reward-item">
+          ${imgEl}
+          <div class="reward-info">
+            <div class="reward-name">${r.name}</div>
+            <div class="reward-poin">⭐ ${r.pointsRequired.toLocaleString('id-ID')} poin</div>
+            <div class="reward-stock">Stok: ${r.stock}</div>
+          </div>
+          <div class="reward-status ${cukup ? 'cukup' : 'kurang'}">${cukup ? 'Bisa Tukar' : 'Belum Cukup'}</div>
+        </div>`;
+      }).join('');
+    } else {
+      document.getElementById('rewardSection').classList.add('hidden');
+    }
+
+    // Riwayat belanja
+    const txList = document.getElementById('txList');
+    if (transactions && transactions.length > 0) {
+      try {
+        txList.innerHTML = transactions.slice(0, 10).map(t => {
+          const itemNames = (t.items || []).map(i => i.productName || i.name || '-').join(', ');
+          const poinEarn = (t.earnedPoints && t.earnedPoints > 0) ? `<div class='tx-poin'>⭐ +${t.earnedPoints} poin</div>` : '';
+          const tgl = t.transactionDate || t.createdAt || '';
+          return `<div class='tx-item'>
+            <div class='tx-header'>
+              <span class='tx-invoice'>${t.invoiceNumber || '-'}</span>
+              <span class='tx-date'>${tgl ? fmtDateShort(tgl) : ''}</span>
+            </div>
+            <div class='tx-total'>${fmt(t.total || t.totalCost || 0)}</div>
+            <div class='tx-items'>${itemNames || '-'}</div>
+            ${poinEarn}
+          </div>`;
+        }).join('');
+      } catch(e) {
+        txList.innerHTML = '<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:16px">Gagal memuat riwayat</p>';
+      }
+    } else {
+      txList.innerHTML = '<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:16px">Belum ada riwayat belanja</p>';
+    }
+
+    // Riwayat poin
+    const logList = document.getElementById('logList');
+    if (logs && logs.length > 0) {
+      logList.innerHTML = logs.map(l => {
+        const isPlus = l.points > 0;
+        const icon = l.type === 'earn' ? '⭐' : l.type === 'redeem' ? '🎁' : l.type === 'manual' ? '✏️' : '❌';
+        const iconClass = l.type === 'earn' ? 'earn' : l.type === 'redeem' ? 'redeem' : l.type === 'manual' ? 'manual' : 'expire';
+        return `<div class="log-item">
+          <div class="log-icon ${iconClass}">${icon}</div>
+          <div class="log-desc">
+            <div class="desc">${l.description || '-'}</div>
+            <div class="date">${fmtDateShort(l.createdAt)}</div>
+          </div>
+          <div class="log-poin ${isPlus ? 'plus' : 'minus'}">${isPlus ? '+' : ''}${l.points}</div>
+        </div>`;
+      }).join('');
+    } else {
+      logList.innerHTML = '<p style="color:#9CA3AF;font-size:13px;text-align:center;padding:16px">Belum ada riwayat poin</p>';
+    }
+
+    show('memberScreen');
+  } catch(e) {
+    logout();
+  }
+}
+
+function logout() {
+  localStorage.removeItem('memberId');
+  memberId = null;
+  document.getElementById('phoneInput').value = '';
+  show('loginScreen');
+}
+
+// Auto login jika ada memberId tersimpan
+if (memberId) {
+  loadMemberInfo();
+} else {
+  show('loginScreen');
+}
+
+// Enter key
+document.getElementById('phoneInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>
