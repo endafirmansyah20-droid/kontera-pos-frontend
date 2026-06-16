@@ -52,7 +52,7 @@ export default function SubscriptionPage() {
   const countNonaktif = subs.filter(s => s.status === 'nonaktif').length;
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       <PageHeader
         title="Manajemen Langganan"
         subtitle="Konfirmasi pembayaran dan kelola status cabang owner"

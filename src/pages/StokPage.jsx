@@ -315,7 +315,7 @@ const [bataling, setBataling] = useState(false);
     <div className="animate-fade-in-up">
       <PageHeader title="Stok Barang" subtitle="Manajemen produk & stok"
         actions={
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2 justify-end w-full sm:w-auto">
             <button className="btn btn-outline" onClick={load}><RefreshCw size={16} /> <span className="hidden sm:inline">Refresh</span></button>
             <button className="btn btn-success" onClick={() => { saldoAPI.getAll().then(r => setSaldos(r.data.data || [])).catch(() => {}); setShowPembelian(true); }}>
               <Plus size={16} /> <span className="hidden sm:inline">Input </span>Pembelian
@@ -326,152 +326,267 @@ const [bataling, setBataling] = useState(false);
       />
 
       {/* Tab */}
-      <div className="flex gap-2 mb-4">
-        <button onClick={() => setActiveTab('stok')} className={`btn ${activeTab === 'stok' ? 'btn-primary' : 'btn-outline'}`}>
+      <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1 pb-1 sm:pb-0 sm:mx-0 sm:px-0">
+        <button onClick={() => setActiveTab('stok')} className={`btn flex-shrink-0 ${activeTab === 'stok' ? 'btn-primary' : 'btn-outline'}`}>
           <Package size={16} /> Stok Barang
         </button>
-        <button onClick={() => { setActiveTab('riwayat'); loadRiwayatPembelian(); }} className={`btn ${activeTab === 'riwayat' ? 'btn-primary' : 'btn-outline'}`}>
+        <button onClick={() => { setActiveTab('riwayat'); loadRiwayatPembelian(); }} className={`btn flex-shrink-0 ${activeTab === 'riwayat' ? 'btn-primary' : 'btn-outline'}`}>
           <History size={16} /> Riwayat Pembelian
         </button>
       </div>
 
       {/* ── TAB STOK ── */}
       {activeTab === 'stok' && (
-        <>
-          <div className="card mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="pb-24 lg:pb-0">
+          <div className="card mb-4 flex flex-col sm:flex-row gap-2 sm:gap-3">
             <SearchInput value={search} onChange={setSearch} placeholder="Cari produk / kode..." className="flex-1" />
-            <select className="input w-auto" value={category} onChange={e => setCategory(e.target.value)}>
+            <select className="input w-full sm:w-auto" value={category} onChange={e => setCategory(e.target.value)}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c === 'semua' ? 'Semua Kategori' : FISIK_CATEGORIES.find(f => f.value === c)?.label || c}</option>)}
             </select>
-            <button onClick={() => setFilterLowStock(!filterLowStock)} className={`btn ${filterLowStock ? 'btn-primary' : 'btn-outline'}`}>
+            <button onClick={() => setFilterLowStock(!filterLowStock)} className={`btn justify-center ${filterLowStock ? 'btn-primary' : 'btn-outline'}`}>
               <AlertTriangle size={16} /> {filterLowStock ? 'Stok Menipis' : 'Semua Stok'}
             </button>
           </div>
 
           {loading ? <Loader /> : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr><th>Kode</th><th>Nama Produk</th><th>Kategori</th><th>Tipe</th><th>Harga Jual</th><th>Modal</th><th>Stok</th><th>Min. Stok</th><th>Expired</th><th>Aksi</th></tr>
-                </thead>
-                <tbody className="bg-white">
-                  {displayProducts.length === 0
-                    ? <tr><td colSpan={10}><EmptyState message="Tidak ada produk" /></td></tr>
-                    : displayProducts.map(p => {
-                      // Cek expired dari batch aktif
-                      const activeBatches = (p.stockBatches || []).filter(b => b.remainingQty > 0 && b.expiryDate);
-                      const today = new Date(); today.setHours(0,0,0,0);
-                      const soon  = new Date(); soon.setDate(soon.getDate() + 30);
-                      const nearestExp = activeBatches.sort((a,b) => new Date(a.expiryDate) - new Date(b.expiryDate))[0];
-                      const isExpired  = nearestExp && new Date(nearestExp.expiryDate) <= today;
-                      const isSoonExp  = nearestExp && !isExpired && new Date(nearestExp.expiryDate) <= soon;
+            <>
+              {/* Desktop / tablet — tabel (scroll horizontal di dalam wrapper) */}
+              <div className="table-wrap hidden sm:block max-w-full">
+                <table className="table">
+                  <thead>
+                    <tr><th>Kode</th><th>Nama Produk</th><th>Kategori</th><th>Tipe</th><th>Harga Jual</th><th>Modal</th><th>Stok</th><th>Min. Stok</th><th>Expired</th><th>Aksi</th></tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {displayProducts.length === 0
+                      ? <tr><td colSpan={10}><EmptyState message="Tidak ada produk" /></td></tr>
+                      : displayProducts.map(p => {
+                        const activeBatches = (p.stockBatches || []).filter(b => b.remainingQty > 0 && b.expiryDate);
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        const soon  = new Date(); soon.setDate(soon.getDate() + 30);
+                        const nearestExp = activeBatches.sort((a,b) => new Date(a.expiryDate) - new Date(b.expiryDate))[0];
+                        const isExpired  = nearestExp && new Date(nearestExp.expiryDate) <= today;
+                        const isSoonExp  = nearestExp && !isExpired && new Date(nearestExp.expiryDate) <= soon;
 
-                      return (
-                      <tr key={p._id} className={isExpired ? 'bg-red-50' : ''}>
-                        <td>
-                          <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{p.code}</code>
-                          {p.provider && <p className="text-xs text-slate-400 mt-0.5">{p.provider}</p>}
-                        </td>
-                        <td className="font-medium text-slate-700">{p.name}</td>
-                        <td><span className={`badge ${CATEGORY_COLORS?.[p.category] || 'badge-gray'}`}>{CATEGORY_LABELS?.[p.category] || p.category}</span></td>
-                        <td><span className={`badge ${p.type === 'fisik' ? 'badge-blue' : p.type === 'jasa' ? 'badge-green' : 'badge-purple'}`}>{p.type}</span></td>
-                        <td className="font-bold text-blue-600">{formatRupiah(p.sellPrice)}</td>
-                        <td className="text-slate-500">{formatRupiah(p.purchasePrice)}</td>
-                        <td>
-                          {p.type === 'fisik'
-                            ? <span className={`badge ${p.stock <= 0 ? 'badge-red' : p.stock <= (p.minStock || settings?.lowStockThreshold || 5) ? 'badge-yellow' : 'badge-green'}`}>{p.stock} {p.unit || 'pcs'}</span>
-                            : <span className="text-slate-300 text-xs">∞</span>}
-                        </td>
-                        <td className="text-slate-500 text-sm">{p.type === 'fisik' ? p.minStock || 5 : '—'}</td>
-                        <td>
-                          {nearestExp ? (
-                            <span className={`badge text-xs ${isExpired ? 'badge-red' : isSoonExp ? 'badge-yellow' : 'badge-green'}`}>
-                              {isExpired ? '⚠️ Expired' : isSoonExp ? '⏳ Segera' : '✓ OK'}
-                              <span className="ml-1 font-normal">
-                                {new Date(nearestExp.expiryDate).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'2-digit' })}
+                        return (
+                        <tr key={p._id} className={isExpired ? 'bg-red-50' : ''}>
+                          <td>
+                            <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{p.code}</code>
+                            {p.provider && <p className="text-xs text-slate-400 mt-0.5">{p.provider}</p>}
+                          </td>
+                          <td className="font-medium text-slate-700">{p.name}</td>
+                          <td><span className={`badge ${CATEGORY_COLORS?.[p.category] || 'badge-gray'}`}>{CATEGORY_LABELS?.[p.category] || p.category}</span></td>
+                          <td><span className={`badge ${p.type === 'fisik' ? 'badge-blue' : p.type === 'jasa' ? 'badge-green' : 'badge-purple'}`}>{p.type}</span></td>
+                          <td className="font-bold text-blue-600">{formatRupiah(p.sellPrice)}</td>
+                          <td className="text-slate-500">{formatRupiah(p.purchasePrice)}</td>
+                          <td>
+                            {p.type === 'fisik'
+                              ? <span className={`badge ${p.stock <= 0 ? 'badge-red' : p.stock <= (p.minStock || settings?.lowStockThreshold || 5) ? 'badge-yellow' : 'badge-green'}`}>{p.stock} {p.unit || 'pcs'}</span>
+                              : <span className="text-slate-300 text-xs">∞</span>}
+                          </td>
+                          <td className="text-slate-500 text-sm">{p.type === 'fisik' ? p.minStock || 5 : '—'}</td>
+                          <td>
+                            {nearestExp ? (
+                              <span className={`badge text-xs ${isExpired ? 'badge-red' : isSoonExp ? 'badge-yellow' : 'badge-green'}`}>
+                                {isExpired ? '⚠️ Expired' : isSoonExp ? '⏳ Segera' : '✓ OK'}
+                                <span className="ml-1 font-normal">
+                                  {new Date(nearestExp.expiryDate).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'2-digit' })}
+                                </span>
                               </span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 text-xs">—</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="flex gap-1">
-                            {p.type === 'fisik' && (
-                              <button onClick={() => openStock(p)} className="btn btn-success py-1 px-2 text-xs" title="Tambah Stok"><PackagePlus size={13} /></button>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
                             )}
-                            <button onClick={() => openLogs(p)} className="btn btn-outline py-1 px-2 text-xs" title="Log Stok"><BarChart2 size={13} /></button>
+                          </td>
+                          <td>
+                            <div className="flex gap-1">
+                              {p.type === 'fisik' && (
+                                <button onClick={() => openStock(p)} className="btn btn-success py-1 px-2 text-xs" title="Tambah Stok"><PackagePlus size={13} /></button>
+                              )}
+                              <button onClick={() => openLogs(p)} className="btn btn-outline py-1 px-2 text-xs" title="Log Stok"><BarChart2 size={13} /></button>
+                              {isAdmin && (
+                                <>
+                                  <button onClick={() => openEdit(p)} className="btn btn-outline py-1 px-2 text-xs"><Edit3 size={13} /></button>
+                                  <button onClick={() => { setSelectedProduct(p); setShowDeleteConfirm(true); }} className="btn btn-danger py-1 px-2 text-xs"><Trash2 size={13} /></button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        );
+                      })
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile — kartu */}
+              <div className="sm:hidden space-y-2">
+                {displayProducts.length === 0
+                  ? <div className="card"><EmptyState message="Tidak ada produk" /></div>
+                  : displayProducts.map(p => {
+                    const activeBatches = (p.stockBatches || []).filter(b => b.remainingQty > 0 && b.expiryDate);
+                    const today = new Date(); today.setHours(0,0,0,0);
+                    const soon  = new Date(); soon.setDate(soon.getDate() + 30);
+                    const nearestExp = activeBatches.sort((a,b) => new Date(a.expiryDate) - new Date(b.expiryDate))[0];
+                    const isExpired  = nearestExp && new Date(nearestExp.expiryDate) <= today;
+                    const isSoonExp  = nearestExp && !isExpired && new Date(nearestExp.expiryDate) <= soon;
+                    const lowStock   = p.type === 'fisik' && p.stock <= (p.minStock || settings?.lowStockThreshold || 5);
+
+                    return (
+                      <div key={p._id} className={`card !p-3 ${isExpired ? 'border-red-200 bg-red-50/40' : ''}`}>
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <div className="min-w-0 flex-1">
+                            <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{p.code}</code>
+                            <p className="font-bold text-sm text-slate-700 mt-1 leading-tight break-words">{p.name}</p>
+                            {p.provider && <p className="text-xs text-slate-400">{p.provider}</p>}
+                          </div>
+                          {p.type === 'fisik'
+                            ? <span className={`badge flex-shrink-0 ${p.stock <= 0 ? 'badge-red' : lowStock ? 'badge-yellow' : 'badge-green'}`}>
+                                {p.stock} {p.unit || 'pcs'}
+                              </span>
+                            : <span className="badge badge-gray flex-shrink-0">∞</span>
+                          }
+                        </div>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          <span className={`badge ${CATEGORY_COLORS?.[p.category] || 'badge-gray'}`}>{CATEGORY_LABELS?.[p.category] || p.category}</span>
+                          <span className={`badge ${p.type === 'fisik' ? 'badge-blue' : p.type === 'jasa' ? 'badge-green' : 'badge-purple'}`}>{p.type}</span>
+                          {nearestExp && (
+                            <span className={`badge text-xs ${isExpired ? 'badge-red' : isSoonExp ? 'badge-yellow' : 'badge-green'}`}>
+                              {isExpired ? '⚠️ Exp' : isSoonExp ? '⏳' : '✓'} {new Date(nearestExp.expiryDate).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100">
+                          <div className="min-w-0">
+                            <p className="text-[11px] text-slate-400">Harga Jual</p>
+                            <p className="font-bold text-blue-600 text-base leading-tight">{formatRupiah(p.sellPrice)}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Modal: {formatRupiah(p.purchasePrice)}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-1 justify-end flex-shrink-0">
+                            {p.type === 'fisik' && (
+                              <button onClick={() => openStock(p)} className="btn btn-success py-1.5 px-2.5 text-xs" title="Tambah Stok"><PackagePlus size={13} /></button>
+                            )}
+                            <button onClick={() => openLogs(p)} className="btn btn-outline py-1.5 px-2.5 text-xs" title="Log Stok"><BarChart2 size={13} /></button>
                             {isAdmin && (
                               <>
-                                <button onClick={() => openEdit(p)} className="btn btn-outline py-1 px-2 text-xs"><Edit3 size={13} /></button>
-                                <button onClick={() => { setSelectedProduct(p); setShowDeleteConfirm(true); }} className="btn btn-danger py-1 px-2 text-xs"><Trash2 size={13} /></button>
+                                <button onClick={() => openEdit(p)} className="btn btn-outline py-1.5 px-2.5 text-xs"><Edit3 size={13} /></button>
+                                <button onClick={() => { setSelectedProduct(p); setShowDeleteConfirm(true); }} className="btn btn-danger py-1.5 px-2.5 text-xs"><Trash2 size={13} /></button>
                               </>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                      );
-                    })
-                  }
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </>
           )}
-        </>
+        </div>
       )}
 
       {/* ── TAB RIWAYAT PEMBELIAN ── */}
       {activeTab === 'riwayat' && (
-        <div>
+        <div className="pb-24 lg:pb-0">
           {riwayatLoading ? <Loader /> : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr><th>No. PO</th><th>Tanggal</th><th>Supplier</th><th>Item</th><th>Total</th><th>Kasir</th><th>Aksi</th></tr>
-                </thead>
-                <tbody className="bg-white">
-                  {riwayatPembelian.length === 0
-                    ? <tr><td colSpan={8}><EmptyState message="Belum ada riwayat pembelian" /></td></tr>
-                    : riwayatPembelian.map(p => (
-                      <tr key={p._id}>
-                        <td>
-  <code className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded">{p.nomorPO}</code>
-  {p.isBatal && <span className="badge badge-red text-xs ml-1">Dibatalkan</span>}
-</td>
-                        <td className="text-xs text-slate-400">{formatDateTime(p.tanggal)}</td>
-                        <td className="font-medium text-sm">{p.supplier || '-'}</td>
-                        <td className="text-slate-500 text-xs">{p.totalItem} item</td>
-                        <td className="font-bold text-blue-600">{formatRupiah(p.totalHarga)}</td>
-                        <td className="text-sm">{p.createdByName}</td>
-                        <td>
-  <div className="flex gap-1">
-    <button onClick={async () => {
-      const { data } = await pembelianAPI.getDetail(p._id);
-      setSelectedPembelian(data.data);
-      setShowDetailPembelian(true);
-    }} className="btn btn-outline py-1 px-2 text-xs">
-      <Eye size={12} /> Detail
-    </button>
-    {isAdmin && !p.isBatal && (
-      <button onClick={() => openEditPembelian(p)}
-        className="btn btn-outline py-1 px-2 text-xs text-blue-600 border-blue-300 hover:bg-blue-50">
-        <Edit3 size={12} /> Edit
-      </button>
-    )}
-    {isAdmin && !p.isBatal && (
-      <button onClick={() => { setSelectedBatal(p); setShowBatalConfirm(true); }}
-        className="btn btn-danger py-1 px-2 text-xs">
-        <Trash2 size={12} /> Batal
-      </button>
-    )}
-  </div>
-</td>
-                      </tr>
-                    ))
-                  }
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop / tablet — tabel */}
+              <div className="table-wrap hidden sm:block max-w-full">
+                <table className="table">
+                  <thead>
+                    <tr><th>No. PO</th><th>Tanggal</th><th>Supplier</th><th>Item</th><th>Total</th><th>Kasir</th><th>Aksi</th></tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {riwayatPembelian.length === 0
+                      ? <tr><td colSpan={8}><EmptyState message="Belum ada riwayat pembelian" /></td></tr>
+                      : riwayatPembelian.map(p => (
+                        <tr key={p._id}>
+                          <td>
+                            <code className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded">{p.nomorPO}</code>
+                            {p.isBatal && <span className="badge badge-red text-xs ml-1">Dibatalkan</span>}
+                          </td>
+                          <td className="text-xs text-slate-400">{formatDateTime(p.tanggal)}</td>
+                          <td className="font-medium text-sm">{p.supplier || '-'}</td>
+                          <td className="text-slate-500 text-xs">{p.totalItem} item</td>
+                          <td className="font-bold text-blue-600">{formatRupiah(p.totalHarga)}</td>
+                          <td className="text-sm">{p.createdByName}</td>
+                          <td>
+                            <div className="flex gap-1">
+                              <button onClick={async () => {
+                                const { data } = await pembelianAPI.getDetail(p._id);
+                                setSelectedPembelian(data.data);
+                                setShowDetailPembelian(true);
+                              }} className="btn btn-outline py-1.5 px-2.5 text-xs">
+                                <Eye size={13} /> Detail
+                              </button>
+                              {isAdmin && !p.isBatal && (
+                                <button onClick={() => openEditPembelian(p)}
+                                  className="btn btn-outline py-1.5 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50">
+                                  <Edit3 size={13} /> Edit
+                                </button>
+                              )}
+                              {isAdmin && !p.isBatal && (
+                                <button onClick={() => { setSelectedBatal(p); setShowBatalConfirm(true); }}
+                                  className="btn btn-danger py-1.5 px-2.5 text-xs">
+                                  <Trash2 size={13} /> Batal
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile — kartu */}
+              <div className="sm:hidden space-y-2">
+                {riwayatPembelian.length === 0
+                  ? <div className="card"><EmptyState message="Belum ada riwayat pembelian" /></div>
+                  : riwayatPembelian.map(p => (
+                    <div key={p._id} className={`card !p-3 ${p.isBatal ? 'opacity-70 border-red-100 bg-red-50/30' : ''}`}>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <code className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded truncate">{p.nomorPO}</code>
+                        {p.isBatal && <span className="badge badge-red text-xs flex-shrink-0">Dibatalkan</span>}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mb-1.5">{formatDateTime(p.tanggal)}</p>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="font-semibold text-sm text-slate-700 truncate flex-1">{p.supplier || 'Tanpa supplier'}</p>
+                        <p className="text-xs text-slate-500 flex-shrink-0">{p.totalItem} item</p>
+                      </div>
+                      <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100">
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-slate-400">Total</p>
+                          <p className="font-bold text-blue-600 text-base leading-tight">{formatRupiah(p.totalHarga)}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 truncate">Kasir: {p.createdByName}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1 justify-end flex-shrink-0">
+                          <button onClick={async () => {
+                            const { data } = await pembelianAPI.getDetail(p._id);
+                            setSelectedPembelian(data.data);
+                            setShowDetailPembelian(true);
+                          }} className="btn btn-outline py-1.5 px-2.5 text-xs">
+                            <Eye size={13} /> Detail
+                          </button>
+                          {isAdmin && !p.isBatal && (
+                            <button onClick={() => openEditPembelian(p)}
+                              className="btn btn-outline py-1.5 px-2.5 text-xs text-blue-600 border-blue-300">
+                              <Edit3 size={13} />
+                            </button>
+                          )}
+                          {isAdmin && !p.isBatal && (
+                            <button onClick={() => { setSelectedBatal(p); setShowBatalConfirm(true); }}
+                              className="btn btn-danger py-1.5 px-2.5 text-xs">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </>
           )}
         </div>
       )}
@@ -706,14 +821,14 @@ const [bataling, setBataling] = useState(false);
                         </div>
                         <button onClick={() => removeItemPembelian(idx)} className="text-red-400"><X size={13} /></button>
                       </div>
-                      <div className="flex gap-2 items-end mt-2">
-  <div style={{width: '70px'}}>
+                      <div className="flex flex-wrap gap-2 items-end mt-2">
+  <div className="w-16 sm:w-[70px]">
     <label className="label text-xs">Jumlah</label>
     <input className="input text-xs text-center px-2" type="text" inputMode="numeric" min="1"
       value={item.jumlah}
       onChange={e => updateItemPembelian(idx, 'jumlah', e.target.value)} />
   </div>
-  <div className="flex-1">
+  <div className="flex-1 min-w-[120px]">
     <label className="label text-xs">Harga Modal Baru (Rp)</label>
     <div className="relative">
       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold pointer-events-none">Rp</span>
@@ -723,16 +838,16 @@ const [bataling, setBataling] = useState(false);
         onChange={e => updateItemPembelian(idx, 'hargaModalBaru', e.target.value.replace(/\D/g, ''))} />
     </div>
   </div>
-  <div style={{width: '80px'}} className="text-right">
+  <div className="w-20 sm:w-[80px] text-right">
     <label className="label text-xs">Subtotal</label>
-    <p className="text-xs font-bold text-blue-600 py-2">{formatRupiah((parseInt(item.hargaModalBaru) || 0) * (parseInt(item.jumlah) || 0))}</p>
+    <p className="text-xs font-bold text-blue-600 py-2 truncate">{formatRupiah((parseInt(item.hargaModalBaru) || 0) * (parseInt(item.jumlah) || 0))}</p>
   </div>
 </div>
                       {/* Input kadaluwarsa — opsional */}
-                      <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
                         <label className="text-xs text-slate-400 whitespace-nowrap">Exp:</label>
                         <input
-                          className="input text-xs py-1"
+                          className="input text-xs py-1 flex-1 min-w-[140px]"
                           type="date"
                           placeholder="Kadaluwarsa (opsional)"
                           value={item.expiryDate || ''}

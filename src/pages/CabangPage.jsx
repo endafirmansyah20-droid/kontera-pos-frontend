@@ -126,7 +126,7 @@ export default function CabangPage() {
   const totalSaldo   = summary.reduce((t, s) => t + (s.saldoDigital || 0) + (s.kasTunai || 0) + (s.brankas || 0), 0);
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       <PageHeader
         title="Manajemen Cabang"
         subtitle="Monitor semua cabang secara real-time"

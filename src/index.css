@@ -135,6 +135,9 @@
 
   /* ─── Main content offset saat bottom nav muncul ────── */
   .mobile-pb { padding-bottom: calc(5rem + var(--safe-bottom)); }
+
+  /* ─── Main content offset agar tidak tertutup mobile top bar fixed ────── */
+  .mobile-pt { padding-top: calc(3.5rem + var(--safe-top)); }
 }
 
 /* ─── Scrollbar ────────────────────────────────────────────── */

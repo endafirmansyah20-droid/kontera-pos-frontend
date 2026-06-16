@@ -376,7 +376,7 @@ function SuperAdminDashboard({ cabangList, loading, onRefresh }) {
   ];
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-black text-slate-800">Dashboard</h1>
@@ -567,7 +567,7 @@ function NormalDashboard({ data, onRefresh, loading }) {
   const greeting = jam < 11 ? '☀️ Selamat Pagi' : jam < 15 ? '🌤 Selamat Siang' : jam < 18 ? '🌅 Selamat Sore' : '🌙 Selamat Malam';
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       {/* Widget Anomali Transaksi */}
       {anomaly?.count > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">

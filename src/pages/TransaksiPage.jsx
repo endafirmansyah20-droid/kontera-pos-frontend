@@ -924,49 +924,49 @@ export default function TransaksiPage() {
         }
       />
 
-      <div className="flex gap-2 mb-4">
-        <button onClick={() => setActiveMainTab('kasir')} className={`btn ${activeMainTab === 'kasir' ? 'btn-primary' : 'btn-outline'}`}>
+      <div className="flex gap-2 mb-4 overflow-x-auto -mx-1 px-1 pb-1 sm:pb-0 sm:mx-0 sm:px-0">
+        <button onClick={() => setActiveMainTab('kasir')} className={`btn flex-shrink-0 ${activeMainTab === 'kasir' ? 'btn-primary' : 'btn-outline'}`}>
           <ShoppingCart size={16} /> Kasir
         </button>
-        <button onClick={() => setActiveMainTab('riwayat')} className={`btn ${activeMainTab === 'riwayat' ? 'btn-primary' : 'btn-outline'}`}>
+        <button onClick={() => setActiveMainTab('riwayat')} className={`btn flex-shrink-0 ${activeMainTab === 'riwayat' ? 'btn-primary' : 'btn-outline'}`}>
           <History size={16} /> Riwayat
         </button>
         {isPrivileged && (
-          <button onClick={() => setActiveMainTab('pembatalan')} className={`btn ${activeMainTab === 'pembatalan' ? 'btn-danger' : 'btn-outline'}`}>
+          <button onClick={() => setActiveMainTab('pembatalan')} className={`btn flex-shrink-0 ${activeMainTab === 'pembatalan' ? 'btn-danger' : 'btn-outline'}`}>
             <Trash2 size={16} /> Pembatalan
           </button>
         )}
       </div>
 
       {/* ── Kartu ringkasan — selalu tampil ── */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="card py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4">
+        <div className="card !p-3 sm:!p-4 flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
             <ShoppingCart size={18} className="text-blue-600" />
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Transaksi Hari Ini</p>
-            <p className="text-lg font-bold text-blue-600">{todayTx} <span className="text-xs font-normal text-slate-400">transaksi</span></p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Transaksi Hari Ini</p>
+            <p className="text-base sm:text-lg font-bold text-blue-600">{todayTx} <span className="text-xs font-normal text-slate-400">transaksi</span></p>
           </div>
         </div>
-        <div className="card py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
+        <div className="card !p-3 sm:!p-4 flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-9 sm:h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
             <Package size={18} className="text-emerald-600" />
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Item Terjual Hari Ini</p>
-            <p className="text-lg font-bold text-emerald-600">{todayItems} <span className="text-xs font-normal text-slate-400">item</span></p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Item Terjual Hari Ini</p>
+            <p className="text-base sm:text-lg font-bold text-emerald-600">{todayItems} <span className="text-xs font-normal text-slate-400">item</span></p>
           </div>
         </div>
-        <div className={`card py-3 flex items-center gap-3 ${kasTunai < 50000 ? 'border-red-200 bg-red-50' : ''}`}>
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${kasTunai < 50000 ? 'bg-red-100' : 'bg-yellow-100'}`}>
+        <div className={`card !p-3 sm:!p-4 flex items-center gap-3 ${kasTunai < 50000 ? 'border-red-200 bg-red-50' : ''}`}>
+          <div className={`w-10 h-10 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${kasTunai < 50000 ? 'bg-red-100' : 'bg-yellow-100'}`}>
             <span className="text-lg">💵</span>
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Kas Tunai</p>
-            <p className={`text-lg font-bold ${kasTunai < 50000 ? 'text-red-600' : 'text-yellow-600'}`}>
-              {formatRupiah(kasTunai)}
-              {kasTunai < 50000 && <span className="ml-1 badge badge-red text-xs">Rendah!</span>}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Kas Tunai</p>
+            <p className={`text-base sm:text-lg font-bold flex items-center gap-1.5 flex-wrap ${kasTunai < 50000 ? 'text-red-600' : 'text-yellow-600'}`}>
+              <span className="truncate">{formatRupiah(kasTunai)}</span>
+              {kasTunai < 50000 && <span className="badge badge-red text-xs flex-shrink-0">Rendah!</span>}
             </p>
           </div>
         </div>
@@ -974,22 +974,22 @@ export default function TransaksiPage() {
 
       {/* ══ KASIR ══ */}
       {activeMainTab === 'kasir' && (
-        <div className="flex gap-3" style={{ height: 'calc(100vh - 200px)' }}>
+        <div className="flex flex-col lg:flex-row gap-3 lg:h-[calc(100vh-200px)] pb-24 lg:pb-0">
 
           {/* Kiri */}
-          <div className="flex-1 flex flex-col overflow-hidden card p-0">
+          <div className="flex-1 flex flex-col card p-0 lg:overflow-hidden min-h-[55vh] lg:min-h-0">
             {/* Tabs */}
-            <div className="flex border-b border-slate-100">
+            <div className="flex border-b border-slate-100 flex-shrink-0">
               <button onClick={() => setActiveTab('fisik')}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition ${activeTab === 'fisik' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                className={`flex-1 py-3 sm:py-3 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${activeTab === 'fisik' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                 <Package size={14} /> Fisik
               </button>
               <button onClick={() => setActiveTab('jasa')}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition ${activeTab === 'jasa' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                className={`flex-1 py-3 sm:py-3 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${activeTab === 'jasa' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                 <Briefcase size={14} /> Jasa
               </button>
               <button onClick={() => setActiveTab('digital')}
-                className={`flex-1 py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition ${activeTab === 'digital' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                className={`flex-1 py-3 sm:py-3 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${activeTab === 'digital' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
                 <Smartphone size={14} /> Digital
               </button>
             </div>
@@ -997,33 +997,33 @@ export default function TransaksiPage() {
             {/* ── FISIK ── */}
             {activeTab === 'fisik' && (
               <>
-                <div className="p-3 border-b border-slate-100 flex gap-2">
-                  <div className="relative flex-1">
+                <div className="p-2 sm:p-3 border-b border-slate-100 flex gap-2 flex-shrink-0">
+                  <div className="relative flex-1 min-w-0">
                     <input ref={codeRef} className="input pr-20" placeholder="F2 | Scan / kode produk → Enter"
                       value={codeInput} onChange={e => setCodeInput(e.target.value)} onKeyDown={handleCodeKeyDown} />
                     <button onClick={() => {
                       productAPI.getByCode(codeInput.trim()).then(r => { if (r.data.success) addToCart(r.data.data); else toast.error('Tidak ditemukan'); }).catch(() => toast.error('Tidak ditemukan'));
                       setCodeInput('');
-                    }} className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-primary py-1 px-2.5 text-xs">Tambah</button>
+                    }} className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-primary py-1.5 px-2.5 text-xs">Tambah</button>
                   </div>
-                  <button className="btn btn-outline py-2" onClick={() => setShowSearch(true)}><Search size={15} /></button>
+                  <button className="btn btn-outline py-2 px-3 flex-shrink-0" onClick={() => setShowSearch(true)}><Search size={15} /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
+                <div className="flex-1 lg:overflow-y-auto p-2 sm:p-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-2.5">
                     {fisikProducts.map(p => {
                       const out = p.stock <= 0;
                       return (
                         <button key={p._id} onClick={() => !out && addToCart(p)} disabled={out}
-                          className={`relative p-3 rounded-xl border text-left transition-all ${out ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-blue-400 hover:bg-blue-50 active:scale-95'}`}>
-                          <p className="text-xs font-bold text-slate-700 leading-tight mb-1">{p.name}</p>
-                          <p className="text-xs text-slate-400 font-mono">{p.code}</p>
-                          <p className="text-sm font-bold text-blue-600 mt-2">{formatRupiah(p.sellPrice)}</p>
-                          <span className={`absolute top-2 right-2 badge text-xs ${p.stock <= (p.minStock || 5) ? 'badge-red' : 'badge-green'}`}>{p.stock}</span>
+                          className={`relative p-2.5 sm:p-3 rounded-xl border text-left transition-all min-h-[88px] ${out ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-blue-400 hover:bg-blue-50 active:scale-95'}`}>
+                          <p className="text-xs font-bold text-slate-700 leading-tight mb-1 pr-8 line-clamp-2">{p.name}</p>
+                          <p className="text-[10px] sm:text-xs text-slate-400 font-mono truncate">{p.code}</p>
+                          <p className="text-sm font-bold text-blue-600 mt-1.5 sm:mt-2">{formatRupiah(p.sellPrice)}</p>
+                          <span className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 badge text-xs ${p.stock <= (p.minStock || 5) ? 'badge-red' : 'badge-green'}`}>{p.stock}</span>
                           {out && <span className="absolute inset-0 rounded-xl flex items-center justify-center bg-slate-100/80 text-xs font-bold text-red-500">HABIS</span>}
                         </button>
                       );
                     })}
-                    {fisikProducts.length === 0 && <div className="col-span-4"><EmptyState message="Tidak ada produk fisik" /></div>}
+                    {fisikProducts.length === 0 && <div className="col-span-2 sm:col-span-3 xl:col-span-4"><EmptyState message="Tidak ada produk fisik" /></div>}
                   </div>
                 </div>
               </>
@@ -1031,39 +1031,41 @@ export default function TransaksiPage() {
 
             {/* ── JASA ── */}
 {activeTab === 'jasa' && (
-  <div className="flex-1 overflow-y-auto p-4">
+  <div className="flex-1 lg:overflow-y-auto p-3 sm:p-4">
     <JasaForm onAddToCart={addItemToCart} />
   </div>
 )}
            
             {/* ── DIGITAL ── */}
             {activeTab === 'digital' && (
-              <div className="flex flex-1 overflow-hidden">
-                {/* Kiri: Pilih Sumber Dana dulu */}
-                <div className="w-28 border-r border-slate-100 overflow-y-auto bg-slate-50 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row flex-1 lg:overflow-hidden">
+                {/* Kiri: Pilih Sumber Dana dulu — di mobile sembunyikan setelah dipilih (info bar punya tombol Ganti) */}
+                <div className={`${selectedSumberDana ? 'hidden sm:block' : 'block'} w-full sm:w-28 border-b sm:border-b-0 sm:border-r border-slate-100 sm:overflow-y-auto bg-slate-50 flex-shrink-0 max-h-56 sm:max-h-none overflow-y-auto`}>
                   {['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'].map(group => {
                     const groupSaldos = saldos.filter(s => s.group === group && s.isActive !== false);
                     if (!groupSaldos.length) return null;
                     return (
                       <div key={group}>
                         <div className="px-2 py-1 text-xs text-slate-400 font-bold bg-slate-100 border-b border-slate-200">{group}</div>
-                        {groupSaldos.map(s => (
-                          <button key={s.akunId} onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
-                            className={`w-full flex flex-col items-center gap-1 py-2.5 px-1 text-xs font-semibold transition border-b border-slate-100 ${selectedSumberDana === s.akunId ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white'}`}>
-                            <span className="text-base">{s.icon}</span>
-                            <span className="text-center leading-tight">{s.namaAkun}</span>
-                            <span className={`text-xs ${selectedSumberDana === s.akunId ? 'text-blue-100' : 'text-green-600'}`}>{formatRupiah(s.saldo)}</span>
-                          </button>
-                        ))}
+                        <div className="grid grid-cols-3 sm:grid-cols-1 gap-px sm:gap-0">
+                          {groupSaldos.map(s => (
+                            <button key={s.akunId} onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
+                              className={`w-full flex flex-col items-center gap-1 py-2.5 px-1 text-xs font-semibold transition border-b border-slate-100 ${selectedSumberDana === s.akunId ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white'}`}>
+                              <span className="text-base">{s.icon}</span>
+                              <span className="text-center leading-tight truncate w-full px-0.5">{s.namaAkun}</span>
+                              <span className={`text-[10px] sm:text-xs truncate w-full text-center ${selectedSumberDana === s.akunId ? 'text-blue-100' : 'text-green-600'}`}>{formatRupiah(s.saldo)}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
 
                 {/* Kanan: Pilih kategori & form */}
-                <div className="flex-1 overflow-y-auto flex flex-col">
+                <div className="flex-1 lg:overflow-y-auto flex flex-col min-w-0">
                   {!selectedSumberDana ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 p-6">
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 p-6 hidden sm:flex">
                       <Wallet size={32} className="text-slate-300" />
                       <p className="text-sm font-semibold">Pilih Sumber Dana</p>
                       <p className="text-xs text-center">Pilih akun sumber dana di sebelah kiri terlebih dahulu</p>
@@ -1101,7 +1103,7 @@ export default function TransaksiPage() {
                         <button onClick={() => setSelectedSumberDana('')} className="ml-auto text-blue-400 hover:text-blue-600 text-xs">Ganti</button>
                       </div>
                       {/* Form sesuai kategori */}
-                      <div className="flex-1 overflow-y-auto">
+                      <div className="flex-1 lg:overflow-y-auto">
                         {(() => {
                           const group = saldos.find(s => s.akunId === selectedSumberDana)?.group || '';
                           const allowed = MENU_PER_GROUP[group] || [];
@@ -1123,35 +1125,35 @@ export default function TransaksiPage() {
           </div>
 
           {/* Kanan: Keranjang */}
-          <div className="w-72 xl:w-80 flex flex-col card p-0 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="w-full lg:w-72 xl:w-80 flex flex-col card p-0 lg:overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <ShoppingCart size={16} className="text-blue-600" />
                 <span className="font-bold text-sm">Keranjang</span>
                 {cart.length > 0 && <span className="badge badge-blue">{cart.length}</span>}
               </div>
-              {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-red-500">Kosongkan</button>}
+              {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-red-500 py-1 px-2 -my-1 -mr-2">Kosongkan</button>}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className="flex-1 lg:overflow-y-auto p-2 space-y-2 max-h-[40vh] lg:max-h-none overflow-y-auto">
               {cart.length === 0
                 ? <EmptyState message="Tambahkan produk ke keranjang" icon={ShoppingCart} />
                 : cart.map((item, idx) => (
                   <div key={item.productId || idx} className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                    <div className="flex justify-between items-start mb-1">
-                      <p className="text-xs font-bold text-slate-700 flex-1 pr-1 leading-tight">{item.productName}</p>
-                      <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X size={13} /></button>
+                    <div className="flex justify-between items-start mb-1 gap-2">
+                      <p className="text-xs sm:text-sm font-bold text-slate-700 flex-1 leading-tight break-words">{item.productName}</p>
+                      <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 flex-shrink-0 p-1 -m-1"><X size={16} /></button>
                     </div>
                     {item.type === 'jasa' && <span className="badge badge-green text-xs mb-1">Jasa</span>}
-                    {item.sumberDana && <p className="text-xs text-blue-500 mb-0.5">{item.sumberDanaIcon} {item.sumberDanaLabel}</p>}
-                    {item.targetNumber && <p className="text-xs text-slate-400 mb-1">→ {item.targetNumber}</p>}
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => updateQty(idx, -1)} className="w-6 h-6 rounded bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100"><Minus size={11} /></button>
-                        <span className="text-xs font-bold text-slate-700 w-6 text-center">{item.quantity}</span>
-                        <button onClick={() => updateQty(idx, 1)} className="w-6 h-6 rounded bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100"><Plus size={11} /></button>
+                    {item.sumberDana && <p className="text-xs text-blue-500 mb-0.5 truncate">{item.sumberDanaIcon} {item.sumberDanaLabel}</p>}
+                    {item.targetNumber && <p className="text-xs text-slate-400 mb-1 truncate">→ {item.targetNumber}</p>}
+                    <div className="flex items-center justify-between mt-1 gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => updateQty(idx, -1)} className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95"><Minus size={14} /></button>
+                        <span className="text-sm font-bold text-slate-700 w-7 text-center">{item.quantity}</span>
+                        <button onClick={() => updateQty(idx, 1)} className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95"><Plus size={14} /></button>
                       </div>
-                      <p className="text-sm font-bold text-blue-600">{formatRupiah(item.subtotal)}</p>
+                      <p className="text-sm font-bold text-blue-600 text-right">{formatRupiah(item.subtotal)}</p>
                     </div>
                   </div>
                 ))
@@ -1210,9 +1212,9 @@ export default function TransaksiPage() {
                   )}
                 </div>
               )}
-              <div className="flex gap-1.5">
-                <div className="relative flex-1">
-                  <input className="input text-xs py-1.5 w-full"
+              <div className="flex flex-col sm:flex-row gap-1.5">
+                <div className="relative flex-1 min-w-0">
+                  <input className="input text-sm sm:text-xs py-2 sm:py-1.5 w-full"
                     placeholder={selectedMember ? selectedMember.name : "Cari member / nama pelanggan..."}
                     value={memberSearch}
                     onChange={e => searchMember(e.target.value)}
@@ -1272,19 +1274,19 @@ export default function TransaksiPage() {
                     </div>
                   )}
                 </div>
-                <div className="relative w-28 flex-shrink-0">
+                <div className="relative w-full sm:w-28 flex-shrink-0">
                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold select-none pointer-events-none">Rp</span>
-                  <input className="input text-xs py-1.5 pl-7 w-full" placeholder="Diskon"
+                  <input className="input text-sm sm:text-xs py-2 sm:py-1.5 pl-7 w-full" placeholder="Diskon"
                     value={formatDisp(discount)}
                     onChange={e => setDiscount(e.target.value.replace(/\D/g, ''))}
                     inputMode="numeric" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-1.5">
                 {PAYMENT_METHODS.map(k => (
                   <button key={k} onClick={() => setPaymentMethod(k)}
-                    className={`py-1.5 rounded-lg text-xs font-semibold transition border ${paymentMethod === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                    className={`py-2.5 sm:py-2 rounded-lg text-xs font-semibold transition border ${paymentMethod === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                     {PAYMENT_LABELS[k]}
                   </button>
                 ))}
@@ -1319,10 +1321,10 @@ export default function TransaksiPage() {
                       onChange={e => setAmountPaid(e.target.value.replace(/\D/g, ''))}
                       inputMode="numeric" />
                   </div>
-                  <div className="grid grid-cols-3 gap-1">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {[total, 50000, 100000].map(v => (
                       <button key={v} onClick={() => setAmountPaid(String(v))}
-                        className="py-1 rounded text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600">
+                        className="py-2 sm:py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 active:scale-95">
                         {v === total ? 'Pas' : `${v / 1000}rb`}
                       </button>
                     ))}
@@ -1354,51 +1356,86 @@ export default function TransaksiPage() {
 
       {/* ══ RIWAYAT ══ */}
       {activeMainTab === 'riwayat' && (
-        <div>
+        <div className="pb-24 lg:pb-0">
           <div className="card mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              {isPrivileged && (
+            {isPrivileged && (
+              <div className="flex items-center gap-2 mb-2">
                 <button onClick={() => { setProfitMinusFilter(f => !f); setTxPage(1); }}
                   className={`btn text-xs py-1.5 px-3 flex items-center gap-1.5 ${profitMinusFilter ? "btn-danger" : "btn-outline"}`}>
                   ⚠️ {profitMinusFilter ? "Tampil Semua" : "Profit Minus"}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             <SearchInput value={txSearch} onChange={v => { setTxSearch(v); setTxPage(1); }} placeholder="Cari nomor faktur atau nama pelanggan..." />
           </div>
           {txLoading ? <Loader /> : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead><tr><th>No. Faktur</th><th>Tanggal</th><th>Pelanggan</th><th>Item</th><th>Total</th><th>Bayar</th><th>Status</th><th>Aksi</th></tr></thead>
-                <tbody className="bg-white">
-                  {transactions.length === 0
-                    ? <tr><td colSpan={8}><EmptyState message="Tidak ada transaksi" /></td></tr>
-                    : transactions.map(tx => (
-                      <tr key={tx._id} className={tx.isVoid ? 'opacity-50' : ''}>
-                        <td><code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{tx.invoiceNumber}</code></td>
-                        <td className="text-xs text-slate-400">{formatDateTime(tx.transactionDate)}</td>
-                        <td className="font-medium text-sm">{tx.customerName}</td>
-                        <td className="text-slate-400 text-xs">{tx.items?.length} item</td>
-                        <td className="font-bold text-blue-600">{formatRupiah(tx.total)}</td>
-                        <td><span className={`badge ${PAYMENT_COLORS[tx.paymentMethod]}`}>{PAYMENT_LABELS[tx.paymentMethod]}</span></td>
-                        <td>{tx.isVoid ? <span className="badge badge-red">Batal</span> : <span className="badge badge-green">Lunas</span>}</td>
-                        <td>
-                          <div className="flex gap-1">
-                            <button onClick={() => { setSelectedTx(tx); setShowDetail(true); }} className="btn btn-outline py-1 px-2 text-xs"><Eye size={12} /></button>
-                            {canVoid(tx) && <button onClick={() => { setSelectedTx(tx); setShowVoidConfirm(true); }} className="btn btn-danger py-1 px-2 text-xs"><Trash2 size={12} /></button>}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  }
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop / tablet — tabel */}
+              <div className="table-wrap hidden sm:block">
+                <table className="table">
+                  <thead><tr><th>No. Faktur</th><th>Tanggal</th><th>Pelanggan</th><th>Item</th><th>Total</th><th>Bayar</th><th>Status</th><th>Aksi</th></tr></thead>
+                  <tbody className="bg-white">
+                    {transactions.length === 0
+                      ? <tr><td colSpan={8}><EmptyState message="Tidak ada transaksi" /></td></tr>
+                      : transactions.map(tx => (
+                        <tr key={tx._id} className={tx.isVoid ? 'opacity-50' : ''}>
+                          <td><code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{tx.invoiceNumber}</code></td>
+                          <td className="text-xs text-slate-400">{formatDateTime(tx.transactionDate)}</td>
+                          <td className="font-medium text-sm">{tx.customerName}</td>
+                          <td className="text-slate-400 text-xs">{tx.items?.length} item</td>
+                          <td className="font-bold text-blue-600">{formatRupiah(tx.total)}</td>
+                          <td><span className={`badge ${PAYMENT_COLORS[tx.paymentMethod]}`}>{PAYMENT_LABELS[tx.paymentMethod]}</span></td>
+                          <td>{tx.isVoid ? <span className="badge badge-red">Batal</span> : <span className="badge badge-green">Lunas</span>}</td>
+                          <td>
+                            <div className="flex gap-1">
+                              <button onClick={() => { setSelectedTx(tx); setShowDetail(true); }} className="btn btn-outline py-1.5 px-2.5 text-xs"><Eye size={14} /></button>
+                              {canVoid(tx) && <button onClick={() => { setSelectedTx(tx); setShowVoidConfirm(true); }} className="btn btn-danger py-1.5 px-2.5 text-xs"><Trash2 size={14} /></button>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile — kartu */}
+              <div className="sm:hidden space-y-2">
+                {transactions.length === 0
+                  ? <div className="card"><EmptyState message="Tidak ada transaksi" /></div>
+                  : transactions.map(tx => (
+                    <div key={tx._id} className={`card !p-3 ${tx.isVoid ? 'opacity-60' : ''}`}>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded truncate">{tx.invoiceNumber}</code>
+                        {tx.isVoid
+                          ? <span className="badge badge-red flex-shrink-0">Batal</span>
+                          : <span className="badge badge-green flex-shrink-0">Lunas</span>}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mb-1.5">{formatDateTime(tx.transactionDate)}</p>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="font-semibold text-sm text-slate-700 truncate flex-1">{tx.customerName}</p>
+                        <span className={`badge ${PAYMENT_COLORS[tx.paymentMethod]} flex-shrink-0`}>{PAYMENT_LABELS[tx.paymentMethod]}</span>
+                      </div>
+                      <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100">
+                        <div>
+                          <p className="text-[11px] text-slate-400">{tx.items?.length} item</p>
+                          <p className="font-bold text-blue-600 text-base leading-tight">{formatRupiah(tx.total)}</p>
+                        </div>
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button onClick={() => { setSelectedTx(tx); setShowDetail(true); }} className="btn btn-outline py-1.5 px-3 text-xs"><Eye size={14} /> Detail</button>
+                          {canVoid(tx) && <button onClick={() => { setSelectedTx(tx); setShowVoidConfirm(true); }} className="btn btn-danger py-1.5 px-2.5 text-xs"><Trash2 size={14} /></button>}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </>
           )}
           {txPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-slate-400">Total: {txTotal} transaksi</p>
-              <div className="flex gap-2">
+            <div className="flex items-center justify-between mt-4 gap-2">
+              <p className="text-xs text-slate-400 truncate">Total: {txTotal} transaksi</p>
+              <div className="flex gap-2 flex-shrink-0">
                 <button className="btn btn-outline py-2 px-3" onClick={() => setTxPage(p => Math.max(1, p - 1))} disabled={txPage <= 1}>←</button>
                 <span className="px-3 py-2 text-sm">{txPage}/{txPages}</span>
                 <button className="btn btn-outline py-2 px-3" onClick={() => setTxPage(p => Math.min(txPages, p + 1))} disabled={txPage >= txPages}>→</button>
@@ -1410,58 +1447,90 @@ export default function TransaksiPage() {
 
       {/* ══ TAB PEMBATALAN (admin/owner only) ══ */}
       {activeMainTab === 'pembatalan' && isPrivileged && (
-        <div>
+        <div className="pb-24 lg:pb-0">
           <div className="card mb-4">
             <SearchInput value={voidedSearch} onChange={v => { setVoidedSearch(v); setVoidedPage(1); }} placeholder="Cari faktur, pelanggan, atau nama pembatal..." />
           </div>
           {voidedLoading ? <Loader /> : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>No. Faktur</th>
-                    <th>Tgl Transaksi</th>
-                    <th>Pelanggan</th>
-                    <th>Total</th>
-                    <th>Dibatalkan Oleh</th>
-                    <th>Waktu Batal</th>
-                    <th>Alasan</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white">
-                  {voidedTx.length === 0
-                    ? <tr><td colSpan={8}><EmptyState message="Tidak ada riwayat pembatalan" /></td></tr>
-                    : voidedTx.map(tx => (
-                      <tr key={tx._id} className="opacity-80">
-                        <td><code className="text-xs font-mono bg-red-50 text-red-600 px-1.5 py-0.5 rounded">{tx.invoiceNumber}</code></td>
-                        <td className="text-xs text-slate-400">{formatDateTime(tx.transactionDate)}</td>
-                        <td className="font-medium text-sm">{tx.customerName}</td>
-                        <td className="font-bold text-red-500">{formatRupiah(tx.total)}</td>
-                        <td>
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700">
-                            👤 {tx.voidByName || tx.cashierName || '-'}
-                          </span>
-                        </td>
-                        <td className="text-xs text-slate-400">{tx.voidAt ? formatDateTime(tx.voidAt) : '-'}</td>
-                        <td className="text-xs text-slate-500 max-w-[160px] truncate" title={tx.voidReason}>{tx.voidReason || '-'}</td>
-                        <td>
-                          <button onClick={() => { setSelectedTx(tx); setShowDetail(true); }}
-                            className="btn btn-outline py-1 px-2" title="Lihat Detail">
-                            <Eye size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  }
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop / tablet — tabel */}
+              <div className="table-wrap hidden sm:block">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>No. Faktur</th>
+                      <th>Tgl Transaksi</th>
+                      <th>Pelanggan</th>
+                      <th>Total</th>
+                      <th>Dibatalkan Oleh</th>
+                      <th>Waktu Batal</th>
+                      <th>Alasan</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {voidedTx.length === 0
+                      ? <tr><td colSpan={8}><EmptyState message="Tidak ada riwayat pembatalan" /></td></tr>
+                      : voidedTx.map(tx => (
+                        <tr key={tx._id} className="opacity-80">
+                          <td><code className="text-xs font-mono bg-red-50 text-red-600 px-1.5 py-0.5 rounded">{tx.invoiceNumber}</code></td>
+                          <td className="text-xs text-slate-400">{formatDateTime(tx.transactionDate)}</td>
+                          <td className="font-medium text-sm">{tx.customerName}</td>
+                          <td className="font-bold text-red-500">{formatRupiah(tx.total)}</td>
+                          <td>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700">
+                              👤 {tx.voidByName || tx.cashierName || '-'}
+                            </span>
+                          </td>
+                          <td className="text-xs text-slate-400">{tx.voidAt ? formatDateTime(tx.voidAt) : '-'}</td>
+                          <td className="text-xs text-slate-500 max-w-[160px] truncate" title={tx.voidReason}>{tx.voidReason || '-'}</td>
+                          <td>
+                            <button onClick={() => { setSelectedTx(tx); setShowDetail(true); }}
+                              className="btn btn-outline py-1.5 px-2.5" title="Lihat Detail">
+                              <Eye size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile — kartu */}
+              <div className="sm:hidden space-y-2">
+                {voidedTx.length === 0
+                  ? <div className="card"><EmptyState message="Tidak ada riwayat pembatalan" /></div>
+                  : voidedTx.map(tx => (
+                    <div key={tx._id} className="card !p-3 border-red-100 bg-red-50/30">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <code className="text-xs font-mono bg-red-50 text-red-600 px-1.5 py-0.5 rounded truncate">{tx.invoiceNumber}</code>
+                        <span className="badge badge-red flex-shrink-0">Dibatalkan</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mb-1.5">{formatDateTime(tx.transactionDate)}</p>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="font-semibold text-sm text-slate-700 truncate flex-1">{tx.customerName}</p>
+                        <p className="font-bold text-red-500 text-sm flex-shrink-0">{formatRupiah(tx.total)}</p>
+                      </div>
+                      <div className="space-y-0.5 pt-2 border-t border-red-100 text-[11px]">
+                        <p className="text-slate-600"><span className="text-slate-400">👤 Oleh:</span> <span className="font-semibold">{tx.voidByName || tx.cashierName || '-'}</span></p>
+                        <p className="text-slate-400">🕐 {tx.voidAt ? formatDateTime(tx.voidAt) : '-'}</p>
+                        {tx.voidReason && <p className="text-slate-500 italic line-clamp-2">📋 {tx.voidReason}</p>}
+                      </div>
+                      <button onClick={() => { setSelectedTx(tx); setShowDetail(true); }}
+                        className="btn btn-outline w-full justify-center py-2 mt-2 text-xs">
+                        <Eye size={14} /> Lihat Detail
+                      </button>
+                    </div>
+                  ))
+                }
+              </div>
+            </>
           )}
           {voidedPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-slate-400">Total: {voidedTotal} pembatalan</p>
-              <div className="flex gap-2">
+            <div className="flex items-center justify-between mt-4 gap-2">
+              <p className="text-xs text-slate-400 truncate">Total: {voidedTotal} pembatalan</p>
+              <div className="flex gap-2 flex-shrink-0">
                 <button className="btn btn-outline py-2 px-3" onClick={() => setVoidedPage(p => Math.max(1, p - 1))} disabled={voidedPage <= 1}>←</button>
                 <span className="px-3 py-2 text-sm">{voidedPage}/{voidedPages}</span>
                 <button className="btn btn-outline py-2 px-3" onClick={() => setVoidedPage(p => Math.min(voidedPages, p + 1))} disabled={voidedPage >= voidedPages}>→</button>

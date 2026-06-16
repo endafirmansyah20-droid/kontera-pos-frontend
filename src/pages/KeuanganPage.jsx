@@ -39,7 +39,7 @@ function KeuanganSuperAdmin() {
   const totalPiutang   = data.reduce((t,c) => t + c.piutangAktif,         0);
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0 min-w-0">
       <PageHeader
         title="Peninjauan Keuangan"
         subtitle="Ringkasan keuangan seluruh cabang bulan ini"
@@ -50,59 +50,62 @@ function KeuanganSuperAdmin() {
         }
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-6">
         <StatCard title="Total Omset Bulan Ini"    value={R(totalOmset)}      subtitle="Semua cabang" icon={DollarSign}   color="blue"   />
         <StatCard title="Total Laba Bulan Ini"     value={R(totalLaba)}       subtitle="Semua cabang" icon={TrendingUp}   color="green"  />
         <StatCard title="Total Pengeluaran"        value={R(totalPengeluaran)} subtitle="Bulan ini"   icon={TrendingDown} color="red"    />
         <StatCard title="Total Aset"               value={R(totalAset)}       subtitle="Kas+Brankas+Digital" icon={Wallet} color="purple" />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-        <div className="bg-green-50 rounded-2xl p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="bg-green-50 rounded-2xl p-3 sm:p-4 min-w-0">
           <p className="text-xs text-green-500 mb-1">Total Pemasukan Non-Penjualan</p>
-          <p className="font-black text-xl text-green-700">{R(totalPemasukan)}</p>
+          <p className="font-black text-lg sm:text-xl text-green-700 truncate">{R(totalPemasukan)}</p>
         </div>
-        <div className="bg-red-50 rounded-2xl p-4">
+        <div className="bg-red-50 rounded-2xl p-3 sm:p-4 min-w-0">
           <p className="text-xs text-red-400 mb-1">Total Hutang Aktif</p>
-          <p className="font-black text-xl text-red-700">{R(totalHutang)}</p>
+          <p className="font-black text-lg sm:text-xl text-red-700 truncate">{R(totalHutang)}</p>
         </div>
-        <div className="bg-blue-50 rounded-2xl p-4">
+        <div className="bg-blue-50 rounded-2xl p-3 sm:p-4 min-w-0">
           <p className="text-xs text-blue-400 mb-1">Total Piutang Aktif</p>
-          <p className="font-black text-xl text-blue-700">{R(totalPiutang)}</p>
+          <p className="font-black text-lg sm:text-xl text-blue-700 truncate">{R(totalPiutang)}</p>
         </div>
       </div>
 
       <div className="space-y-3">
         {data.map((c, i) => (
-          <div key={c._id} className="card">
+          <div key={c._id} className="card min-w-0">
             <button
               onClick={() => setSelected(selected === c._id ? null : c._id)}
-              className="w-full flex items-center justify-between"
+              className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-                  style={{ background: ['#6366f1','#22c55e','#f59e0b','#ec4899','#14b8a6'][i % 5] }}>
-                  {c.kode}
+              <div className="flex items-center justify-between gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                    style={{ background: ['#6366f1','#22c55e','#f59e0b','#ec4899','#14b8a6'][i % 5] }}>
+                    {c.kode}
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="font-bold text-slate-800 truncate">{c.nama}</p>
+                    <p className="text-xs text-slate-400">Klik untuk detail</p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="font-bold text-slate-800">{c.nama}</p>
-                  <p className="text-xs text-slate-400">Klik untuk detail</p>
-                </div>
+                <span className={`text-slate-400 transition-transform flex-shrink-0 sm:hidden ${selected===c._id?'rotate-180':''}`}>▼</span>
               </div>
-              <div className="flex items-center gap-6 text-right">
-                <div>
-                  <p className="text-xs text-slate-400">Omset Bulan Ini</p>
-                  <p className="font-bold text-green-600">{R(c.bulanIni.omset)}</p>
+              <div className="grid grid-cols-3 sm:flex sm:items-center sm:gap-6 gap-2 text-left sm:text-right w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-0 border-slate-100">
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs text-slate-400">Omset</p>
+                  <p className="font-bold text-green-600 text-xs sm:text-base truncate">{R(c.bulanIni.omset)}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-400">Pengeluaran</p>
-                  <p className="font-bold text-red-500">{R(c.bulanIni.pengeluaran)}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs text-slate-400">Pengeluaran</p>
+                  <p className="font-bold text-red-500 text-xs sm:text-base truncate">{R(c.bulanIni.pengeluaran)}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-400">Total Aset</p>
-                  <p className="font-bold text-blue-600">{R(c.totalAset)}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs text-slate-400">Total Aset</p>
+                  <p className="font-bold text-blue-600 text-xs sm:text-base truncate">{R(c.totalAset)}</p>
                 </div>
-                <span className={`text-slate-400 transition-transform ${selected===c._id?'rotate-180':''}`}>▼</span>
+                <span className={`text-slate-400 transition-transform flex-shrink-0 hidden sm:inline ${selected===c._id?'rotate-180':''}`}>▼</span>
               </div>
             </button>
 
@@ -232,29 +235,29 @@ function BrankasSection({ isAdmin, cabangId }) {
   return (
     <>
       {/* Brankas Card */}
-      <div className="card mb-6 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center">
+      <div className="card mb-6 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center flex-shrink-0">
               <Lock size={22} className="text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Uang Brankas</p>
-              <p className="text-3xl font-black text-amber-800">{formatRupiah(brankas)}</p>
+              <p className="text-2xl sm:text-3xl font-black text-amber-800 whitespace-nowrap">{formatRupiah(brankas)}</p>
               <p className="text-xs text-amber-500 mt-0.5">Disimpan terpisah dari kas harian</p>
             </div>
           </div>
           {isAdmin && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 w-full sm:w-auto">
               <button
                 onClick={() => { setEditVal(brankas.toString()); setShowEdit(true); }}
-                className="btn btn-outline py-1.5 px-3 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+                className="btn btn-outline py-2 px-3 text-xs border-amber-300 text-amber-700 hover:bg-amber-100 w-full justify-center"
               >
                 <Edit2 size={13} /> Edit Saldo
               </button>
               <button
                 onClick={() => { setShowTransfer(true); }}
-                className="btn py-1.5 px-3 text-xs bg-amber-500 text-white hover:bg-amber-600"
+                className="btn py-2 px-3 text-xs bg-amber-500 text-white hover:bg-amber-600 w-full justify-center"
                 disabled={brankas <= 0}
               >
                 <ArrowRightLeft size={13} /> Ke Kas Tunai
@@ -292,7 +295,7 @@ function BrankasSection({ isAdmin, cabangId }) {
             </div>
           </div>
         </div>
-        <div className="flex gap-3 mt-5">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-5">
           <button className="btn btn-outline flex-1" onClick={() => setShowEdit(false)}>Batal</button>
           <button className="btn btn-primary flex-1 bg-amber-500 hover:bg-amber-600" onClick={handleUpdate} disabled={saving}>
             {saving ? 'Menyimpan...' : 'Simpan'}
@@ -330,7 +333,7 @@ function BrankasSection({ isAdmin, cabangId }) {
             />
           </div>
         </div>
-        <div className="flex gap-3 mt-5">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-5">
           <button className="btn btn-outline flex-1" onClick={() => setShowTransfer(false)}>Batal</button>
           <button className="btn btn-primary flex-1" onClick={handleTransfer} disabled={saving}>
             {saving ? 'Memproses...' : 'Transfer'}
@@ -435,18 +438,18 @@ function KeuanganOwner() {
   if (loading) return <Loader />;
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0 min-w-0">
       <PageHeader title="Keuangan Cabang" subtitle="Pembukuan per cabang"
         actions={
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             <select
-              className="border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-200 font-semibold"
+              className="border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-200 font-semibold flex-1 sm:flex-none min-w-0"
               value={selectedCabang || ''}
               onChange={e => { setSelectedCabang(e.target.value); setTypeFilter(''); }}
             >
               {cabangs.map(c => <option key={c._id} value={c._id}>{c.nama}</option>)}
             </select>
-            <button className="btn btn-primary" onClick={openAdd}><Plus size={16} /> Catat</button>
+            <button className="btn btn-primary flex-shrink-0" onClick={openAdd}><Plus size={16} /> Catat</button>
           </div>
         }
       />
@@ -456,7 +459,7 @@ function KeuanganOwner() {
 
       {/* Summary */}
       {summary && (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <StatCard title="Total Penjualan"     value={formatRupiah(summary.salesRevenue)}   subtitle="Bulan ini" icon={TrendingUp}   color="blue"   />
           <StatCard title="Total Pemasukan"     value={formatRupiah(summary.totalIncome)}     subtitle="Bulan ini" icon={DollarSign}   color="green"  />
           <StatCard title="Total Pengeluaran"   value={formatRupiah(summary.totalExpense)}    subtitle="Bulan ini" icon={TrendingDown} color="orange" />
@@ -465,10 +468,10 @@ function KeuanganOwner() {
       )}
 
       {/* Filter */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap min-w-0 max-w-full">
         {['', ...FINANCE_TYPES].map(t => (
           <button key={t} onClick={() => setTypeFilter(t)}
-            className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2`}>
+            className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>
             {t ? FINANCE_TYPE_LABELS[t] : 'Semua'}
           </button>
         ))}
@@ -486,7 +489,14 @@ function KeuanganOwner() {
                 ? <tr><td colSpan={8}><EmptyState message="Belum ada catatan keuangan" /></td></tr>
                 : records.map(r => (
                   <tr key={r._id}>
-                    <td className="text-xs">{formatDate(r.date)}</td>
+                    <td className="text-xs">
+                      <div>{formatDate(r.date)}</div>
+                      {r.createdAt && (
+                        <div className="text-xs text-slate-400">
+                          {new Date(r.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </div>
+                      )}
+                    </td>
                     <td><span className={`badge ${TYPE_COLORS[r.type]}`}>{FINANCE_TYPE_LABELS[r.type]}</span></td>
                     <td className="text-slate-500 text-xs">{r.category}</td>
                     <td className="font-medium text-slate-700 dark:text-slate-300">{r.description}</td>
@@ -518,7 +528,7 @@ function KeuanganOwner() {
         <div className="space-y-4">
           <div>
             <label className="label">Tipe *</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {FINANCE_TYPES.map(t => (
                 <button key={t} onClick={() => F('type', t)}
                   className={`py-2 rounded-xl text-xs font-semibold border transition ${form.type===t?'bg-primary-600 text-white border-primary-600':'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
@@ -535,7 +545,7 @@ function KeuanganOwner() {
             </select>
           </div>
           <div><label className="label">Deskripsi *</label><input className="input" value={form.description} onChange={e => F('description', e.target.value)} placeholder="Keterangan..." /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Nominal (Rp) *</label>
               <div className="relative">
@@ -548,17 +558,17 @@ function KeuanganOwner() {
             <div><label className="label">Tanggal</label><input className="input" type="date" value={form.date} onChange={e => F('date', e.target.value)} /></div>
           </div>
           {(form.type==='hutang'||form.type==='piutang') && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className="label">Nama Pihak</label><input className="input" value={form.relatedParty} onChange={e => F('relatedParty', e.target.value)} placeholder="Nama supplier/pelanggan" /></div>
               <div><label className="label">Jatuh Tempo</label><input className="input" type="date" value={form.dueDate} onChange={e => F('dueDate', e.target.value)} /></div>
-              <div className="col-span-2 flex items-center gap-2">
+              <div className="sm:col-span-2 flex items-center gap-2">
                 <input type="checkbox" id="isPaid" checked={form.isPaid} onChange={e => F('isPaid', e.target.checked)} className="rounded" />
                 <label htmlFor="isPaid" className="text-sm text-slate-700 dark:text-slate-300">Sudah Lunas</label>
               </div>
             </div>
           )}
         </div>
-        <div className="flex gap-3 mt-5">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-5">
           <button className="btn btn-outline flex-1" onClick={() => setShowModal(false)}>Batal</button>
           <button className="btn btn-primary flex-1" onClick={handleSave} disabled={saving}>{saving?'Menyimpan...':'Simpan'}</button>
         </div>
@@ -687,33 +697,33 @@ export default function KeuanganPage() {
   const F = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0 min-w-0">
       <PageHeader title="Keuangan" subtitle="Pembukuan pemasukan, pengeluaran, hutang & piutang"
         actions={
           <div className="flex gap-2">
-            {activeMainTab === 'keuangan' && <button className="btn btn-primary" onClick={openAdd}><Plus size={16} /> Catat Keuangan</button>}
+            {activeMainTab === 'keuangan' && <button className="btn btn-primary" onClick={openAdd}><Plus size={16} /> <span className="hidden sm:inline">Catat </span>Keuangan</button>}
             {activeMainTab === 'hutang' && <button className="btn btn-outline" onClick={loadHutang}><RefreshCw size={16} /> Refresh</button>}
           </div>
         }
       />
 
       {/* Main Tabs */}
-      <div className="flex gap-2 mb-4">
-        <button onClick={() => setActiveMainTab('keuangan')} className={`btn ${activeMainTab === 'keuangan' ? 'btn-primary' : 'btn-outline'}`}>
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 min-w-0 max-w-full">
+        <button onClick={() => setActiveMainTab('keuangan')} className={`btn flex-shrink-0 whitespace-nowrap ${activeMainTab === 'keuangan' ? 'btn-primary' : 'btn-outline'}`}>
           <DollarSign size={16} /> Keuangan
         </button>
-        <button onClick={() => setActiveMainTab('hutang')} className={`btn ${activeMainTab === 'hutang' ? 'btn-primary' : 'btn-outline'}`}>
+        <button onClick={() => setActiveMainTab('hutang')} className={`btn flex-shrink-0 whitespace-nowrap ${activeMainTab === 'hutang' ? 'btn-primary' : 'btn-outline'}`}>
           <CreditCard size={16} /> Hutang Pelanggan
         </button>
       </div>
 
       {/* Tab Hutang */}
       {activeMainTab === 'hutang' && (
-        <div className="animate-fade-in-up">
-          <div className="flex gap-2 mb-4">
-            <button onClick={() => setHutangFilter('hutang')} className={`btn ${hutangFilter === 'hutang' ? 'btn-danger' : 'btn-outline'} py-2`}>Belum Lunas</button>
-            <button onClick={() => setHutangFilter('lunas')} className={`btn ${hutangFilter === 'lunas' ? 'btn-success' : 'btn-outline'} py-2`}>Sudah Lunas</button>
-            <button onClick={() => setHutangFilter('')} className={`btn ${hutangFilter === '' ? 'btn-primary' : 'btn-outline'} py-2`}>Semua</button>
+        <div className="animate-fade-in-up min-w-0">
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap min-w-0 max-w-full">
+            <button onClick={() => setHutangFilter('hutang')} className={`btn ${hutangFilter === 'hutang' ? 'btn-danger' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>Belum Lunas</button>
+            <button onClick={() => setHutangFilter('lunas')} className={`btn ${hutangFilter === 'lunas' ? 'btn-success' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>Sudah Lunas</button>
+            <button onClick={() => setHutangFilter('')} className={`btn ${hutangFilter === '' ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>Semua</button>
           </div>
           {hutangLoading ? <Loader /> : (
             <div className="table-wrap">
@@ -755,19 +765,19 @@ export default function KeuanganPage() {
 
       {/* Tab Keuangan */}
       {activeMainTab === 'keuangan' && (
-        <div>
+        <div className="min-w-0">
           <BrankasSection isAdmin={isAdmin} cabangId={null} />
           {summary && (
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
               <StatCard title="Total Penjualan" value={formatRupiah(summary.salesRevenue)} icon={TrendingUp} color="blue" />
               <StatCard title="Total Pemasukan" value={formatRupiah(summary.totalIncome)} icon={DollarSign} color="green" />
               <StatCard title="Total Pengeluaran" value={formatRupiah(summary.totalExpense)} icon={TrendingDown} color="orange" />
               <StatCard title="Piutang Belum Lunas" value={formatRupiah(summary.totalReceivable)} icon={AlertCircle} color="red" />
             </div>
           )}
-          <div className="flex gap-2 mb-4 flex-wrap">
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap min-w-0 max-w-full">
             {['', ...FINANCE_TYPES].map(t => (
-              <button key={t} onClick={() => setTypeFilter(t)} className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2`}>
+              <button key={t} onClick={() => setTypeFilter(t)} className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>
                 {t ? FINANCE_TYPE_LABELS[t] : 'Semua'}
               </button>
             ))}
@@ -783,7 +793,14 @@ export default function KeuanganPage() {
                     ? <tr><td colSpan={8}><EmptyState message="Belum ada catatan keuangan" /></td></tr>
                     : records.map(r => (
                       <tr key={r._id}>
-                        <td className="text-xs">{formatDate(r.date)}</td>
+                        <td className="text-xs">
+                      <div>{formatDate(r.date)}</div>
+                      {r.createdAt && (
+                        <div className="text-xs text-slate-400">
+                          {new Date(r.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </div>
+                      )}
+                    </td>
                         <td><span className={`badge ${TYPE_COLORS[r.type]}`}>{FINANCE_TYPE_LABELS[r.type]}</span></td>
                         <td className="text-slate-500 text-xs">{r.category}</td>
                         <td className="font-medium text-slate-700">{r.description}</td>
@@ -823,7 +840,7 @@ export default function KeuanganPage() {
         <div className="space-y-4">
           <div>
             <label className="label">Tipe *</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {FINANCE_TYPES.map(t => (
                 <button key={t} onClick={() => F('type', t)}
                   className={`py-2 rounded-xl text-xs font-semibold border transition ${form.type === t ? 'bg-primary-600 text-white border-primary-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
@@ -840,7 +857,7 @@ export default function KeuanganPage() {
             </select>
           </div>
           <div><label className="label">Deskripsi *</label><input className="input" value={form.description} onChange={e => F('description', e.target.value)} placeholder="Keterangan..." /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Nominal (Rp) *</label>
               <div className="relative">
@@ -893,17 +910,17 @@ export default function KeuanganPage() {
             </div>
           )}
           {(form.type === 'hutang' || form.type === 'piutang') && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className="label">Nama Pihak</label><input className="input" value={form.relatedParty} onChange={e => F('relatedParty', e.target.value)} placeholder="Nama supplier/pelanggan" /></div>
               <div><label className="label">Jatuh Tempo</label><input className="input" type="date" value={form.dueDate} onChange={e => F('dueDate', e.target.value)} /></div>
-              <div className="col-span-2 flex items-center gap-2">
+              <div className="sm:col-span-2 flex items-center gap-2">
                 <input type="checkbox" id="isPaid" checked={form.isPaid} onChange={e => F('isPaid', e.target.checked)} className="rounded" />
                 <label htmlFor="isPaid" className="text-sm text-slate-700">Sudah Lunas</label>
               </div>
             </div>
           )}
         </div>
-        <div className="flex gap-3 mt-5">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-5">
           <button className="btn btn-outline flex-1" onClick={() => setShowModal(false)}>Batal</button>
           <button className="btn btn-primary flex-1" onClick={handleSave} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan'}</button>
         </div>
@@ -914,12 +931,12 @@ export default function KeuanganPage() {
 
       {/* Modal Bayar Hutang */}
       {showBayarModal && bayarTx && ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-3 sm:p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-slate-800 mb-1">Lunasi Hutang</h3>
-            <div className="bg-slate-50 rounded-xl p-3 mb-4">
-              <p className="text-xs text-slate-500">{bayarTx.invoiceNumber} · {bayarTx.customerName}</p>
-              <p className="text-xl font-black text-slate-800 mt-1">{formatRupiah(bayarTx.total)}</p>
+            <div className="bg-slate-50 rounded-xl p-3 mb-4 min-w-0">
+              <p className="text-xs text-slate-500 truncate">{bayarTx.invoiceNumber} · {bayarTx.customerName}</p>
+              <p className="text-lg sm:text-xl font-black text-slate-800 mt-1 break-all">{formatRupiah(bayarTx.total)}</p>
             </div>
             <div className="space-y-3">
               <div>
@@ -927,7 +944,7 @@ export default function KeuanganPage() {
                 <div className="grid grid-cols-3 gap-2">
                   {[["cash","💵 Tunai"],["transfer","🏦 Transfer"],["qris","📱 QRIS"]].map(([val, label]) => (
                     <button key={val} onClick={() => { setBayarMetode(val); setBayarAkunId(""); }}
-                      className={"py-2 rounded-xl text-xs font-semibold border transition " + (bayarMetode === val ? "bg-primary-600 text-white border-primary-600" : "border-slate-200 text-slate-600 hover:border-primary-300")}>
+                      className={"py-2 px-1 rounded-xl text-[11px] sm:text-xs font-semibold border transition whitespace-nowrap " + (bayarMetode === val ? "bg-primary-600 text-white border-primary-600" : "border-slate-200 text-slate-600 hover:border-primary-300")}>
                       {label}
                     </button>
                   ))}
@@ -945,7 +962,7 @@ export default function KeuanganPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-2 mt-4">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 mt-4">
               <button onClick={() => setShowBayarModal(false)} className="btn btn-outline flex-1">Batal</button>
               <button onClick={handleKonfirmasiBayar} disabled={!!bayarLoading}
                 className="btn btn-success flex-1 flex items-center justify-center gap-2">

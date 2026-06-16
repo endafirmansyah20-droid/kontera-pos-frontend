@@ -728,7 +728,7 @@ function LaporanServiceHP() {
 export function LaporanPage() {
   const [tab, setTab] = useState('utama');
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       <PageHeader
         title="Laporan"
         subtitle="Rekap laba rugi per bulan"
@@ -1015,7 +1015,7 @@ export function PelangganPage() {
   const totalPoin   = customers.reduce((s, c) => s + (c.points || 0), 0);
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       <PageHeader title="Pelanggan" subtitle="Data pelanggan & sistem poin member"
         actions={<button className="btn btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Pelanggan</button>}
       />
@@ -1326,7 +1326,7 @@ export function PengaturanPage() {
   if (!settings) return <Loader />;
 
   return (
-    <div className="animate-fade-in-up max-w-3xl">
+    <div className="animate-fade-in-up max-w-3xl pb-24 lg:pb-0">
       <PageHeader title="Pengaturan" subtitle="Konfigurasi toko & manajemen pengguna" />
 
       {/* Backup Database - SuperAdmin Only */}

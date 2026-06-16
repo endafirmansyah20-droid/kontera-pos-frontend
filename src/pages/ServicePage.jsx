@@ -218,17 +218,17 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         </div>
 
         {/* Total & Estimasi Keuntungan */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
-            <span className="text-sm font-semibold text-slate-600">Total Bayar Pelanggan</span>
-            <span className="text-lg font-bold text-primary-600">{formatRupiah(Number(form.serviceFee) || 0)}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-3 sm:px-4 py-3 gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-slate-600">Total Bayar Pelanggan</span>
+            <span className="text-base sm:text-lg font-bold text-primary-600 flex-shrink-0">{formatRupiah(Number(form.serviceFee) || 0)}</span>
           </div>
-          <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${
+          <div className={`flex items-center justify-between rounded-xl px-3 sm:px-4 py-3 gap-2 ${
             ((Number(form.serviceFee)||0) - (Number(form.partsCost)||0)) >= 0
               ? 'bg-green-50' : 'bg-red-50'
           }`}>
-            <span className="text-sm font-semibold text-slate-600">Estimasi Keuntungan</span>
-            <span className={`text-lg font-bold ${
+            <span className="text-xs sm:text-sm font-semibold text-slate-600">Estimasi Keuntungan</span>
+            <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${
               ((Number(form.serviceFee)||0) - (Number(form.partsCost)||0)) >= 0
                 ? 'text-green-600' : 'text-red-500'
             }`}>
@@ -250,7 +250,7 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
             <input className="input" type="date" value={form.estimatedDone} onChange={e => set('estimatedDone', e.target.value)} />
           </div>
           <div className="flex flex-col justify-end">
-            <label className="flex items-center gap-2 cursor-pointer mt-4">
+            <label className="flex items-center gap-2 cursor-pointer sm:mt-4">
               <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={form.isPaid} onChange={e => set('isPaid', e.target.checked)} />
               <span className="text-sm font-semibold text-slate-700">Sudah Lunas (Tunai)</span>
             </label>
@@ -263,9 +263,9 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
           <input className="input" placeholder="Catatan tambahan..." value={form.notes} onChange={e => set('notes', e.target.value)} />
         </div>
 
-        <div className="flex gap-2 justify-end pt-2">
-          <button className="btn btn-outline" onClick={onClose}>Batal</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2">
+          <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
             {saving ? 'Menyimpan...' : editData ? 'Simpan Perubahan' : 'Buat Servis'}
           </button>
         </div>
@@ -338,16 +338,16 @@ function ServiceDetailModal({ open, onClose, data, onEdit, onVoid, isAdmin }) {
 
         {data.notes && <p className="text-xs text-slate-400 italic">{data.notes}</p>}
 
-        <div className="flex gap-2 justify-end pt-2">
+        <div className="flex flex-wrap gap-2 justify-end pt-2">
           {isAdmin && !data.isVoid && (
-            <button className="btn btn-danger py-2 px-3 text-xs" onClick={onVoid}>
+            <button className="btn btn-danger py-2 px-3 text-xs flex-1 sm:flex-none" onClick={onVoid}>
               <Trash2 size={13} /> Void
             </button>
           )}
-          <button className="btn btn-outline py-2 px-3 text-xs" onClick={onEdit}>
+          <button className="btn btn-outline py-2 px-3 text-xs flex-1 sm:flex-none" onClick={onEdit}>
             <Edit2 size={13} /> Edit
           </button>
-          <button className="btn btn-outline py-2 px-3 text-xs" onClick={onClose}>Tutup</button>
+          <button className="btn btn-outline py-2 px-3 text-xs flex-1 sm:flex-none" onClick={onClose}>Tutup</button>
         </div>
       </div>
     </Modal>
@@ -610,10 +610,10 @@ function TabKeuangan({ isAdmin }) {
   };
 
   return (
-    <div>
+    <div className="min-w-0">
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
           {[
             { label: 'Kas Tunai Servis',  val: summary.omset,        color: 'blue',
               sub: 'Total bayar pelanggan masuk' },
@@ -630,10 +630,10 @@ function TabKeuangan({ isAdmin }) {
               red:    'bg-red-50 border-red-100 text-red-600',
             };
             return (
-              <div key={label} className={`rounded-xl border p-3 ${colorMap[color]}`}>
-                <p className="text-xs font-semibold text-slate-500 mb-1">{label}</p>
-                <p className="text-sm font-bold">{formatRupiah(val)}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+              <div key={label} className={`rounded-xl border p-3 min-w-0 ${colorMap[color]}`}>
+                <p className="text-xs font-semibold text-slate-500 mb-1 truncate">{label}</p>
+                <p className="text-sm font-bold truncate">{formatRupiah(val)}</p>
+                <p className="text-xs text-slate-400 mt-0.5 truncate">{sub}</p>
               </div>
             );
           })}
@@ -641,62 +641,99 @@ function TabKeuangan({ isAdmin }) {
       )}
 
       {/* Header + tombol tambah */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-2 mb-3">
         <h3 className="text-sm font-bold text-slate-700">Catatan Keuangan Servis</h3>
-        <button className="btn btn-primary py-2 px-3 text-xs" onClick={() => setModalOpen(true)}>
-          <Plus size={14} /> Tambah Catatan
+        <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={() => setModalOpen(true)}>
+          <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Catatan
         </button>
       </div>
 
       {loading ? <Loader /> : (
-        <div className="card">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Tipe</th>
-                  <th>Kategori</th>
-                  <th>Keterangan</th>
-                  <th className="text-right">Nominal</th>
-                  {isAdmin && <th></th>}
-                </tr>
-              </thead>
-              <tbody className="bg-white">
-                {finance.length === 0
-                  ? <tr><td colSpan={6}><EmptyState message="Belum ada catatan keuangan servis" /></td></tr>
-                  : finance.map(f => (
-                    <tr key={f._id}>
-                      <td className="text-xs text-slate-400">{formatDate(f.date)}</td>
-                      <td>
-                        <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'}`}>
-                          {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
-                        </span>
-                      </td>
-                      <td className="text-xs text-slate-500 capitalize">{f.category}</td>
-                      <td className="text-sm text-slate-700">{f.description}</td>
-                      <td className={`text-right font-bold text-sm ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
-                        {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
-                      </td>
-                      {isAdmin && (
+        <>
+          {/* Desktop / tablet — tabel */}
+          <div className="card hidden sm:block">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Tipe</th>
+                    <th>Kategori</th>
+                    <th>Keterangan</th>
+                    <th className="text-right">Nominal</th>
+                    {isAdmin && <th></th>}
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {finance.length === 0
+                    ? <tr><td colSpan={6}><EmptyState message="Belum ada catatan keuangan servis" /></td></tr>
+                    : finance.map(f => (
+                      <tr key={f._id}>
+                        <td className="text-xs text-slate-400">{formatDate(f.date)}</td>
                         <td>
-                          <div className="flex gap-1">
-                            <button onClick={() => handleEdit(f)} className="btn btn-outline py-1 px-2 text-xs text-blue-500">
-                              <Pencil size={12} />
-                            </button>
-                            <button onClick={() => setDelConfirm(f)} className="btn btn-outline py-1 px-2 text-xs text-red-500">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
+                          <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'}`}>
+                            {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                          </span>
                         </td>
-                      )}
-                    </tr>
-                  ))
-                }
-              </tbody>
-            </table>
+                        <td className="text-xs text-slate-500 capitalize">{f.category}</td>
+                        <td className="text-sm text-slate-700">{f.description}</td>
+                        <td className={`text-right font-bold text-sm ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
+                          {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
+                        </td>
+                        {isAdmin && (
+                          <td>
+                            <div className="flex gap-1">
+                              <button onClick={() => handleEdit(f)} className="btn btn-outline py-1 px-2 text-xs text-blue-500">
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => setDelConfirm(f)} className="btn btn-outline py-1 px-2 text-xs text-red-500">
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile — kartu */}
+          <div className="sm:hidden space-y-2">
+            {finance.length === 0
+              ? <div className="card"><EmptyState message="Belum ada catatan keuangan servis" /></div>
+              : finance.map(f => (
+                <div key={f._id} className="card !p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'} flex-shrink-0`}>
+                      {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                    </span>
+                    <p className="text-[11px] text-slate-400 flex-shrink-0">{formatDate(f.date)}</p>
+                  </div>
+                  <p className="text-sm text-slate-700 mb-0.5">{f.description}</p>
+                  <p className="text-[11px] text-slate-500 capitalize mb-2">Kategori: {f.category}</p>
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <span className={`font-bold text-base ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
+                      {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
+                    </span>
+                    {isAdmin && (
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => handleEdit(f)} className="btn btn-outline py-1.5 px-2.5 text-xs text-blue-500">
+                          <Pencil size={13} />
+                        </button>
+                        <button onClick={() => setDelConfirm(f)} className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </>
       )}
 
       {/* Modal tambah catatan */}
@@ -731,9 +768,9 @@ function TabKeuangan({ isAdmin }) {
             <label className="label">Tanggal</label>
             <input className="input" type="date" value={form.date} onChange={e => setF('date', e.target.value)} />
           </div>
-          <div className="flex gap-2 justify-end pt-1">
-            <button className="btn btn-outline" onClick={() => setModalOpen(false)}>Batal</button>
-            <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+            <button className="btn btn-outline w-full sm:w-auto" onClick={() => setModalOpen(false)}>Batal</button>
+            <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
               {saving ? 'Menyimpan...' : editData ? 'Update' : 'Simpan'}
             </button>
           </div>
@@ -777,8 +814,8 @@ function TabArsip() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="card">
+    <div className="space-y-5 min-w-0">
+      <div className="card min-w-0">
         <h3 className="font-bold text-slate-800 mb-1">📦 Arsip Transaksi Service</h3>
         <p className="text-xs text-slate-400 mb-4">Transaksi bulan-bulan sebelumnya — otomatis tersimpan saat berganti bulan</p>
         {loading ? <Loader /> : arsipList.length === 0 ? (
@@ -787,15 +824,15 @@ function TabArsip() {
           <div className="space-y-3">
             {arsipList.map(a => (
               <div key={`${a.bulan}-${a.tahun}`}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+                className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition cursor-pointer"
                 onClick={() => loadDetail(a.bulan, a.tahun)}>
-                <div>
-                  <p className="font-bold text-slate-800">{a.label}</p>
-                  <p className="text-xs text-slate-400">{a.jumlahTx} transaksi</p>
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-800 text-sm sm:text-base truncate">{a.label}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400">{a.jumlahTx} transaksi</p>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-green-600">{formatRupiah(a.laba)}</p>
-                  <p className="text-xs text-slate-400">Laba Kotor</p>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-bold text-green-600 text-sm sm:text-base">{formatRupiah(a.laba)}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Laba Kotor</p>
                 </div>
               </div>
             ))}
@@ -808,25 +845,27 @@ function TabArsip() {
         <Modal open={!!detail} onClose={() => setDetail(null)} title={`Arsip ${detail.label}`} size="lg">
           {loadingD ? <Loader /> : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
                 <div className="card py-3 text-center bg-blue-50">
-                  <p className="text-xs text-slate-400">Omset</p>
-                  <p className="font-bold text-blue-600 text-sm">{formatRupiah(detail.omset)}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Omset</p>
+                  <p className="font-bold text-blue-600 text-xs sm:text-sm">{formatRupiah(detail.omset)}</p>
                 </div>
                 <div className="card py-3 text-center bg-green-50">
-                  <p className="text-xs text-slate-400">Laba Kotor</p>
-                  <p className="font-bold text-green-600 text-sm">{formatRupiah(detail.laba)}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Laba Kotor</p>
+                  <p className="font-bold text-green-600 text-xs sm:text-sm">{formatRupiah(detail.laba)}</p>
                 </div>
                 <div className="card py-3 text-center bg-red-50">
-                  <p className="text-xs text-slate-400">Pengeluaran</p>
-                  <p className="font-bold text-red-500 text-sm">{formatRupiah(detail.totalExpense)}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Pengeluaran</p>
+                  <p className="font-bold text-red-500 text-xs sm:text-sm">{formatRupiah(detail.totalExpense)}</p>
                 </div>
                 <div className="card py-3 text-center bg-purple-50">
-                  <p className="text-xs text-slate-400">Laba Bersih</p>
-                  <p className={`font-bold text-sm ${detail.labaBersih >= 0 ? 'text-purple-600' : 'text-red-500'}`}>{formatRupiah(detail.labaBersih)}</p>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Laba Bersih</p>
+                  <p className={`font-bold text-xs sm:text-sm ${detail.labaBersih >= 0 ? 'text-purple-600' : 'text-red-500'}`}>{formatRupiah(detail.labaBersih)}</p>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+
+              {/* Desktop / tablet — tabel */}
+              <div className="overflow-x-auto hidden sm:block">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b">
                     <th className="text-left py-2">Invoice</th>
@@ -850,6 +889,24 @@ function TabArsip() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile — kartu */}
+              <div className="sm:hidden space-y-2">
+                {(detail.transactions || []).map(t => (
+                  <div key={t._id} className="p-3 bg-slate-50 rounded-xl">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <code className="text-xs font-mono text-slate-500 truncate">{t.invoiceNumber}</code>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${t.status === 'diambil' ? 'bg-green-100 text-green-700' : t.status === 'batal' ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-700'}`}>{t.status}</span>
+                    </div>
+                    <p className="font-semibold text-sm text-slate-700 truncate">{t.customerName}</p>
+                    <p className="text-[11px] text-slate-500 mb-2 truncate">{t.deviceBrand} {t.deviceModel}</p>
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                      <p className="text-[11px]">{t.isPaid ? '✅ Lunas' : '⏳ Belum'}</p>
+                      <p className="font-bold text-sm">{formatRupiah(t.totalCost)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </Modal>
@@ -866,7 +923,7 @@ export default function ServicePage() {
   const [tab, setTab] = useState('transaksi');
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up min-w-0 pb-24 lg:pb-0">
       <PageHeader
         title="Service HP"
         subtitle="Manajemen servis & keuangan bengkel HP"
@@ -875,26 +932,28 @@ export default function ServicePage() {
             <button className="btn btn-primary" onClick={() => {
               window.dispatchEvent(new CustomEvent('service:new'));
             }}>
-              <Plus size={16} /> Input Servis
+              <Plus size={16} /> <span className="hidden sm:inline">Input </span>Servis
             </button>
           )
         }
       />
 
       {/* Tab bar */}
-      <div className="flex gap-1 mb-5 bg-slate-100 p-1 rounded-xl w-fit">
-        {[
-          { key: 'transaksi', label: 'Transaksi Servis', icon: Wrench },
-          { key: 'keuangan',  label: 'Keuangan Servis',  icon: DollarSign },
-          { key: 'arsip',     label: 'Arsip',             icon: Archive },
-        ].map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              tab === key ? 'bg-white shadow-sm text-primary-700' : 'text-slate-500 hover:text-slate-700'
-            }`}>
-            <Icon size={15} /> {label}
-          </button>
-        ))}
+      <div className="bg-slate-100 p-1 rounded-xl mb-5 overflow-x-auto sm:w-fit">
+        <div className="flex gap-1 w-max sm:w-auto">
+          {[
+            { key: 'transaksi', label: 'Transaksi Servis', icon: Wrench },
+            { key: 'keuangan',  label: 'Keuangan Servis',  icon: DollarSign },
+            { key: 'arsip',     label: 'Arsip',             icon: Archive },
+          ].map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                tab === key ? 'bg-white shadow-sm text-primary-700' : 'text-slate-500 hover:text-slate-700'
+              }`}>
+              <Icon size={15} /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'transaksi' && <TabTransaksiWithRef isAdmin={isAdmin} />}
@@ -966,111 +1025,162 @@ function TabTransaksiWithRef({ isAdmin }) {
   const sc = summary?.statusCount || {};
 
   return (
-    <div>
+    <div className="min-w-0">
       {summary && (
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
-          <div className="card py-3 text-center">
-            <p className="text-xs text-slate-400">Omset (Lunas)</p>
-            <p className="font-bold text-blue-600 text-sm">{formatRupiah(summary.omsetMurni)}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
+          <div className="card py-3 px-2 text-center min-w-0">
+            <p className="text-[11px] sm:text-xs text-slate-400 truncate">Omset (Lunas)</p>
+            <p className="font-bold text-blue-600 text-xs sm:text-sm truncate">{formatRupiah(summary.omsetMurni)}</p>
           </div>
-          <div className="card py-3 text-center">
-            <p className="text-xs text-slate-400">Laba Kotor</p>
-            <p className="font-bold text-green-600 text-sm">{formatRupiah(summary.labaKotor)}</p>
+          <div className="card py-3 px-2 text-center min-w-0">
+            <p className="text-[11px] sm:text-xs text-slate-400 truncate">Laba Kotor</p>
+            <p className="font-bold text-green-600 text-xs sm:text-sm truncate">{formatRupiah(summary.labaKotor)}</p>
           </div>
-          <div className="card py-3 text-center border-yellow-100 bg-yellow-50">
-            <p className="text-xs text-yellow-500">Antrian</p>
-            <p className="font-bold text-yellow-700 text-sm">{sc.antrian || 0} unit</p>
+          <div className="card py-3 px-2 text-center border-yellow-100 bg-yellow-50 min-w-0">
+            <p className="text-[11px] sm:text-xs text-yellow-500 truncate">Antrian</p>
+            <p className="font-bold text-yellow-700 text-xs sm:text-sm truncate">{sc.antrian || 0} unit</p>
           </div>
-          <div className="card py-3 text-center border-blue-100 bg-blue-50">
-            <p className="text-xs text-blue-500">Proses</p>
-            <p className="font-bold text-blue-700 text-sm">{sc.proses || 0} unit</p>
+          <div className="card py-3 px-2 text-center border-blue-100 bg-blue-50 min-w-0">
+            <p className="text-[11px] sm:text-xs text-blue-500 truncate">Proses</p>
+            <p className="font-bold text-blue-700 text-xs sm:text-sm truncate">{sc.proses || 0} unit</p>
           </div>
-          <div className="card py-3 text-center border-emerald-100 bg-emerald-50">
-            <p className="text-xs text-emerald-500">Selesai</p>
-            <p className="font-bold text-emerald-700 text-sm">{sc.selesai || 0} unit</p>
+          <div className="card py-3 px-2 text-center border-emerald-100 bg-emerald-50 min-w-0">
+            <p className="text-[11px] sm:text-xs text-emerald-500 truncate">Selesai</p>
+            <p className="font-bold text-emerald-700 text-xs sm:text-sm truncate">{sc.selesai || 0} unit</p>
           </div>
-          <div className="card py-3 text-center border-slate-100 bg-slate-50">
-            <p className="text-xs text-slate-500">Diambil</p>
-            <p className="font-bold text-slate-600 text-sm">{sc.diambil || 0} unit</p>
+          <div className="card py-3 px-2 text-center border-slate-100 bg-slate-50 min-w-0">
+            <p className="text-[11px] sm:text-xs text-slate-500 truncate">Diambil</p>
+            <p className="font-bold text-slate-600 text-xs sm:text-sm truncate">{sc.diambil || 0} unit</p>
           </div>
         </div>
       )}
 
-      <div className="card mb-4 flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[180px]">
+      <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
+        <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input className="input pl-9" placeholder="Cari nama, HP, merk, invoice..." value={search}
             onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap min-w-0 max-w-full">
           {[{ key: '', label: 'Semua' }, ...STATUS_LIST].map(s => (
             <button key={s.key} onClick={() => setStatusFilter(s.key)}
-              className={`btn py-1.5 px-3 text-xs ${statusFilter === s.key ? 'btn-primary' : 'btn-outline'}`}>
+              className={`btn py-1.5 px-3 text-xs flex-shrink-0 whitespace-nowrap ${statusFilter === s.key ? 'btn-primary' : 'btn-outline'}`}>
               {s.label}
             </button>
           ))}
+          <button className="btn btn-outline py-2 px-3 flex-shrink-0 sm:hidden" onClick={load}><RefreshCw size={14} /></button>
         </div>
-        <button className="btn btn-outline py-2 px-3" onClick={load}><RefreshCw size={14} /></button>
+        <button className="btn btn-outline py-2 px-3 hidden sm:inline-flex" onClick={load}><RefreshCw size={14} /></button>
       </div>
 
       {loading ? <Loader /> : (
-        <div className="card">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Invoice</th>
-                  <th>Pelanggan</th>
-                  <th>HP</th>
-                  <th>Keluhan</th>
-                  <th>Sparepart</th>
-                  <th>Biaya Service</th>
-                  <th>Keuntungan</th>
-                  <th>Status</th>
-                  <th>Bayar</th>
-                  <th>Tgl Masuk</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white">
-                {data.length === 0
-                  ? <tr><td colSpan={11}><EmptyState message="Belum ada data servis" /></td></tr>
-                  : data.map(d => (
-                    <tr key={d._id} className={d.isVoid ? 'opacity-40' : ''}>
-                      <td><code className="text-xs font-mono text-primary-600">{d.invoiceNumber}</code></td>
-                      <td>
-                        <p className="font-semibold text-slate-700 text-sm">{d.customerName}</p>
-                        {d.customerPhone && <p className="text-xs text-slate-400">{d.customerPhone}</p>}
-                      </td>
-                      <td className="text-sm text-slate-600">{d.deviceBrand} {d.deviceModel}</td>
-                      <td className="text-sm max-w-[160px] truncate text-slate-600" title={d.complaint}>{d.complaint}</td>
-                      <td className="text-sm">{formatRupiah(d.partsCost)}</td>
-                      <td className="text-sm">{formatRupiah(d.serviceFee)}</td>
-                      <td className={(d.profit||0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>{formatRupiah(d.profit||0)}</td>
-                      <td>
-                        {!d.isVoid ? (
-                          <select value={d.status} onChange={e => handleStatusQuick(d._id, e.target.value)}
-                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer">
-                            {STATUS_LIST.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                          </select>
-                        ) : <StatusBadge status={d.status} />}
-                      </td>
-                      <td>
-                        <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                          {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                        </span>
-                      </td>
-                      <td className="text-xs text-slate-400">{formatDate(d.receivedAt)}</td>
-                      <td>
-                        <button onClick={() => openDetail(d)} className="btn btn-outline py-1 px-2 text-xs">Detail</button>
-                      </td>
-                    </tr>
-                  ))
-                }
-              </tbody>
-            </table>
+        <>
+          {/* Desktop / tablet — tabel */}
+          <div className="card hidden sm:block">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Pelanggan</th>
+                    <th>HP</th>
+                    <th>Keluhan</th>
+                    <th>Sparepart</th>
+                    <th>Biaya Service</th>
+                    <th>Keuntungan</th>
+                    <th>Status</th>
+                    <th>Bayar</th>
+                    <th>Tgl Masuk</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {data.length === 0
+                    ? <tr><td colSpan={11}><EmptyState message="Belum ada data servis" /></td></tr>
+                    : data.map(d => (
+                      <tr key={d._id} className={d.isVoid ? 'opacity-40' : ''}>
+                        <td><code className="text-xs font-mono text-primary-600">{d.invoiceNumber}</code></td>
+                        <td>
+                          <p className="font-semibold text-slate-700 text-sm">{d.customerName}</p>
+                          {d.customerPhone && <p className="text-xs text-slate-400">{d.customerPhone}</p>}
+                        </td>
+                        <td className="text-sm text-slate-600">{d.deviceBrand} {d.deviceModel}</td>
+                        <td className="text-sm max-w-[160px] truncate text-slate-600" title={d.complaint}>{d.complaint}</td>
+                        <td className="text-sm">{formatRupiah(d.partsCost)}</td>
+                        <td className="text-sm">{formatRupiah(d.serviceFee)}</td>
+                        <td className={(d.profit||0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>{formatRupiah(d.profit||0)}</td>
+                        <td>
+                          {!d.isVoid ? (
+                            <select value={d.status} onChange={e => handleStatusQuick(d._id, e.target.value)}
+                              className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer">
+                              {STATUS_LIST.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                            </select>
+                          ) : <StatusBadge status={d.status} />}
+                        </td>
+                        <td>
+                          <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                            {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                          </span>
+                        </td>
+                        <td className="text-xs text-slate-400">{formatDate(d.receivedAt)}</td>
+                        <td>
+                          <button onClick={() => openDetail(d)} className="btn btn-outline py-1 px-2 text-xs">Detail</button>
+                        </td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile — kartu */}
+          <div className="sm:hidden space-y-2">
+            {data.length === 0
+              ? <div className="card"><EmptyState message="Belum ada data servis" /></div>
+              : data.map(d => (
+                <div key={d._id} className={`card !p-3 ${d.isVoid ? 'opacity-50' : ''}`}>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
+                    <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                      {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="font-semibold text-sm text-slate-700 truncate flex-1">{d.customerName}</p>
+                    {!d.isVoid ? (
+                      <select value={d.status} onChange={e => handleStatusQuick(d._id, e.target.value)}
+                        className="text-[11px] border border-slate-200 rounded-lg px-2 py-1 bg-white cursor-pointer flex-shrink-0">
+                        {STATUS_LIST.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      </select>
+                    ) : <StatusBadge status={d.status} />}
+                  </div>
+                  {d.customerPhone && <p className="text-[11px] text-slate-400 mb-1">{d.customerPhone}</p>}
+                  <p className="text-xs text-slate-600 mb-1">{d.deviceBrand} {d.deviceModel}</p>
+                  <p className="text-xs text-slate-500 line-clamp-2 mb-2" title={d.complaint}>{d.complaint}</p>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                    <div>
+                      <p className="text-[10px] text-slate-400">Sparepart</p>
+                      <p className="text-[11px] font-semibold">{formatRupiah(d.partsCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Service</p>
+                      <p className="text-[11px] font-semibold">{formatRupiah(d.serviceFee)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Untung</p>
+                      <p className={`text-[11px] font-bold ${(d.profit||0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatRupiah(d.profit||0)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-slate-100">
+                    <p className="text-[11px] text-slate-400">{formatDate(d.receivedAt)}</p>
+                    <button onClick={() => openDetail(d)} className="btn btn-outline py-1.5 px-3 text-xs">Detail</button>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </>
       )}
 
       <ServiceFormModal open={modalOpen} onClose={() => setModalOpen(false)} onSaved={load} editData={editData} />

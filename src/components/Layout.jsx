@@ -94,8 +94,8 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen dark:bg-slate-900 flex transition-colors duration-200">
       <Sidebar lowStockCount={lowStockCount} />
-      <main className="flex-1 lg:ml-60 min-h-screen">
-        <div className="p-4 lg:p-6 max-w-screen-2xl mx-auto mobile-pb lg:pb-6">
+      <main className="flex-1 lg:ml-60 min-h-screen min-w-0 max-w-full overflow-x-hidden mobile-pt lg:pt-0">
+        <div className="p-4 lg:p-6 max-w-screen-2xl mx-auto mobile-pb lg:pb-6 min-w-0">
           {children}
         </div>
       </main>

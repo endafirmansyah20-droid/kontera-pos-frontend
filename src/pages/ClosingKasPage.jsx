@@ -27,42 +27,53 @@ const TotalSelisihCard = ({ kasSummary }) => {
   const allMinus = kasSummary?.totalCashMinus || 0;
 
   return (
-    <div className="card mb-4 p-4">
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 text-xs">
+    <div className="card mb-4 p-4 min-w-0">
+      <div className="hidden sm:flex items-center gap-2 mb-2 pb-2 border-b border-slate-100 text-xs">
         <span className="w-48 flex-shrink-0 text-slate-400 font-bold uppercase tracking-wide">Keterangan</span>
         <span className="flex-1 text-right text-green-500 font-bold">Cash Plus ⬆️</span>
         <span className="flex-1 text-right text-red-400 font-bold">Cash Minus ⬇️</span>
       </div>
 
-      <div className="flex items-center gap-2 py-1.5 border-b border-slate-50 text-xs">
-        <span className="w-48 flex-shrink-0 text-slate-500">🧾 Selisih Cash & Stok (Bulan Ini)</span>
-        <span className="flex-1 text-right text-green-600 font-semibold">+{formatRupiah(allPlus)}</span>
-        <span className="flex-1 text-right text-red-500 font-semibold">-{formatRupiah(allMinus)}</span>
+      {/* Mobile: stacked rows / Desktop: aligned columns */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 py-1.5 border-b border-slate-50 text-xs gap-1">
+        <span className="sm:w-48 sm:flex-shrink-0 text-slate-500 font-semibold sm:font-normal">🧾 Selisih Cash & Stok (Bulan Ini)</span>
+        <div className="flex sm:contents gap-2 justify-between">
+          <span className="sm:flex-1 sm:text-right text-green-600 font-semibold">
+            <span className="sm:hidden text-[10px] text-green-400 font-normal block">Cash Plus ⬆️</span>
+            +{formatRupiah(allPlus)}
+          </span>
+          <span className="sm:flex-1 sm:text-right text-red-500 font-semibold">
+            <span className="sm:hidden text-[10px] text-red-300 font-normal block">Cash Minus ⬇️</span>
+            -{formatRupiah(allMinus)}
+          </span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 pt-2 mt-1 border-t-2 border-slate-200 text-xs">
-        <span className="w-48 flex-shrink-0 text-slate-700 font-black">🧮 Total Kumulatif</span>
-        <span className="flex-1 text-right text-green-700 font-black text-sm">+{formatRupiah(allPlus)}</span>
-        <span className="flex-1 text-right text-red-600 font-black text-sm">-{formatRupiah(allMinus)}</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 pt-2 mt-1 border-t-2 border-slate-200 text-xs gap-1">
+        <span className="sm:w-48 sm:flex-shrink-0 text-slate-700 font-black">🧮 Total Kumulatif</span>
+        <div className="flex sm:contents gap-2 justify-between">
+          <span className="sm:flex-1 sm:text-right text-green-700 font-black text-sm">+{formatRupiah(allPlus)}</span>
+          <span className="sm:flex-1 sm:text-right text-red-600 font-black text-sm">-{formatRupiah(allMinus)}</span>
+        </div>
       </div>
 
       {allPlus > 0 && (
-        <div className="mt-3 p-3 bg-green-50 rounded-xl flex items-center justify-between">
-          <div>
+        <div className="mt-3 p-3 bg-green-50 rounded-xl flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-green-700">💰 Uang Plus Menunggu Setor</p>
             <p className="text-xs text-green-500">Setor saat Closing Produk berikutnya</p>
           </div>
-          <p className="text-base font-black text-green-700">+{formatRupiah(allPlus)}</p>
+          <p className="text-sm sm:text-base font-black text-green-700 flex-shrink-0">+{formatRupiah(allPlus)}</p>
         </div>
       )}
 
       {allMinus > 0 && (
-        <div className="mt-2 p-3 bg-red-50 rounded-xl flex items-center justify-between">
-          <div>
+        <div className="mt-2 p-3 bg-red-50 rounded-xl flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-red-600">⚠️ Total Cash Minus Bulan Ini</p>
             <p className="text-xs text-red-400">Reset setiap akhir bulan (tutup buku)</p>
           </div>
-          <p className="text-base font-black text-red-600">-{formatRupiah(allMinus)}</p>
+          <p className="text-sm sm:text-base font-black text-red-600 flex-shrink-0">-{formatRupiah(allMinus)}</p>
         </div>
       )}
     </div>
@@ -70,23 +81,23 @@ const TotalSelisihCard = ({ kasSummary }) => {
 };
 
 const CashPlusMinusCard = ({ cashPlus = 0, cashMinus = 0, netCash = 0, label = '' }) => (
-  <div className="rounded-xl border border-slate-100 bg-white p-4">
+  <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4 min-w-0">
     {label && <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">{label}</p>}
-    <div className="grid grid-cols-3 gap-3">
-      <div className="bg-green-50 rounded-xl p-3 text-center">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+      <div className="bg-green-50 rounded-xl p-3 text-center min-w-0">
         <p className="text-xs text-green-600 font-bold mb-0.5">Cash Plus ⬆️</p>
-        <p className="text-xs text-green-400 mb-1.5">Selisih Lebih</p>
-        <p className="text-sm font-black text-green-700">{formatRupiah(cashPlus)}</p>
+        <p className="text-[11px] sm:text-xs text-green-400 mb-1.5">Selisih Lebih</p>
+        <p className="text-sm font-black text-green-700 truncate">{formatRupiah(cashPlus)}</p>
       </div>
-      <div className="bg-red-50 rounded-xl p-3 text-center">
+      <div className="bg-red-50 rounded-xl p-3 text-center min-w-0">
         <p className="text-xs text-red-500 font-bold mb-0.5">Cash Minus ⬇️</p>
-        <p className="text-xs text-red-300 mb-1.5">Selisih Kurang</p>
-        <p className="text-sm font-black text-red-600">{formatRupiah(cashMinus)}</p>
+        <p className="text-[11px] sm:text-xs text-red-300 mb-1.5">Selisih Kurang</p>
+        <p className="text-sm font-black text-red-600 truncate">{formatRupiah(cashMinus)}</p>
       </div>
-      <div className={`rounded-xl p-3 text-center ${netCash >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
+      <div className={`rounded-xl p-3 text-center min-w-0 ${netCash >= 0 ? 'bg-blue-50' : 'bg-orange-50'}`}>
         <p className={`text-xs font-bold mb-0.5 ${netCash >= 0 ? 'text-blue-600' : 'text-orange-500'}`}>Net Selisih</p>
-        <p className={`text-xs mb-1.5 ${netCash >= 0 ? 'text-blue-300' : 'text-orange-300'}`}>{netCash >= 0 ? 'Untung' : 'Rugi'}</p>
-        <p className={`text-sm font-black ${netCash >= 0 ? 'text-blue-700' : 'text-orange-600'}`}>
+        <p className={`text-[11px] sm:text-xs mb-1.5 ${netCash >= 0 ? 'text-blue-300' : 'text-orange-300'}`}>{netCash >= 0 ? 'Untung' : 'Rugi'}</p>
+        <p className={`text-sm font-black truncate ${netCash >= 0 ? 'text-blue-700' : 'text-orange-600'}`}>
           {netCash > 0 ? '+' : ''}{formatRupiah(netCash)}
         </p>
       </div>
@@ -292,7 +303,7 @@ const [resetting, setResetting] = useState(false);
   const filteredRiwayat = filterType === 'semua' ? riwayat : riwayat.filter(r => r.type === filterType || (!r.type && filterType === 'cash'));
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up min-w-0 pb-24 lg:pb-0">
       <PageHeader title="Closing" subtitle="Closing kas harian, stok produk, dan riwayat" />
 
       <TotalSelisihCard kasSummary={kasSummary} />
@@ -301,31 +312,33 @@ const [resetting, setResetting] = useState(false);
       {isAdmin && (
         <div className="flex justify-end mb-2">
           <button onClick={() => setShowResetMinus(true)}
-            className="btn btn-outline py-1.5 text-xs text-red-500 border-red-200 hover:bg-red-50">
-            🗓️ Reset Cash Minus (Tutup Buku)
+            className="btn btn-outline py-1.5 px-3 text-xs text-red-500 border-red-200 hover:bg-red-50">
+            🗓️ <span className="hidden sm:inline">Reset Cash Minus </span>(Tutup Buku)
           </button>
         </div>
       )}
 
-      <div className="flex gap-0 mb-6 border-b border-slate-100">
-        {[
-          { id: 'cash',    label: 'Closing Cash',    icon: Calculator },
-          { id: 'produk',  label: 'Closing Produk',  icon: Package },
-          { id: 'riwayat', label: 'Riwayat Closing', icon: History },
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition -mb-px ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-              <Icon size={15} /> {tab.label}
-            </button>
-          );
-        })}
+      <div className="border-b border-slate-100 mb-6 overflow-x-auto">
+        <div className="flex gap-0 w-max sm:w-auto">
+          {[
+            { id: 'cash',    label: 'Closing Cash',    icon: Calculator },
+            { id: 'produk',  label: 'Closing Produk',  icon: Package },
+            { id: 'riwayat', label: 'Riwayat Closing', icon: History },
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3 sm:px-5 py-3 text-xs sm:text-sm font-semibold border-b-2 transition -mb-px whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+                <Icon size={15} /> {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {activeTab === 'cash' && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 min-w-0">
+          <div className="space-y-4 min-w-0">
             <div className="card">
               <h3 className="font-bold text-slate-700 text-sm mb-3">Tanggal & Shift</h3>
               <div className="grid grid-cols-2 gap-3">
@@ -371,9 +384,9 @@ const [resetting, setResetting] = useState(false);
     </div>
   </div>
 
-  <div className="mt-4 pt-4 border-t-2 border-slate-200 flex justify-between items-center">
-    <span className="text-base font-bold text-slate-700">Total Uang Fisik</span>
-    <span className="text-xl font-black text-blue-600">{formatRupiah(totalFisik)}</span>
+  <div className="mt-4 pt-4 border-t-2 border-slate-200 flex justify-between items-center gap-2">
+    <span className="text-sm sm:text-base font-bold text-slate-700">Total Uang Fisik</span>
+    <span className="text-lg sm:text-xl font-black text-blue-600 truncate">{formatRupiah(totalFisik)}</span>
   </div>
 </div>
 
@@ -384,8 +397,8 @@ const [resetting, setResetting] = useState(false);
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="card">
+          <div className="space-y-4 min-w-0">
+            <div className="card min-w-0">
               <h3 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
                 <DollarSign size={16} className="text-green-600" /> Ringkasan Sistem
               </h3>
@@ -460,61 +473,61 @@ const [resetting, setResetting] = useState(false);
       )}
 
       {activeTab === 'produk' && (
-        <div>
-          <div className="card mb-4">
+        <div className="min-w-0">
+          <div className="card mb-4 min-w-0">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between mb-3">
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-bold text-slate-700 text-sm">Hitung Stok Fisik Produk</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Isi stok fisik → sistem otomatis update & hitung nilai selisih</p>
               </div>
-              <div className="flex gap-2 items-center">
-                <select className="input w-32" value={shiftProduk} onChange={e => setShiftProduk(e.target.value)}>
+              <div className="flex gap-2 items-center w-full sm:w-auto">
+                <select className="input flex-1 sm:w-32 sm:flex-none" value={shiftProduk} onChange={e => setShiftProduk(e.target.value)}>
                   <option value="full">Full Day</option>
                   <option value="pagi">Pagi</option>
                   <option value="siang">Siang</option>
                   <option value="malam">Malam</option>
                 </select>
-                {/* Input Uang Plus Setor */}
-
-  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-  <div className="flex items-center justify-between mb-2">
-    <div>
-      <p className="text-xs font-bold text-green-700">💰 Setor Uang Plus ke Kas Tunai</p>
-      <p className="text-xs text-green-500">
-        Uang Plus terkumpul: <span className="font-bold">{formatRupiah(kasSummary?.totalCashPlus || 0)}</span>
-      </p>
-    </div>
-    {(kasSummary?.totalCashPlus || 0) > 0 && (
-      <span className="badge badge-green text-xs">Ada {formatRupiah(kasSummary?.totalCashPlus || 0)}</span>
-    )}
-  </div>
-  <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold select-none pointer-events-none">Rp</span>
-    <input
-      className="input pl-10 border-green-300 focus:ring-green-400"
-      type="text"
-      inputMode="numeric"
-      placeholder="0 — isi jika mau setor uang plus"
-      value={uangPlusSetor ? Number(uangPlusSetor).toLocaleString('id-ID') : ''}
-      onChange={e => {
-        const raw = e.target.value.replace(/\D/g, '');
-        setUangPlusSetor(raw);
-      }}
-    />
-  </div>
-  {uangPlusSetor && parseInt(uangPlusSetor) > 0 && (
-    <div className="mt-2 text-xs text-green-700 bg-green-100 rounded-lg p-2">
-      ✅ <span className="font-bold">Rp {parseInt(uangPlusSetor).toLocaleString('id-ID')}</span> akan masuk ke Kas Tunai &amp; Cash Plus direset sebesar nominal yang disetor
-    </div>
-  )}
-</div>
                 <button onClick={() => {
                   if (selisihProduk.length === 0) return toast.error('Belum ada produk yang dihitung!');
                   setShowProdukConfirm(true);
-                }} className="btn btn-primary whitespace-nowrap">
-                  <Package size={16} /> Simpan Closing
+                }} className="btn btn-primary whitespace-nowrap flex-shrink-0">
+                  <Package size={16} /> <span className="hidden sm:inline">Simpan </span>Closing
                 </button>
               </div>
+            </div>
+
+            {/* Input Uang Plus Setor */}
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-green-700">💰 Setor Uang Plus ke Kas Tunai</p>
+                  <p className="text-xs text-green-500">
+                    Uang Plus terkumpul: <span className="font-bold">{formatRupiah(kasSummary?.totalCashPlus || 0)}</span>
+                  </p>
+                </div>
+                {(kasSummary?.totalCashPlus || 0) > 0 && (
+                  <span className="badge badge-green text-xs flex-shrink-0 self-start sm:self-auto">Ada {formatRupiah(kasSummary?.totalCashPlus || 0)}</span>
+                )}
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold select-none pointer-events-none">Rp</span>
+                <input
+                  className="input pl-10 border-green-300 focus:ring-green-400"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0 — isi jika mau setor uang plus"
+                  value={uangPlusSetor ? Number(uangPlusSetor).toLocaleString('id-ID') : ''}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    setUangPlusSetor(raw);
+                  }}
+                />
+              </div>
+              {uangPlusSetor && parseInt(uangPlusSetor) > 0 && (
+                <div className="mt-2 text-xs text-green-700 bg-green-100 rounded-lg p-2">
+                  ✅ <span className="font-bold">Rp {parseInt(uangPlusSetor).toLocaleString('id-ID')}</span> akan masuk ke Kas Tunai &amp; Cash Plus direset sebesar nominal yang disetor
+                </div>
+              )}
             </div>
 
             {selisihProduk.length > 0 && (
@@ -522,25 +535,25 @@ const [resetting, setResetting] = useState(false);
             )}
 
             {selisihProduk.length > 0 && (cashPlusProduk > 0 || cashMinusProduk > 0) && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {cashPlusProduk > 0 && (
-                  <div className="bg-green-50 rounded-xl p-3">
+                  <div className="bg-green-50 rounded-xl p-3 min-w-0">
                     <p className="text-xs font-bold text-green-600 mb-2">Stok Lebih (Cash Plus):</p>
                     {selisihProduk.filter(p => p.selisih > 0).map(p => (
                       <div key={p._id} className="text-xs text-green-700 mb-1">
-                        <p className="font-semibold">{p.name}</p>
-                        <p>+{p.selisih} × {formatRupiah(p.sellPrice)} = <span className="font-bold">{formatRupiah(p.nilaiSelisih)}</span></p>
+                        <p className="font-semibold break-words">{p.name}</p>
+                        <p className="break-words">+{p.selisih} × {formatRupiah(p.sellPrice)} = <span className="font-bold">{formatRupiah(p.nilaiSelisih)}</span></p>
                       </div>
                     ))}
                   </div>
                 )}
                 {cashMinusProduk > 0 && (
-                  <div className="bg-red-50 rounded-xl p-3">
+                  <div className="bg-red-50 rounded-xl p-3 min-w-0">
                     <p className="text-xs font-bold text-red-500 mb-2">Stok Kurang (Cash Minus):</p>
                     {selisihProduk.filter(p => p.selisih < 0).map(p => (
                       <div key={p._id} className="text-xs text-red-600 mb-1">
-                        <p className="font-semibold">{p.name}</p>
-                        <p>{p.selisih} × {formatRupiah(p.sellPrice)} = <span className="font-bold">-{formatRupiah(Math.abs(p.nilaiSelisih))}</span></p>
+                        <p className="font-semibold break-words">{p.name}</p>
+                        <p className="break-words">{p.selisih} × {formatRupiah(p.sellPrice)} = <span className="font-bold">-{formatRupiah(Math.abs(p.nilaiSelisih))}</span></p>
                       </div>
                     ))}
                   </div>
@@ -605,10 +618,10 @@ const [resetting, setResetting] = useState(false);
       )}
 
       {activeTab === 'riwayat' && (
-        <div>
+        <div className="min-w-0">
           <div className="flex gap-2 mb-4 flex-wrap">
             {[{ id: 'semua', label: 'Semua' }, { id: 'cash', label: '💵 Cash' }, { id: 'produk', label: '📦 Produk' }].map(f => (
-              <button key={f.id} onClick={() => setFilterType(f.id)} className={`btn ${filterType === f.id ? 'btn-primary' : 'btn-outline'} py-2`}>{f.label}</button>
+              <button key={f.id} onClick={() => setFilterType(f.id)} className={`btn ${filterType === f.id ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm`}>{f.label}</button>
             ))}
           </div>
           {riwayatLoading ? <Loader /> : (
@@ -732,12 +745,12 @@ const [resetting, setResetting] = useState(false);
 
       <Modal open={showDetail} onClose={() => setShowDetail(false)} title="Detail Closing" size="lg">
         {selectedClosing && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><p className="text-xs text-slate-400">Tanggal</p><p className="font-medium">{formatDateTime(selectedClosing.createdAt)}</p></div>
-              <div><p className="text-xs text-slate-400">Tipe</p><span className={`badge ${!selectedClosing.type || selectedClosing.type === 'cash' ? 'badge-blue' : 'badge-purple'}`}>{!selectedClosing.type || selectedClosing.type === 'cash' ? '💵 Cash' : '📦 Produk'}</span></div>
-              <div><p className="text-xs text-slate-400">Shift</p><span className="badge badge-gray capitalize">{selectedClosing.shift}</span></div>
-              <div><p className="text-xs text-slate-400">Kasir</p><p className="font-medium">{selectedClosing.createdByName}</p></div>
+          <div className="space-y-4 min-w-0">
+            <div className="grid grid-cols-2 gap-3 text-sm min-w-0">
+              <div className="min-w-0"><p className="text-xs text-slate-400">Tanggal</p><p className="font-medium text-xs sm:text-sm break-words">{formatDateTime(selectedClosing.createdAt)}</p></div>
+              <div className="min-w-0"><p className="text-xs text-slate-400">Tipe</p><span className={`badge ${!selectedClosing.type || selectedClosing.type === 'cash' ? 'badge-blue' : 'badge-purple'}`}>{!selectedClosing.type || selectedClosing.type === 'cash' ? '💵 Cash' : '📦 Produk'}</span></div>
+              <div className="min-w-0"><p className="text-xs text-slate-400">Shift</p><span className="badge badge-gray capitalize">{selectedClosing.shift}</span></div>
+              <div className="min-w-0"><p className="text-xs text-slate-400">Kasir</p><p className="font-medium truncate">{selectedClosing.createdByName}</p></div>
             </div>
             <CashPlusMinusCard label={`Selisih ${selectedClosing.type === 'produk' ? 'Stok' : 'Cash'}`} cashPlus={selectedClosing.cashPlus || 0} cashMinus={selectedClosing.cashMinus || 0} netCash={selectedClosing.netCash || 0} />
             {(!selectedClosing.type || selectedClosing.type === 'cash') && (
@@ -757,14 +770,14 @@ const [resetting, setResetting] = useState(false);
                 </div>
                 <div className="mt-3">
                   <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wide mb-2">Detail Pecahan</h4>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                     {PECAHAN.map(p => {
                       const j = selectedClosing.uangFisik?.[p.key] || 0;
                       if (!j) return null;
                       return (
-                        <div key={p.key} className="flex justify-between text-xs py-1.5 px-2 bg-white rounded-lg">
-                          <span className="text-slate-500">{p.label} × {j}</span>
-                          <span className="font-semibold">{formatRupiah(j * p.nilai)}</span>
+                        <div key={p.key} className="flex justify-between items-center gap-2 text-xs py-1.5 px-2 bg-white rounded-lg">
+                          <span className="text-slate-500 truncate">{p.label} × {j}</span>
+                          <span className="font-semibold flex-shrink-0">{formatRupiah(j * p.nilai)}</span>
                         </div>
                       );
                     })}

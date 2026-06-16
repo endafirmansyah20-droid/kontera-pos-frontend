@@ -293,7 +293,7 @@ export default function SaldoPage() {
   );
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
       <PageHeader
         title="Mutasi Saldo"
         subtitle="Kelola saldo semua akun — server pulsa, bank, e-wallet"

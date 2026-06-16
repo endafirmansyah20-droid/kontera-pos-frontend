@@ -74,20 +74,21 @@ export function StatCard({ title, value, subtitle, icon: Icon, color = 'blue', t
   };
   const c = colors[color] || colors.blue;
   return (
-    <div className="card hover:shadow-card-hover transition-shadow duration-200">
+    <div className="card hover:shadow-card-hover transition-shadow duration-200 !p-3 sm:!p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1 truncate">{title}</p>
-          <p className="text-lg sm:text-2xl font-bold text-slate-800 leading-tight break-all">{value}</p>
-          {subtitle && <p className="text-xs text-slate-400 mt-1 truncate">{subtitle}</p>}
+          <p className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1 leading-tight">{title}</p>
+          <p className="text-base sm:text-2xl font-bold text-slate-800 leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{value}</p>
+          {subtitle && <p className="text-[10px] sm:text-xs text-slate-400 mt-1 truncate">{subtitle}</p>}
           {trend !== undefined && (
             <p className={`text-xs font-semibold mt-2 ${trend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
               {trend >= 0 ? '↑' : '↓'} {Math.abs(trend).toFixed(1)}% vs kemarin
             </p>
           )}
         </div>
-        <div className={`p-2.5 sm:p-3 rounded-xl ${c.bg} border ${c.border} shrink-0`}>
-          <Icon size={18} className={c.icon} />
+        <div className={`p-2 sm:p-3 rounded-xl ${c.bg} border ${c.border} shrink-0`}>
+          <Icon size={16} className={`sm:hidden ${c.icon}`} />
+          <Icon size={18} className={`hidden sm:block ${c.icon}`} />
         </div>
       </div>
     </div>
@@ -117,12 +118,12 @@ export function Loader({ size = 'md' }) {
 // ─── PageHeader ───────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-800">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-400 mt-0.5">{subtitle}</p>}
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-3 mb-6">
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{title}</h1>
+        {subtitle && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-1 sm:mb-0">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">{actions}</div>}
     </div>
   );
 }
