@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import ReactDOM from 'react-dom';
 import { productAPI, transactionAPI, settingsAPI, saldoAPI, customerAPI, pointAPI } from '../services/api';
 import { formatRupiah, formatDateTime, PAYMENT_LABELS, PAYMENT_COLORS } from '../utils/helpers';
 import { Modal, EmptyState, ReceiptView, PageHeader, Loader, SearchInput } from '../components/UI';
@@ -428,6 +429,11 @@ export default function TransaksiPage() {
   const [akunTransfer, setAkunTransfer] = useState('');
   const [akunQris, setAkunQris] = useState('');
   const [kasTunai, setKasTunai] = useState(0);
+
+  // Mobile bottom sheet keranjang
+  const [showMobileCart, setShowMobileCart] = useState(false);
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const sheetDragStartY = useRef(null);
 
   // Riwayat
   const [transactions, setTransactions] = useState([]);
@@ -883,6 +889,261 @@ export default function TransaksiPage() {
     setDaftarForm({ name: '', phone: '', address: '' });
   };
 
+  // Tutup bottom sheet otomatis saat keranjang kosong (mis. setelah checkout)
+  useEffect(() => {
+    if (cart.length === 0 && showMobileCart) setShowMobileCart(false);
+  }, [cart.length, showMobileCart]);
+
+  // Swipe-down untuk dismiss bottom sheet
+  const handleSheetTouchStart = (e) => {
+    sheetDragStartY.current = e.touches[0].clientY;
+    setSheetDragY(0);
+  };
+  const handleSheetTouchMove = (e) => {
+    if (sheetDragStartY.current === null) return;
+    const dy = e.touches[0].clientY - sheetDragStartY.current;
+    if (dy > 0) setSheetDragY(dy);
+  };
+  const handleSheetTouchEnd = () => {
+    if (sheetDragY > 80) setShowMobileCart(false);
+    setSheetDragY(0);
+    sheetDragStartY.current = null;
+  };
+
+  // Hitung jumlah qty per productId di keranjang (untuk badge di kartu produk fisik)
+  const cartQtyByProduct = cart.reduce((m, item) => {
+    if (item.productId) m[item.productId] = (m[item.productId] || 0) + item.quantity;
+    return m;
+  }, {});
+  const totalCartQty = cart.reduce((s, i) => s + i.quantity, 0);
+
+  // ── Bagian keranjang dipecah agar desktop & mobile bisa pakai layout berbeda
+  //    Desktop: header | items(scroll) | form+bayar
+  //    Mobile : header | items+form(scroll) | bayar(pinned)
+  const renderCartHeader = () => (
+    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center gap-2">
+        <ShoppingCart size={16} className="text-blue-600" />
+        <span className="font-bold text-sm">Keranjang</span>
+        {cart.length > 0 && <span className="badge badge-blue">{cart.length}</span>}
+      </div>
+      {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-red-500 py-1 px-2 -my-1 -mr-2">Kosongkan</button>}
+    </div>
+  );
+
+  const renderCartItems = () => (
+    cart.length === 0
+      ? <EmptyState message="Tambahkan produk ke keranjang" icon={ShoppingCart} />
+      : cart.map((item, idx) => (
+        <div key={item.productId || idx} className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+          <div className="flex justify-between items-start mb-1 gap-2">
+            <p className="text-xs sm:text-sm font-bold text-slate-700 flex-1 leading-tight break-words">{item.productName}</p>
+            <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 flex-shrink-0 p-1 -m-1"><X size={16} /></button>
+          </div>
+          {item.type === 'jasa' && <span className="badge badge-green text-xs mb-1">Jasa</span>}
+          {item.sumberDana && <p className="text-xs text-blue-500 mb-0.5 truncate">{item.sumberDanaIcon} {item.sumberDanaLabel}</p>}
+          {item.targetNumber && <p className="text-xs text-slate-400 mb-1 truncate">→ {item.targetNumber}</p>}
+          <div className="flex items-center justify-between mt-1 gap-2">
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => updateQty(idx, -1)} className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95"><Minus size={14} /></button>
+              <span className="text-sm font-bold text-slate-700 w-7 text-center">{item.quantity}</span>
+              <button onClick={() => updateQty(idx, 1)} className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95"><Plus size={14} /></button>
+            </div>
+            <p className="text-sm font-bold text-blue-600 text-right">{formatRupiah(item.subtotal)}</p>
+          </div>
+        </div>
+      ))
+  );
+
+  const renderCartForm = () => (
+    <>
+        {selectedMember && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-yellow-700">⭐ {selectedMember.name}</p>
+                <p className="text-xs text-yellow-600">{selectedMember.points?.toLocaleString("id-ID") || 0} poin tersedia</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {selectedMember.isMember && selectedMember.points > 0 && !redeemDiskon && (
+                  <button onClick={() => setShowRedeemInput(r => !r)}
+                    className="btn btn-outline py-1 px-2 text-xs text-yellow-600 border-yellow-300">
+                    🎁 Tukar Poin
+                  </button>
+                )}
+                {redeemDiskon > 0 && (
+                  <button onClick={cancelRedeem}
+                    className="btn btn-outline py-1 px-2 text-xs text-red-500 border-red-300">
+                    ✕ Batal Redeem
+                  </button>
+                )}
+                <button onClick={clearMember} className="text-yellow-400 hover:text-red-400 text-lg leading-none">&times;</button>
+              </div>
+            </div>
+            {showRedeemInput && (
+              <div className="mt-2 pt-2 border-t border-yellow-200">
+                <p className="text-xs text-yellow-600 mb-1.5">Masukkan jumlah poin yang ingin ditukar:</p>
+                <div className="flex gap-1.5">
+                  <input className="input text-xs py-1.5 flex-1" type="text" inputMode="numeric"
+                    placeholder={`Maks ${selectedMember.points?.toLocaleString("id-ID")} poin`}
+                    value={redeemPoints}
+                    onChange={e => setRedeemPoints(e.target.value.replace(/\D/g, ""))}
+                  />
+                  <button onClick={applyRedeem} disabled={redeemLoading}
+                    className="btn btn-primary py-1.5 px-3 text-xs">
+                    {redeemLoading ? "..." : "Terapkan"}
+                  </button>
+                </div>
+                {redeemPoints && parseInt(redeemPoints) > 0 && (
+                  <p className="text-xs text-green-600 font-bold mt-1">
+                    = diskon {formatRupiah(parseInt(redeemPoints) * (settings?.pointSettings?.rupiahPerPoint || 10))}
+                  </p>
+                )}
+              </div>
+            )}
+            {redeemDiskon > 0 && (
+              <p className="text-xs text-green-700 font-bold mt-1.5">✅ Redeem aktif: diskon {formatRupiah(redeemDiskon)}</p>
+            )}
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row gap-1.5">
+          <div className="relative flex-1 min-w-0">
+            <input className="input text-sm sm:text-xs py-2 sm:py-1.5 w-full"
+              placeholder={selectedMember ? selectedMember.name : "Cari member / nama pelanggan..."}
+              value={memberSearch}
+              onChange={e => searchMember(e.target.value)}
+              onFocus={() => setShowMemberDropdown(true)}
+              onBlur={() => setTimeout(() => setShowMemberDropdown(false), 200)}
+            />
+            {showMemberDropdown && (memberResults.length > 0 || memberSearch) && (
+              <div className="absolute top-full left-0 right-0 z-50 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 overflow-hidden">
+                {memberSearchLoading && <div className="px-3 py-2 text-xs text-slate-400">Mencari...</div>}
+                {memberResults.map(m => (
+                  <button key={m._id} onMouseDown={() => selectMember(m)}
+                    className="w-full px-3 py-2 text-left hover:bg-yellow-50 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">{m.name}</p>
+                      <p className="text-xs text-slate-400">{m.phone || "-"}</p>
+                    </div>
+                    <div className="text-right">
+                      {m.isMember
+                        ? <span className="text-xs font-bold text-yellow-600">⭐ {m.points?.toLocaleString("id-ID")} poin</span>
+                        : <span className="text-xs text-slate-400">Bukan member</span>}
+                    </div>
+                  </button>
+                ))}
+                {memberSearch && (
+                  <button onMouseDown={() => { setCustomerName(memberSearch); setShowMemberDropdown(false); }}
+                    className="w-full px-3 py-2 text-left hover:bg-slate-50 border-t">
+                    <p className="text-xs text-slate-500">Pakai nama "<span className="font-bold">{memberSearch}</span>" (tanpa member)</p>
+                  </button>
+                )}
+                <button onMouseDown={() => { setShowDaftarMember(true); setShowMemberDropdown(false); setDaftarForm(f => ({...f, name: memberSearch, phone: '', address: ''})); }}
+                  className="w-full px-3 py-2 text-left hover:bg-green-50 border-t flex items-center gap-2">
+                  <span className="text-green-600 font-bold text-xs">+ Daftar Member Baru</span>
+                </button>
+              </div>
+            )}
+            {showDaftarMember && (
+              <div className="mt-1.5 bg-green-50 border border-green-200 rounded-xl p-2.5 space-y-1.5">
+                <p className="text-xs font-bold text-green-700">+ Daftar Member Baru</p>
+                <input className="input text-xs py-1.5" placeholder="Nama *"
+                  value={daftarForm.name} onChange={e => setDaftarForm(f=>({...f,name:e.target.value}))} />
+                <input className="input text-xs py-1.5" placeholder="No. WhatsApp"
+                  value={daftarForm.phone} onChange={e => setDaftarForm(f=>({...f,phone:e.target.value}))} />
+                <input className="input text-xs py-1.5" placeholder="Alamat (opsional)"
+                  value={daftarForm.address} onChange={e => setDaftarForm(f=>({...f,address:e.target.value}))} />
+                <div className="flex gap-1.5">
+                  <button onClick={() => { setShowDaftarMember(false); setDaftarForm({name:'',phone:'',address:''}); }}
+                    className="btn btn-outline py-1 px-2 text-xs flex-1">Batal</button>
+                  <button onClick={handleDaftarMember} disabled={daftarLoading}
+                    className="btn btn-primary py-1 px-2 text-xs flex-1">
+                    {daftarLoading ? '...'  : 'Daftar & Pilih'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="relative w-full sm:w-28 flex-shrink-0">
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold select-none pointer-events-none">Rp</span>
+            <input className="input text-sm sm:text-xs py-2 sm:py-1.5 pl-7 w-full" placeholder="Diskon"
+              value={formatDisp(discount)}
+              onChange={e => setDiscount(e.target.value.replace(/\D/g, ''))}
+              inputMode="numeric" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-1.5">
+          {PAYMENT_METHODS.map(k => (
+            <button key={k} onClick={() => setPaymentMethod(k)}
+              className={`py-2.5 sm:py-2 rounded-lg text-xs font-semibold transition border ${paymentMethod === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+              {PAYMENT_LABELS[k]}
+            </button>
+          ))}
+        </div>
+
+        {(paymentMethod === 'transfer' || paymentMethod === 'qris') && (
+          <div>
+            <label className="label text-xs">{paymentMethod === 'transfer' ? '🏦 Transfer masuk ke' : '📱 QRIS masuk ke'}</label>
+            <select className="input text-sm"
+              value={paymentMethod === 'transfer' ? akunTransfer : akunQris}
+              onChange={e => paymentMethod === 'transfer' ? setAkunTransfer(e.target.value) : setAkunQris(e.target.value)}>
+              <option value="">-- Pilih Akun --</option>
+              {['Bank', 'E-Wallet', 'Server Pulsa', 'Tunai'].map(g => {
+                const group = saldos.filter(s => s.group === g);
+                if (!group.length) return null;
+                return (
+                  <optgroup key={g} label={g}>
+                    {group.map(s => <option key={s.akunId} value={s.akunId}>{s.icon} {s.namaAkun}</option>)}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </div>
+        )}
+
+        {paymentMethod === 'cash' && (
+          <div>
+            <div className="relative mb-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold select-none pointer-events-none">Rp</span>
+              <input ref={amountPaidRef} className="input pl-10 text-sm" placeholder="Jumlah bayar (F6)"
+                value={formatDisp(amountPaid)}
+                onChange={e => setAmountPaid(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric" />
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[total, 50000, 100000].map(v => (
+                <button key={v} onClick={() => setAmountPaid(String(v))}
+                  className="py-2 sm:py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 active:scale-95">
+                  {v === total ? 'Pas' : `${v / 1000}rb`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="bg-slate-50 rounded-xl p-2.5 text-xs space-y-1">
+          <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
+          {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Diskon</span><span>-{formatRupiah(discountAmt)}</span></div>}
+          <div className="flex justify-between font-bold text-sm pt-1 border-t border-slate-200">
+            <span>Total</span><span className="text-blue-600">{formatRupiah(total)}</span>
+          </div>
+          {paymentMethod === 'cash' && amountPaid && (
+            <div className={`flex justify-between font-semibold ${change < 0 ? 'text-red-500' : 'text-green-600'}`}>
+              <span>Kembalian</span><span>{formatRupiah(change)}</span>
+            </div>
+          )}
+        </div>
+    </>
+  );
+
+  const renderBayarButton = () => (
+    <button onClick={handleCheckout} disabled={loading || cart.length === 0} className="btn btn-primary w-full justify-center py-3" title="Shortcut: F9">
+      {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+      {loading ? 'Memproses...' : `Bayar ${formatRupiah(total)}`}
+    </button>
+  );
+
   return (
     <div className="animate-fade-in-up">
       {/* Marquee motivasi — dikontrol dari Pengaturan */}
@@ -974,10 +1235,11 @@ export default function TransaksiPage() {
 
       {/* ══ KASIR ══ */}
       {activeMainTab === 'kasir' && (
-        <div className="flex flex-col lg:flex-row gap-3 lg:h-[calc(100vh-200px)] pb-24 lg:pb-0">
+        <>
+        <div className="flex flex-col lg:flex-row lg:items-start gap-3 pb-32 lg:pb-0">
 
-          {/* Kiri */}
-          <div className="flex-1 flex flex-col card p-0 lg:overflow-hidden min-h-[55vh] lg:min-h-0">
+          {/* Kiri — height menyesuaikan konten di mobile; desktop dibatasi viewport agar produk scroll internal */}
+          <div className="flex-1 min-w-0 flex flex-col card p-0 lg:max-h-[calc(100vh-2rem)] lg:overflow-hidden">
             {/* Tabs */}
             <div className="flex border-b border-slate-100 flex-shrink-0">
               <button onClick={() => setActiveTab('fisik')}
@@ -1012,13 +1274,19 @@ export default function TransaksiPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-2.5">
                     {fisikProducts.map(p => {
                       const out = p.stock <= 0;
+                      const cartQty = cartQtyByProduct[p._id] || 0;
                       return (
                         <button key={p._id} onClick={() => !out && addToCart(p)} disabled={out}
-                          className={`relative p-2.5 sm:p-3 rounded-xl border text-left transition-all min-h-[88px] ${out ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-blue-400 hover:bg-blue-50 active:scale-95'}`}>
-                          <p className="text-xs font-bold text-slate-700 leading-tight mb-1 pr-8 line-clamp-2">{p.name}</p>
+                          className={`relative p-2.5 sm:p-3 rounded-xl border text-left transition-all min-h-[88px] ${out ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-blue-400 hover:bg-blue-50 active:scale-95'} ${cartQty > 0 ? 'border-emerald-300 ring-1 ring-emerald-200' : ''}`}>
+                          <p className="text-xs font-bold text-slate-700 leading-tight mb-1 pl-8 pr-8 line-clamp-2">{p.name}</p>
                           <p className="text-[10px] sm:text-xs text-slate-400 font-mono truncate">{p.code}</p>
                           <p className="text-sm font-bold text-blue-600 mt-1.5 sm:mt-2">{formatRupiah(p.sellPrice)}</p>
-                          <span className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 badge text-xs ${p.stock <= (p.minStock || 5) ? 'badge-red' : 'badge-green'}`}>{p.stock}</span>
+                          <span className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 badge text-xs ${p.stock <= (p.minStock || 5) ? 'badge-red' : 'badge-green'}`}>{p.stock}</span>
+                          {cartQty > 0 && (
+                            <span className="absolute top-1 right-1 min-w-[22px] h-[22px] px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md ring-2 ring-white z-10">
+                              {cartQty}
+                            </span>
+                          )}
                           {out && <span className="absolute inset-0 rounded-xl flex items-center justify-center bg-slate-100/80 text-xs font-bold text-red-500">HABIS</span>}
                         </button>
                       );
@@ -1124,234 +1392,79 @@ export default function TransaksiPage() {
             )}
           </div>
 
-          {/* Kanan: Keranjang */}
-          <div className="w-full lg:w-72 xl:w-80 flex flex-col card p-0 lg:overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <ShoppingCart size={16} className="text-blue-600" />
-                <span className="font-bold text-sm">Keranjang</span>
-                {cart.length > 0 && <span className="badge badge-blue">{cart.length}</span>}
-              </div>
-              {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-red-500 py-1 px-2 -my-1 -mr-2">Kosongkan</button>}
+          {/* Kanan: Keranjang (desktop only — sticky agar tidak ikut scroll. Mobile pakai bottom sheet) */}
+          <div className="hidden lg:flex lg:w-72 xl:w-80 lg:flex-col card p-0 lg:overflow-hidden lg:sticky lg:top-4 lg:self-start lg:h-[calc(100vh-2rem)]">
+            {renderCartHeader()}
+            <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
+              {renderCartItems()}
             </div>
-
-            <div className="flex-1 lg:overflow-y-auto p-2 space-y-2 max-h-[40vh] lg:max-h-none overflow-y-auto">
-              {cart.length === 0
-                ? <EmptyState message="Tambahkan produk ke keranjang" icon={ShoppingCart} />
-                : cart.map((item, idx) => (
-                  <div key={item.productId || idx} className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                    <div className="flex justify-between items-start mb-1 gap-2">
-                      <p className="text-xs sm:text-sm font-bold text-slate-700 flex-1 leading-tight break-words">{item.productName}</p>
-                      <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 flex-shrink-0 p-1 -m-1"><X size={16} /></button>
-                    </div>
-                    {item.type === 'jasa' && <span className="badge badge-green text-xs mb-1">Jasa</span>}
-                    {item.sumberDana && <p className="text-xs text-blue-500 mb-0.5 truncate">{item.sumberDanaIcon} {item.sumberDanaLabel}</p>}
-                    {item.targetNumber && <p className="text-xs text-slate-400 mb-1 truncate">→ {item.targetNumber}</p>}
-                    <div className="flex items-center justify-between mt-1 gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => updateQty(idx, -1)} className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95"><Minus size={14} /></button>
-                        <span className="text-sm font-bold text-slate-700 w-7 text-center">{item.quantity}</span>
-                        <button onClick={() => updateQty(idx, 1)} className="w-8 h-8 sm:w-7 sm:h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:scale-95"><Plus size={14} /></button>
-                      </div>
-                      <p className="text-sm font-bold text-blue-600 text-right">{formatRupiah(item.subtotal)}</p>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-
-            <div className="border-t border-slate-100 p-3 space-y-2">
-              {/* Info member terpilih */}
-              {selectedMember && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-yellow-700">⭐ {selectedMember.name}</p>
-                      <p className="text-xs text-yellow-600">{selectedMember.points?.toLocaleString("id-ID") || 0} poin tersedia</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {selectedMember.isMember && selectedMember.points > 0 && !redeemDiskon && (
-                        <button onClick={() => setShowRedeemInput(r => !r)}
-                          className="btn btn-outline py-1 px-2 text-xs text-yellow-600 border-yellow-300">
-                          🎁 Tukar Poin
-                        </button>
-                      )}
-                      {redeemDiskon > 0 && (
-                        <button onClick={cancelRedeem}
-                          className="btn btn-outline py-1 px-2 text-xs text-red-500 border-red-300">
-                          ✕ Batal Redeem
-                        </button>
-                      )}
-                      <button onClick={clearMember} className="text-yellow-400 hover:text-red-400 text-lg leading-none">&times;</button>
-                    </div>
-                  </div>
-                  {/* Input redeem poin */}
-                  {showRedeemInput && (
-                    <div className="mt-2 pt-2 border-t border-yellow-200">
-                      <p className="text-xs text-yellow-600 mb-1.5">Masukkan jumlah poin yang ingin ditukar:</p>
-                      <div className="flex gap-1.5">
-                        <input className="input text-xs py-1.5 flex-1" type="text" inputMode="numeric"
-                          placeholder={`Maks ${selectedMember.points?.toLocaleString("id-ID")} poin`}
-                          value={redeemPoints}
-                          onChange={e => setRedeemPoints(e.target.value.replace(/\D/g, ""))}
-                        />
-                        <button onClick={applyRedeem} disabled={redeemLoading}
-                          className="btn btn-primary py-1.5 px-3 text-xs">
-                          {redeemLoading ? "..." : "Terapkan"}
-                        </button>
-                      </div>
-                      {redeemPoints && parseInt(redeemPoints) > 0 && (
-                        <p className="text-xs text-green-600 font-bold mt-1">
-                          = diskon {formatRupiah(parseInt(redeemPoints) * (settings?.pointSettings?.rupiahPerPoint || 10))}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {redeemDiskon > 0 && (
-                    <p className="text-xs text-green-700 font-bold mt-1.5">✅ Redeem aktif: diskon {formatRupiah(redeemDiskon)}</p>
-                  )}
-                </div>
-              )}
-              <div className="flex flex-col sm:flex-row gap-1.5">
-                <div className="relative flex-1 min-w-0">
-                  <input className="input text-sm sm:text-xs py-2 sm:py-1.5 w-full"
-                    placeholder={selectedMember ? selectedMember.name : "Cari member / nama pelanggan..."}
-                    value={memberSearch}
-                    onChange={e => searchMember(e.target.value)}
-                    onFocus={() => setShowMemberDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowMemberDropdown(false), 200)}
-                  />
-                  {/* Dropdown hasil search */}
-                  {showMemberDropdown && (memberResults.length > 0 || memberSearch) && (
-                    <div className="absolute top-full left-0 right-0 z-50 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 overflow-hidden">
-                      {memberSearchLoading && <div className="px-3 py-2 text-xs text-slate-400">Mencari...</div>}
-                      {memberResults.map(m => (
-                        <button key={m._id} onMouseDown={() => selectMember(m)}
-                          className="w-full px-3 py-2 text-left hover:bg-yellow-50 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-bold text-slate-700">{m.name}</p>
-                            <p className="text-xs text-slate-400">{m.phone || "-"}</p>
-                          </div>
-                          <div className="text-right">
-                            {m.isMember
-                              ? <span className="text-xs font-bold text-yellow-600">⭐ {m.points?.toLocaleString("id-ID")} poin</span>
-                              : <span className="text-xs text-slate-400">Bukan member</span>}
-                          </div>
-                        </button>
-                      ))}
-                      {/* Opsi input manual */}
-                      {memberSearch && (
-                        <button onMouseDown={() => { setCustomerName(memberSearch); setShowMemberDropdown(false); }}
-                          className="w-full px-3 py-2 text-left hover:bg-slate-50 border-t">
-                          <p className="text-xs text-slate-500">Pakai nama "<span className="font-bold">{memberSearch}</span>" (tanpa member)</p>
-                        </button>
-                      )}
-                      {/* Daftar member baru */}
-                      <button onMouseDown={() => { setShowDaftarMember(true); setShowMemberDropdown(false); setDaftarForm(f => ({...f, name: memberSearch, phone: '', address: ''})); }}
-                        className="w-full px-3 py-2 text-left hover:bg-green-50 border-t flex items-center gap-2">
-                        <span className="text-green-600 font-bold text-xs">+ Daftar Member Baru</span>
-                      </button>
-                    </div>
-                  )}
-                  {/* Form daftar member baru - inline compact */}
-                  {showDaftarMember && (
-                    <div className="mt-1.5 bg-green-50 border border-green-200 rounded-xl p-2.5 space-y-1.5">
-                      <p className="text-xs font-bold text-green-700">+ Daftar Member Baru</p>
-                      <input className="input text-xs py-1.5" placeholder="Nama *"
-                        value={daftarForm.name} onChange={e => setDaftarForm(f=>({...f,name:e.target.value}))} />
-                      <input className="input text-xs py-1.5" placeholder="No. WhatsApp"
-                        value={daftarForm.phone} onChange={e => setDaftarForm(f=>({...f,phone:e.target.value}))} />
-                      <input className="input text-xs py-1.5" placeholder="Alamat (opsional)"
-                        value={daftarForm.address} onChange={e => setDaftarForm(f=>({...f,address:e.target.value}))} />
-                      <div className="flex gap-1.5">
-                        <button onClick={() => { setShowDaftarMember(false); setDaftarForm({name:'',phone:'',address:''}); }}
-                          className="btn btn-outline py-1 px-2 text-xs flex-1">Batal</button>
-                        <button onClick={handleDaftarMember} disabled={daftarLoading}
-                          className="btn btn-primary py-1 px-2 text-xs flex-1">
-                          {daftarLoading ? '...'  : 'Daftar & Pilih'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="relative w-full sm:w-28 flex-shrink-0">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold select-none pointer-events-none">Rp</span>
-                  <input className="input text-sm sm:text-xs py-2 sm:py-1.5 pl-7 w-full" placeholder="Diskon"
-                    value={formatDisp(discount)}
-                    onChange={e => setDiscount(e.target.value.replace(/\D/g, ''))}
-                    inputMode="numeric" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-1.5">
-                {PAYMENT_METHODS.map(k => (
-                  <button key={k} onClick={() => setPaymentMethod(k)}
-                    className={`py-2.5 sm:py-2 rounded-lg text-xs font-semibold transition border ${paymentMethod === k ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                    {PAYMENT_LABELS[k]}
-                  </button>
-                ))}
-              </div>
-
-              {(paymentMethod === 'transfer' || paymentMethod === 'qris') && (
-                <div>
-                  <label className="label text-xs">{paymentMethod === 'transfer' ? '🏦 Transfer masuk ke' : '📱 QRIS masuk ke'}</label>
-                  <select className="input text-sm"
-                    value={paymentMethod === 'transfer' ? akunTransfer : akunQris}
-                    onChange={e => paymentMethod === 'transfer' ? setAkunTransfer(e.target.value) : setAkunQris(e.target.value)}>
-                    <option value="">-- Pilih Akun --</option>
-                    {['Bank', 'E-Wallet', 'Server Pulsa', 'Tunai'].map(g => {
-                      const group = saldos.filter(s => s.group === g);
-                      if (!group.length) return null;
-                      return (
-                        <optgroup key={g} label={g}>
-                          {group.map(s => <option key={s.akunId} value={s.akunId}>{s.icon} {s.namaAkun}</option>)}
-                        </optgroup>
-                      );
-                    })}
-                  </select>
-                </div>
-              )}
-
-              {paymentMethod === 'cash' && (
-                <div>
-                  <div className="relative mb-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold select-none pointer-events-none">Rp</span>
-                    <input ref={amountPaidRef} className="input pl-10 text-sm" placeholder="Jumlah bayar (F6)"
-                      value={formatDisp(amountPaid)}
-                      onChange={e => setAmountPaid(e.target.value.replace(/\D/g, ''))}
-                      inputMode="numeric" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[total, 50000, 100000].map(v => (
-                      <button key={v} onClick={() => setAmountPaid(String(v))}
-                        className="py-2 sm:py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 active:scale-95">
-                        {v === total ? 'Pas' : `${v / 1000}rb`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-slate-50 rounded-xl p-2.5 text-xs space-y-1">
-                <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatRupiah(subtotal)}</span></div>
-                {discountAmt > 0 && <div className="flex justify-between text-red-500"><span>Diskon</span><span>-{formatRupiah(discountAmt)}</span></div>}
-                <div className="flex justify-between font-bold text-sm pt-1 border-t border-slate-200">
-                  <span>Total</span><span className="text-blue-600">{formatRupiah(total)}</span>
-                </div>
-                {paymentMethod === 'cash' && amountPaid && (
-                  <div className={`flex justify-between font-semibold ${change < 0 ? 'text-red-500' : 'text-green-600'}`}>
-                    <span>Kembalian</span><span>{formatRupiah(change)}</span>
-                  </div>
-                )}
-              </div>
-
-              <button onClick={handleCheckout} disabled={loading || cart.length === 0} className="btn btn-primary w-full justify-center py-3" title="Shortcut: F9">
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                {loading ? 'Memproses...' : `Bayar ${formatRupiah(total)}`}
-              </button>
+            <div className="border-t border-slate-100 p-3 space-y-2 flex-shrink-0">
+              {renderCartForm()}
+              {renderBayarButton()}
             </div>
           </div>
         </div>
+
+        {/* Mobile bottom bar — di-portal ke body agar lepas dari containing block transform parent.
+            Diposisikan di ATAS bottom-nav (bottom-16 = 4rem) + safe-area iOS. */}
+        {cart.length > 0 && !showMobileCart && ReactDOM.createPortal(
+          <div
+            className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_12px_rgba(0,0,0,0.12)] px-4 py-3 flex items-center justify-between gap-3"
+            style={{ marginBottom: 'var(--safe-bottom)' }}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-slate-400 font-medium leading-tight">{totalCartQty} item</p>
+              <p className="text-base font-bold text-blue-600 truncate leading-tight">{formatRupiah(total)}</p>
+            </div>
+            <button onClick={() => setShowMobileCart(true)} className="btn btn-primary py-2.5 px-5 flex-shrink-0">
+              Lanjut →
+            </button>
+          </div>,
+          document.body
+        )}
+
+        {/* Mobile bottom sheet — di-portal ke body agar position fixed bekerja benar
+            (parent punya transform dari animate-fade-in-up yang bikin containing block).
+            Layout: handle + header (shrink) | items+form (flex-1 scroll) | bayar (shrink, pinned). */}
+        {showMobileCart && ReactDOM.createPortal(
+          <div className="lg:hidden fixed inset-0 z-50" onClick={() => setShowMobileCart(false)}>
+            <div className="absolute inset-0 bg-black/50 animate-fade-in" />
+            <div
+              onClick={e => e.stopPropagation()}
+              className="absolute left-0 right-0 bottom-0 bg-white dark:bg-slate-800 rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+              style={{
+                transform: `translateY(${sheetDragY}px)`,
+                transition: sheetDragY === 0 ? 'transform 0.25s ease' : 'none',
+              }}
+            >
+              <div
+                className="flex justify-center pt-2 pb-1 flex-shrink-0 cursor-grab"
+                style={{ touchAction: 'none' }}
+                onTouchStart={handleSheetTouchStart}
+                onTouchMove={handleSheetTouchMove}
+                onTouchEnd={handleSheetTouchEnd}
+              >
+                <div className="w-12 h-1.5 bg-slate-300 rounded-full" />
+              </div>
+              {renderCartHeader()}
+              {/* Scrollable area: berisi list item + form (member/diskon/metode bayar/total) */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="p-2 space-y-2">
+                  {renderCartItems()}
+                </div>
+                <div className="border-t border-slate-100 p-3 space-y-2">
+                  {renderCartForm()}
+                </div>
+              </div>
+              {/* Tombol Bayar pinned di bawah — tidak ikut scroll */}
+              <div className="border-t border-slate-100 p-3 pb-4 flex-shrink-0 bg-white dark:bg-slate-800">
+                {renderBayarButton()}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+        </>
       )}
 
       {/* ══ RIWAYAT ══ */}
