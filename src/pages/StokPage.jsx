@@ -316,7 +316,7 @@ const [bataling, setBataling] = useState(false);
       <PageHeader title="Stok Barang" subtitle="Manajemen produk & stok"
         actions={
           <div className="flex flex-wrap gap-2 justify-end w-full sm:w-auto">
-            <button className="btn btn-outline" onClick={load}><RefreshCw size={16} /> <span className="hidden sm:inline">Refresh</span></button>
+            <button className="btn btn-outline" onClick={load}><RefreshCw size={16} /> Refresh</button>
             <button className="btn btn-success" onClick={() => { saldoAPI.getAll().then(r => setSaldos(r.data.data || [])).catch(() => {}); setShowPembelian(true); }}>
               <Plus size={16} /> <span className="hidden sm:inline">Input </span>Pembelian
             </button>
@@ -368,22 +368,22 @@ const [bataling, setBataling] = useState(false);
                         const isSoonExp  = nearestExp && !isExpired && new Date(nearestExp.expiryDate) <= soon;
 
                         return (
-                        <tr key={p._id} className={isExpired ? 'bg-red-50' : ''}>
+                        <tr key={p._id} className={isExpired ? 'bg-red-50 dark:bg-red-900/20' : ''}>
                           <td>
-                            <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{p.code}</code>
-                            {p.provider && <p className="text-xs text-slate-400 mt-0.5">{p.provider}</p>}
+                            <code className="text-xs font-mono bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-1.5 py-0.5 rounded">{p.code}</code>
+                            {p.provider && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{p.provider}</p>}
                           </td>
-                          <td className="font-medium text-slate-700">{p.name}</td>
+                          <td className="font-medium text-slate-700 dark:text-slate-100">{p.name}</td>
                           <td><span className={`badge ${CATEGORY_COLORS?.[p.category] || 'badge-gray'}`}>{CATEGORY_LABELS?.[p.category] || p.category}</span></td>
                           <td><span className={`badge ${p.type === 'fisik' ? 'badge-blue' : p.type === 'jasa' ? 'badge-green' : 'badge-purple'}`}>{p.type}</span></td>
-                          <td className="font-bold text-blue-600">{formatRupiah(p.sellPrice)}</td>
-                          <td className="text-slate-500">{formatRupiah(p.purchasePrice)}</td>
+                          <td className="font-bold text-blue-600 dark:text-blue-400">{formatRupiah(p.sellPrice)}</td>
+                          <td className="text-slate-500 dark:text-slate-400">{formatRupiah(p.purchasePrice)}</td>
                           <td>
                             {p.type === 'fisik'
                               ? <span className={`badge ${p.stock <= 0 ? 'badge-red' : p.stock <= (p.minStock || settings?.lowStockThreshold || 5) ? 'badge-yellow' : 'badge-green'}`}>{p.stock} {p.unit || 'pcs'}</span>
-                              : <span className="text-slate-300 text-xs">∞</span>}
+                              : <span className="text-slate-300 dark:text-slate-500 text-xs">∞</span>}
                           </td>
-                          <td className="text-slate-500 text-sm">{p.type === 'fisik' ? p.minStock || 5 : '—'}</td>
+                          <td className="text-slate-500 dark:text-slate-400 text-sm">{p.type === 'fisik' ? p.minStock || 5 : '—'}</td>
                           <td>
                             {nearestExp ? (
                               <span className={`badge text-xs ${isExpired ? 'badge-red' : isSoonExp ? 'badge-yellow' : 'badge-green'}`}>
@@ -393,7 +393,7 @@ const [bataling, setBataling] = useState(false);
                                 </span>
                               </span>
                             ) : (
-                              <span className="text-slate-300 text-xs">—</span>
+                              <span className="text-slate-300 dark:text-slate-500 text-xs">—</span>
                             )}
                           </td>
                           <td>
@@ -432,12 +432,12 @@ const [bataling, setBataling] = useState(false);
                     const lowStock   = p.type === 'fisik' && p.stock <= (p.minStock || settings?.lowStockThreshold || 5);
 
                     return (
-                      <div key={p._id} className={`card !p-3 ${isExpired ? 'border-red-200 bg-red-50/40' : ''}`}>
+                      <div key={p._id} className={`card !p-3 ${isExpired ? 'border-red-200 bg-red-50/40 dark:border-red-800 dark:bg-red-900/20' : ''}`}>
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                           <div className="min-w-0 flex-1">
-                            <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{p.code}</code>
-                            <p className="font-bold text-sm text-slate-700 mt-1 leading-tight break-words">{p.name}</p>
-                            {p.provider && <p className="text-xs text-slate-400">{p.provider}</p>}
+                            <code className="text-xs font-mono bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-1.5 py-0.5 rounded">{p.code}</code>
+                            <p className="font-bold text-sm text-slate-700 dark:text-slate-100 mt-1 leading-tight break-words">{p.name}</p>
+                            {p.provider && <p className="text-xs text-slate-400 dark:text-slate-500">{p.provider}</p>}
                           </div>
                           {p.type === 'fisik'
                             ? <span className={`badge flex-shrink-0 ${p.stock <= 0 ? 'badge-red' : lowStock ? 'badge-yellow' : 'badge-green'}`}>
@@ -455,11 +455,11 @@ const [bataling, setBataling] = useState(false);
                             </span>
                           )}
                         </div>
-                        <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100">
+                        <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                           <div className="min-w-0">
-                            <p className="text-[11px] text-slate-400">Harga Jual</p>
-                            <p className="font-bold text-blue-600 text-base leading-tight">{formatRupiah(p.sellPrice)}</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">Modal: {formatRupiah(p.purchasePrice)}</p>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500">Harga Jual</p>
+                            <p className="font-bold text-blue-600 dark:text-blue-400 text-base leading-tight">{formatRupiah(p.sellPrice)}</p>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Modal: {formatRupiah(p.purchasePrice)}</p>
                           </div>
                           <div className="flex flex-wrap gap-1 justify-end flex-shrink-0">
                             {p.type === 'fisik' && (
@@ -501,14 +501,14 @@ const [bataling, setBataling] = useState(false);
                       : riwayatPembelian.map(p => (
                         <tr key={p._id}>
                           <td>
-                            <code className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded">{p.nomorPO}</code>
+                            <code className="text-xs font-mono bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-2 py-0.5 rounded">{p.nomorPO}</code>
                             {p.isBatal && <span className="badge badge-red text-xs ml-1">Dibatalkan</span>}
                           </td>
-                          <td className="text-xs text-slate-400">{formatDateTime(p.tanggal)}</td>
-                          <td className="font-medium text-sm">{p.supplier || '-'}</td>
-                          <td className="text-slate-500 text-xs">{p.totalItem} item</td>
-                          <td className="font-bold text-blue-600">{formatRupiah(p.totalHarga)}</td>
-                          <td className="text-sm">{p.createdByName}</td>
+                          <td className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(p.tanggal)}</td>
+                          <td className="font-medium text-sm dark:text-slate-100">{p.supplier || '-'}</td>
+                          <td className="text-slate-500 dark:text-slate-400 text-xs">{p.totalItem} item</td>
+                          <td className="font-bold text-blue-600 dark:text-blue-400">{formatRupiah(p.totalHarga)}</td>
+                          <td className="text-sm dark:text-slate-300">{p.createdByName}</td>
                           <td>
                             <div className="flex gap-1">
                               <button onClick={async () => {
@@ -544,21 +544,21 @@ const [bataling, setBataling] = useState(false);
                 {riwayatPembelian.length === 0
                   ? <div className="card"><EmptyState message="Belum ada riwayat pembelian" /></div>
                   : riwayatPembelian.map(p => (
-                    <div key={p._id} className={`card !p-3 ${p.isBatal ? 'opacity-70 border-red-100 bg-red-50/30' : ''}`}>
+                    <div key={p._id} className={`card !p-3 ${p.isBatal ? 'opacity-70 border-red-100 bg-red-50/30 dark:border-red-900 dark:bg-red-900/20' : ''}`}>
                       <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <code className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded truncate">{p.nomorPO}</code>
+                        <code className="text-xs font-mono bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-2 py-0.5 rounded truncate">{p.nomorPO}</code>
                         {p.isBatal && <span className="badge badge-red text-xs flex-shrink-0">Dibatalkan</span>}
                       </div>
-                      <p className="text-[11px] text-slate-400 mb-1.5">{formatDateTime(p.tanggal)}</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-1.5">{formatDateTime(p.tanggal)}</p>
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <p className="font-semibold text-sm text-slate-700 truncate flex-1">{p.supplier || 'Tanpa supplier'}</p>
-                        <p className="text-xs text-slate-500 flex-shrink-0">{p.totalItem} item</p>
+                        <p className="font-semibold text-sm text-slate-700 dark:text-slate-100 truncate flex-1">{p.supplier || 'Tanpa supplier'}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 flex-shrink-0">{p.totalItem} item</p>
                       </div>
-                      <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100">
+                      <div className="flex items-end justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                         <div className="min-w-0">
-                          <p className="text-[11px] text-slate-400">Total</p>
-                          <p className="font-bold text-blue-600 text-base leading-tight">{formatRupiah(p.totalHarga)}</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5 truncate">Kasir: {p.createdByName}</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">Total</p>
+                          <p className="font-bold text-blue-600 dark:text-blue-400 text-base leading-tight">{formatRupiah(p.totalHarga)}</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 truncate">Kasir: {p.createdByName}</p>
                         </div>
                         <div className="flex flex-wrap gap-1 justify-end flex-shrink-0">
                           <button onClick={async () => {
