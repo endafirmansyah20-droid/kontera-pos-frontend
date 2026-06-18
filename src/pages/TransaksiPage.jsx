@@ -1306,40 +1306,77 @@ export default function TransaksiPage() {
            
             {/* ── DIGITAL ── */}
             {activeTab === 'digital' && (
-              <div className="flex flex-col sm:flex-row flex-1 lg:overflow-hidden">
-                {/* Kiri: Pilih Sumber Dana dulu — di mobile sembunyikan setelah dipilih (info bar punya tombol Ganti) */}
-                <div className={`${selectedSumberDana ? 'hidden sm:block' : 'block'} w-full sm:w-28 border-b sm:border-b-0 sm:border-r border-slate-100 sm:overflow-y-auto bg-slate-50 flex-shrink-0 max-h-56 sm:max-h-none overflow-y-auto`}>
-                  {['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'].map(group => {
-                    const groupSaldos = saldos.filter(s => s.group === group && s.isActive !== false);
-                    if (!groupSaldos.length) return null;
-                    return (
-                      <div key={group}>
-                        <div className="px-2 py-1 text-xs text-slate-400 font-bold bg-slate-100 border-b border-slate-200">{group}</div>
-                        <div className="grid grid-cols-3 sm:grid-cols-1 gap-px sm:gap-0">
-                          {groupSaldos.map(s => (
-                            <button key={s.akunId} onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
-                              className={`w-full flex flex-col items-center gap-1 py-2.5 px-1 text-xs font-semibold transition border-b border-slate-100 ${selectedSumberDana === s.akunId ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white'}`}>
-                              <span className="text-base">{s.icon}</span>
-                              <span className="text-center leading-tight truncate w-full px-0.5">{s.namaAkun}</span>
-                              <span className={`text-[10px] sm:text-xs truncate w-full text-center ${selectedSumberDana === s.akunId ? 'text-blue-100' : 'text-green-600'}`}>{formatRupiah(s.saldo)}</span>
-                            </button>
-                          ))}
+              <div className="flex flex-col lg:flex-row flex-1 lg:overflow-hidden">
+                {/* Panel sumber dana — di mobile DIGANTI form saat sumber dana dipilih (toggle).
+                    Di desktop tetap selalu tampil di kiri. */}
+                <div className={`${selectedSumberDana ? 'hidden lg:block' : 'block'} w-full lg:w-28 border-b lg:border-b-0 lg:border-r border-slate-100 lg:overflow-y-auto bg-slate-50 flex-shrink-0`}>
+                  {/* ─ Mobile (< lg): grouped grid 3-col per kategori ─ */}
+                  <div className="lg:hidden p-3 space-y-3">
+                    {['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'].map(group => {
+                      const groupSaldos = saldos.filter(s => s.group === group && s.isActive !== false);
+                      if (!groupSaldos.length) return null;
+                      return (
+                        <div key={group}>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5 px-0.5">{group}</p>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {groupSaldos.map(s => {
+                              const isSelected = selectedSumberDana === s.akunId;
+                              return (
+                                <button key={s.akunId}
+                                  onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
+                                  className={`flex flex-col items-center gap-0.5 py-2 px-1.5 rounded-lg border transition active:scale-95 ${
+                                    isSelected
+                                      ? 'bg-blue-600 text-white border-blue-700 shadow-md'
+                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50'
+                                  }`}>
+                                  <span className="text-lg leading-none">{s.icon}</span>
+                                  <span className="text-[11px] font-semibold leading-tight truncate w-full text-center">{s.namaAkun}</span>
+                                  <span className={`text-[10px] font-medium truncate w-full text-center ${isSelected ? 'text-blue-100' : 'text-green-600'}`}>
+                                    {formatRupiah(s.saldo)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+
+                  {/* ─ Desktop (lg+): grouped vertical seperti semula ─ */}
+                  <div className="hidden lg:block">
+                    {['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'].map(group => {
+                      const groupSaldos = saldos.filter(s => s.group === group && s.isActive !== false);
+                      if (!groupSaldos.length) return null;
+                      return (
+                        <div key={group}>
+                          <div className="px-2 py-1 text-xs text-slate-400 font-bold bg-slate-100 border-b border-slate-200">{group}</div>
+                          <div>
+                            {groupSaldos.map(s => (
+                              <button key={s.akunId} onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
+                                className={`w-full flex flex-col items-center gap-1 py-2.5 px-1 text-xs font-semibold transition border-b border-slate-100 ${selectedSumberDana === s.akunId ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white'}`}>
+                                <span className="text-base">{s.icon}</span>
+                                <span className="text-center leading-tight truncate w-full px-0.5">{s.namaAkun}</span>
+                                <span className={`text-xs truncate w-full text-center ${selectedSumberDana === s.akunId ? 'text-blue-100' : 'text-green-600'}`}>{formatRupiah(s.saldo)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Kanan: Pilih kategori & form */}
+                {/* Bawah (mobile) / Kanan (desktop): Form input (tahap 2) — muncul setelah sumber dana dipilih */}
                 <div className="flex-1 lg:overflow-y-auto flex flex-col min-w-0">
                   {!selectedSumberDana ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-2 p-6 hidden sm:flex">
+                    <div className="flex-1 flex-col items-center justify-center text-slate-400 gap-2 p-6 hidden lg:flex">
                       <Wallet size={32} className="text-slate-300" />
                       <p className="text-sm font-semibold">Pilih Sumber Dana</p>
                       <p className="text-xs text-center">Pilih akun sumber dana di sebelah kiri terlebih dahulu</p>
                     </div>
                   ) : (
-                    <>
+                    <div key={selectedSumberDana} className="flex-1 flex flex-col animate-fade-in-up">
                       {/* Sub menu kategori — disesuaikan per group */}
                       <div className="flex overflow-x-auto border-b border-slate-100 bg-white flex-shrink-0">
                         {(() => {
@@ -1385,7 +1422,7 @@ export default function TransaksiPage() {
                           return <DigitalForm key={`${digitalMenu}-${selectedSumberDana}`} saldos={saldos} digitalMenu={digitalMenu} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
                         })()}
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
