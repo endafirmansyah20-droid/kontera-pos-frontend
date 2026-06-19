@@ -247,7 +247,7 @@ export default function Sidebar({ lowStockCount = 0 }) {
               </NavLink>
             );
           })}
-          {moreItems.length > 0 && (
+          {(moreItems.length > 0 || isOwner) && (
             <button className={`bottom-nav-item ${isMoreActive || drawerOpen ? 'active' : ''}`}
               onClick={() => setDrawerOpen(v => !v)}>
               <Menu size={22} strokeWidth={isMoreActive || drawerOpen ? 2.5 : 1.8} />
