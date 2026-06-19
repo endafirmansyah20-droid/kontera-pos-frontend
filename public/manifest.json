@@ -4,7 +4,7 @@
   "description": "Sistem POS untuk manajemen konter pulsa",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#1e40af",
   "icons": [
