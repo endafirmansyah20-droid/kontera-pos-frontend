@@ -56,13 +56,14 @@ function LowStockAlert({ products, onClose }) {
 }
 
 export default function Layout({ children }) {
-  const { isOwner, user } = useAuth();
+  const { isOwner, isSuperAdmin, user } = useAuth();
+  const userId = user?._id;
   const [lowStockCount, setLowStockCount]       = useState(0);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [showAlert, setShowAlert]               = useState(false);
 
   const checkLowStock = useCallback(async () => {
-    if (isOwner) return; // Owner tidak punya produk langsung
+    if (isOwner || isSuperAdmin) return; // Owner & SuperAdmin tidak punya produk langsung
     try {
       const r = await productAPI.getLowStock();
       const products = r.data.data || [];
@@ -75,16 +76,21 @@ export default function Layout({ children }) {
         if (!dismissed) setShowAlert(true);
       }
     } catch { /* silent */ }
-  }, [isOwner, user]);
+  }, [isOwner, isSuperAdmin]);
 
   useEffect(() => {
-    if (!user) return; // Tunggu user siap dulu
+    if (!userId) return; // Tunggu user siap dulu
+    // Skip jadwal sama sekali untuk owner & superadmin (tidak punya produk)
+    if (isOwner || isSuperAdmin) return;
     // Delay kecil agar token sudah siap di header
     const timeout = setTimeout(() => checkLowStock(), 500);
     // Cek ulang setiap 10 menit
     const interval = setInterval(checkLowStock, 10 * 60 * 1000);
     return () => { clearTimeout(timeout); clearInterval(interval); };
-  }, [checkLowStock, user]);
+    // Sengaja pakai userId primitif (bukan user object) supaya effect tidak
+    // re-fire saat AuthContext re-render dengan referensi user baru.
+    // eslint-disable-next-line
+  }, [userId, isOwner, isSuperAdmin]);
 
   const handleCloseAlert = () => {
     setShowAlert(false);

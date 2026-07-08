@@ -14,7 +14,7 @@ import toast from 'react-hot-toast';
 // Nav untuk superadmin
 const SUPER_NAV = [
   { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard'     },
-  { to: '/cabang',        icon: Building2,       label: 'Cabang'        },
+  { to: '/client',        icon: Building2,       label: 'Client'        },
   { to: '/subscriptions', icon: CreditCard,      label: 'Langganan',    badge: 'sub_pending' },
   { to: '/pengaturan',    icon: Settings,        label: 'Pengaturan'    },
 ];

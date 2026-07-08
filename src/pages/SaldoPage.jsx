@@ -5,12 +5,25 @@ import { PageHeader, Modal, Loader, EmptyState } from '../components/UI';
 import {
   Wallet, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight,
   RefreshCw, Edit3, TrendingUp, TrendingDown, AlertTriangle,
-  History, Plus, Trash2, Settings, Loader2
+  History, Plus, Trash2, Settings, Loader2, GripVertical
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const GROUP_ORDER = ['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'];
+
+const DIGITAL_MENU_OPTIONS = [
+  { key: 'pulsa',         label: 'Pulsa' },
+  { key: 'kuota',         label: 'Kuota' },
+  { key: 'topup_ewallet', label: 'Top Up E-Wallet' },
+  { key: 'topup_game',    label: 'Top Up Game' },
+  { key: 'token_listrik', label: 'Token Listrik' },
+  { key: 'transfer',      label: 'Transfer' },
+  { key: 'tarik_tunai',   label: 'Tarik Tunai' },
+  { key: 'tagihan',       label: 'Tagihan' },
+];
+
+const DEFAULT_MENU_ORDER = DIGITAL_MENU_OPTIONS.map(o => o.key);
 
 export default function SaldoPage() {
   const { isAdmin } = useAuth();
@@ -60,6 +73,7 @@ export default function SaldoPage() {
   const [selectedAkunEdit, setSelectedAkunEdit] = useState(null);
   const [savingAkun, setSavingAkun] = useState(false);
   const [akunForm, setAkunForm] = useState({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳' });
+  const [draggedMenuKey, setDraggedMenuKey] = useState(null);
 
   const [saving, setSaving] = useState(false);
 
@@ -222,6 +236,17 @@ export default function SaldoPage() {
     if (!v && v !== 0) return '';
     const n = v.toString().replace(/\D/g, '');
     return n ? new Intl.NumberFormat('id-ID').format(parseInt(n)) : '';
+  };
+
+  const getJenisMutasi = (keterangan = '') => {
+    const k = keterangan.toLowerCase();
+    if (k.includes('penjualan cash')) return { label: 'Penjualan', cls: 'bg-blue-100 text-blue-700' };
+    if (k.includes('tarik tunai')) return { label: 'Tarik Tunai', cls: 'bg-purple-100 text-purple-700' };
+    if (k.includes('transfer')) return { label: 'Transfer', cls: 'bg-orange-100 text-orange-700' };
+    if (k.includes('top up') || k.includes('pemasukan')) return { label: 'Top Up', cls: 'bg-green-100 text-green-700' };
+    if (k.includes('pengeluaran')) return { label: 'Pengeluaran', cls: 'bg-red-100 text-red-700' };
+    if (k.includes('koreksi')) return { label: 'Koreksi', cls: 'bg-yellow-100 text-yellow-700' };
+    return { label: 'Lainnya', cls: 'bg-slate-100 text-slate-600' };
   };
 
   const SumberDanaSelect = ({ value, onChange, label = 'Akun', excludeAkunId = '' }) => (
@@ -397,21 +422,31 @@ export default function SaldoPage() {
         {mutasiLoading ? <Loader size="sm" /> : (
           <div className="max-h-96 overflow-y-auto">
             {mutasi.length === 0 ? <EmptyState message="Belum ada mutasi" />
-              : mutasi.map((m, i) => (
-                <div key={i} className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${m.type === 'masuk' ? 'bg-green-100' : 'bg-red-100'}`}>
-                    {m.type === 'masuk' ? <TrendingUp size={14} className="text-green-600" /> : <TrendingDown size={14} className="text-red-500" />}
+              : mutasi.map((m, i) => {
+                const jenis = getJenisMutasi(m.keterangan);
+                const kasir = (typeof m.createdBy === 'object' && m.createdBy !== null)
+                  ? (m.createdBy.name || 'Sistem')
+                  : (m.createdBy || 'Sistem');
+                return (
+                  <div key={i} className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${m.type === 'masuk' ? 'bg-green-100' : 'bg-red-100'}`}>
+                      {m.type === 'masuk' ? <TrendingUp size={14} className="text-green-600" /> : <TrendingDown size={14} className="text-red-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${jenis.cls}`}>{jenis.label}</span>
+                        <p className={`text-sm font-bold whitespace-nowrap ${m.type === 'masuk' ? 'text-green-600' : 'text-red-500'}`}>
+                          {m.type === 'masuk' ? '+' : '-'}{formatRupiah(m.amount)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium text-slate-700 break-words">{m.keterangan}</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {formatDateTime(m.createdAt)} <span className="mx-1">|</span> oleh: {kasir} <span className="mx-1">|</span> {formatRupiah(m.saldoBefore)} → {formatRupiah(m.saldoAfter)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-700">{m.keterangan}</p>
-                    <p className="text-xs text-slate-400">{formatDateTime(m.createdAt)}</p>
-                    <p className="text-xs text-slate-400">{formatRupiah(m.saldoBefore)} → {formatRupiah(m.saldoAfter)}</p>
-                  </div>
-                  <p className={`text-sm font-bold ${m.type === 'masuk' ? 'text-green-600' : 'text-red-500'}`}>
-                    {m.type === 'masuk' ? '+' : '-'}{formatRupiah(m.amount)}
-                  </p>
-                </div>
-              ))
+                );
+              })
             }
           </div>
         )}
@@ -661,7 +696,18 @@ export default function SaldoPage() {
                       {!akun.isActive && <span className="badge badge-red text-xs">Nonaktif</span>}
                       <button onClick={() => {
                         setSelectedAkunEdit(akun);
-                        setAkunForm({ namaAkun: akun.namaAkun, group: akun.group, icon: akun.icon, isActive: akun.isActive !== false });
+                        const savedAllowed = Array.isArray(akun.allowedMenus) ? akun.allowedMenus : [];
+                        const savedOrder = Array.isArray(akun.menuOrder) ? akun.menuOrder : [];
+                        const baseOrder = savedOrder.length > 0 ? savedOrder : DEFAULT_MENU_ORDER;
+                        const backfilled = [...baseOrder, ...DEFAULT_MENU_ORDER.filter(k => !baseOrder.includes(k))];
+                        setAkunForm({
+                          namaAkun: akun.namaAkun,
+                          group: akun.group,
+                          icon: akun.icon,
+                          isActive: akun.isActive !== false,
+                          allowedMenus: savedAllowed.length > 0 ? [...savedAllowed] : DEFAULT_MENU_ORDER.slice(),
+                          menuOrder: backfilled,
+                        });
                         setShowEditAkun(true);
                       }} className="btn btn-outline py-1 px-2 text-xs">
                         <Edit3 size={12} /> Edit
@@ -763,6 +809,83 @@ export default function SaldoPage() {
             <input className="input" placeholder="Atau ketik emoji lain..."
               value={akunForm.icon} onChange={e => setAkunForm(f => ({ ...f, icon: e.target.value }))} />
           </div>
+          {akunForm.group !== 'Tunai' && (
+            <div className="p-3 bg-slate-50 rounded-xl">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <label className="text-sm font-bold text-slate-700">Menu Transaksi Digital</label>
+                <div className="flex gap-1.5 items-center flex-shrink-0">
+                  <button type="button"
+                    onClick={() => setAkunForm(f => ({ ...f, allowedMenus: DIGITAL_MENU_OPTIONS.map(o => o.key) }))}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold">
+                    Pilih Semua
+                  </button>
+                  <span className="text-slate-300 text-xs">·</span>
+                  <button type="button"
+                    onClick={() => setAkunForm(f => ({ ...f, allowedMenus: [] }))}
+                    className="text-xs text-red-500 hover:text-red-600 font-semibold">
+                    Hapus Semua
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                {(() => {
+                  const currentOrder = (akunForm.menuOrder?.length > 0 ? akunForm.menuOrder : DEFAULT_MENU_ORDER);
+                  const backfilled = [...currentOrder, ...DEFAULT_MENU_ORDER.filter(k => !currentOrder.includes(k))];
+                  return backfilled
+                    .map(k => DIGITAL_MENU_OPTIONS.find(o => o.key === k))
+                    .filter(Boolean)
+                    .map(opt => {
+                      const checked = (akunForm.allowedMenus || []).includes(opt.key);
+                      const isDragging = draggedMenuKey === opt.key;
+                      return (
+                        <div key={opt.key}
+                          draggable={checked}
+                          onDragStart={(e) => {
+                            if (!checked) return;
+                            setDraggedMenuKey(opt.key);
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onDragOver={(e) => {
+                            if (!draggedMenuKey) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (!draggedMenuKey || draggedMenuKey === opt.key) return;
+                            setAkunForm(f => {
+                              const cur = (f.menuOrder?.length > 0 ? f.menuOrder : DEFAULT_MENU_ORDER);
+                              const arr = [...cur, ...DEFAULT_MENU_ORDER.filter(k => !cur.includes(k))];
+                              const from = arr.indexOf(draggedMenuKey);
+                              const to   = arr.indexOf(opt.key);
+                              if (from === -1 || to === -1) return f;
+                              arr.splice(from, 1);
+                              arr.splice(to, 0, draggedMenuKey);
+                              return { ...f, menuOrder: arr };
+                            });
+                            setDraggedMenuKey(null);
+                          }}
+                          onDragEnd={() => setDraggedMenuKey(null)}
+                          className={`flex items-center gap-2 p-2 rounded-lg border transition ${isDragging ? 'opacity-40' : ''} ${checked ? 'bg-blue-50 border-blue-200 cursor-move' : 'bg-white border-slate-100'}`}>
+                          <GripVertical size={14} className={`flex-shrink-0 ${checked ? 'text-slate-400' : 'text-slate-200'}`} />
+                          <input type="checkbox" className="rounded"
+                            checked={checked}
+                            onChange={() => setAkunForm(f => {
+                              const list = f.allowedMenus || [];
+                              return {
+                                ...f,
+                                allowedMenus: checked ? list.filter(k => k !== opt.key) : [...list, opt.key],
+                              };
+                            })} />
+                          <span className="text-xs font-medium text-slate-700 flex-1">{opt.label}</span>
+                        </div>
+                      );
+                    });
+                })()}
+              </div>
+              <p className="text-xs text-slate-400 mt-2">Drag ⠿ menu tercentang untuk atur urutan tab di Transaksi. Kosongkan semua = default (semua menu aktif).</p>
+            </div>
+          )}
           <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl">
             <input type="checkbox" id="isActiveEdit" checked={akunForm.isActive !== false}
               onChange={e => setAkunForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />

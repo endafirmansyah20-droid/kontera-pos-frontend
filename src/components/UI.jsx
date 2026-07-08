@@ -261,6 +261,8 @@ export function ReceiptView({ transaction, settings }) {
     cash: 'TUNAI', qris: 'QRIS', transfer: 'TRANSFER', hutang: 'HUTANG'
   };
 
+  const isGrosirTx = transaction.isGrosir || transaction.items?.some(i => i.isGrosir);
+
   return (
     <div
       id="print-root"
@@ -282,6 +284,19 @@ export function ReceiptView({ transaction, settings }) {
         {settings?.storeAddress && <div>{settings.storeAddress}</div>}
         {settings?.storePhone   && <div>Telp: {settings.storePhone}</div>}
       </div>
+
+      {isGrosirTx && (
+        <div style={{
+          textAlign: 'center',
+          fontWeight: 'bold',
+          fontSize: '9pt',
+          border: '1px solid #000',
+          padding: '2px 0',
+          margin: '3px 0',
+        }}>
+          🛒 TRANSAKSI GROSIR
+        </div>
+      )}
 
       <div style={{ borderTop: '1px dashed #000', margin: '3px 0' }} />
 
@@ -311,6 +326,11 @@ export function ReceiptView({ transaction, settings }) {
             <div style={{ whiteSpace: 'pre', fontFamily: 'inherit' }}>
               {row(`  ${item.quantity}x${fmt(item.sellPrice)}`, `${fmt(item.subtotal)}`)}
             </div>
+            {item.isGrosir && (
+              <div style={{ fontSize: '7pt', fontStyle: 'italic', color: '#333', paddingLeft: '2px' }}>
+                (Harga Grosir)
+              </div>
+            )}
           </div>
         ))}
       </div>

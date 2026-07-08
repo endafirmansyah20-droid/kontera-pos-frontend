@@ -6,23 +6,21 @@ import { Loader, EmptyState } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  TrendingUp, TrendingDown, ShoppingCart, Package,
+  TrendingUp, TrendingDown, ShoppingCart,
   AlertTriangle, DollarSign, RefreshCw, Building2,
-  Wallet, BarChart2, Store, Wrench, Users, BarChart3,
-  Target, Edit2, CheckCircle2, Sparkles, ArrowUpRight,
-  Calendar, Clock, Star
+  BarChart2, Users, BarChart3,
+  Target, Edit2, Sparkles, ArrowUpRight,
+  Calendar, Clock, Star, CreditCard
 } from 'lucide-react';
 import api from '../services/api';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
-import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const R = (v) => formatRupiah(v || 0);
 const PALETTE = ['#6366f1','#22c55e','#f59e0b','#ec4899','#14b8a6','#f97316','#8b5cf6'];
-const PERIODS = [['harian','Hari Ini'],['mingguan','7 Hari'],['bulanan','Bulan Ini']];
 
 // ── Soft Tooltip ──────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
@@ -63,20 +61,6 @@ function SoftStatCard({ title, value, subtitle, icon: Icon, gradient, iconBg, ic
   );
 }
 
-// ── Period Selector ───────────────────────────────────────────────────────
-function PeriodSel({ value, onChange }) {
-  return (
-    <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-      {PERIODS.map(([k,l]) => (
-        <button key={k} onClick={() => onChange(k)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            value===k ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}>{l}</button>
-      ))}
-    </div>
-  );
-}
-
 // ── Section Header ────────────────────────────────────────────────────────
 function SectionHeader({ title, subtitle, icon: Icon, iconColor = 'text-slate-500', action }) {
   return (
@@ -97,314 +81,210 @@ function SectionHeader({ title, subtitle, icon: Icon, iconColor = 'text-slate-50
   );
 }
 
-// ── Dashboard Toko ────────────────────────────────────────────────────────
-function DashToko({ cabangList, period }) {
-  const totalOmset = cabangList.reduce((t,c)=>t+(c[period]?.omset||0),0);
-  const totalTx    = cabangList.reduce((t,c)=>t+(c[period]?.count||0),0);
-  const totalLaba  = cabangList.reduce((t,c)=>t+(c[period]?.laba||0),0);
-  const totalAset  = cabangList.reduce((t,c)=>t+(c.kasTunai||0)+(c.brankas||0)+(c.saldoDigital||0),0);
+// ── SuperAdmin Dashboard (Platform) ───────────────────────────────────────
+function SuperAdminDashboard({ subscriptions, cabangList, loading, onRefresh }) {
+  const navigate = useNavigate();
+  const now      = new Date();
+  const inSeven  = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
 
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SoftStatCard label="Total Omset" title="Total Omset" value={R(totalOmset)} subtitle="Semua cabang"
-          icon={DollarSign} gradient="bg-gradient-to-br from-blue-400 to-blue-600"
-          iconBg="bg-white/20" iconColor="text-white" />
-        <SoftStatCard title="Total Laba" value={R(totalLaba)} subtitle="Semua cabang"
-          icon={TrendingUp} gradient="bg-gradient-to-br from-emerald-400 to-emerald-600"
-          iconBg="bg-white/20" iconColor="text-white" />
-        <SoftStatCard title="Transaksi" value={`${totalTx} tx`} subtitle="Semua cabang"
-          icon={ShoppingCart} gradient="bg-gradient-to-br from-violet-400 to-violet-600"
-          iconBg="bg-white/20" iconColor="text-white" />
-        <SoftStatCard title="Total Aset" value={R(totalAset)} subtitle="Kas + brankas"
-          icon={Wallet} gradient="bg-gradient-to-br from-amber-400 to-orange-500"
-          iconBg="bg-white/20" iconColor="text-white" />
-      </div>
+  const subByCabang = React.useMemo(() => {
+    const m = new Map();
+    subscriptions.forEach(s => { if (s.cabang?._id) m.set(String(s.cabang._id), s); });
+    return m;
+  }, [subscriptions]);
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {[
-          { title: 'Omset per Cabang', key: 'omset', color: 'from-blue-50 to-indigo-50', palette: PALETTE },
-          { title: 'Laba per Cabang',  key: 'laba',  color: 'from-emerald-50 to-teal-50', palette: [...PALETTE].reverse() },
-        ].map(({ title, key, color, palette }) => (
-          <div key={key} className={`bg-gradient-to-br ${color} rounded-2xl p-5 border border-white`}>
-            <SectionHeader title={title} icon={BarChart3} iconColor="text-slate-400" />
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={cabangList.map(c=>({nama:c.kode||c.nama, [key]:c[period]?.[key]||0}))} margin={{top:4,right:4,left:0,bottom:0}}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="nama" tick={{fontSize:11,fill:'#94a3b8'}} axisLine={false} tickLine={false} />
-                <YAxis tick={{fontSize:10,fill:'#94a3b8'}} axisLine={false} tickLine={false}
-                  tickFormatter={v=>v>=1e6?`${(v/1e6).toFixed(1)}jt`:v>=1e3?`${(v/1e3).toFixed(0)}k`:v} />
-                <Tooltip content={<CustomTooltip />} cursor={{fill:'rgba(100,116,139,0.06)',radius:8}} />
-                <Bar dataKey={key} name={key === 'omset' ? 'Omset' : 'Laba'} radius={[8,8,0,0]} maxBarSize={56}>
-                  {cabangList.map((_,i)=><Cell key={i} fill={palette[i%palette.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ))}
-      </div>
+  const totalClientAktif = subscriptions.filter(s => s.status === 'aktif' || s.status === 'gratis').length;
+  const revenuePlatform  = subscriptions
+    .filter(s => s.status === 'aktif')
+    .reduce((t, s) => t + (s.harga || 30000), 0);
+  const expiringSoon = subscriptions
+    .filter(s => s.status === 'aktif' && s.expiredAt &&
+      new Date(s.expiredAt) >= now && new Date(s.expiredAt) <= inSeven)
+    .sort((a, b) => new Date(a.expiredAt) - new Date(b.expiredAt));
+  const totalCabang = cabangList.length;
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-50">
-          <SectionHeader title="Ringkasan per Cabang" subtitle={`${cabangList.length} cabang`} icon={Building2} iconColor="text-slate-400" />
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="bg-gradient-to-r from-slate-50 to-white">
-              {['Cabang','Transaksi','Omset','Laba','Aset'].map(h=>(
-                <th key={h} className={`py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide ${h==='Cabang'?'text-left px-5':'text-right px-4'}`}>{h}</th>
-              ))}
-            </tr></thead>
-            <tbody className="divide-y divide-slate-50/80">
-              {cabangList.map((c,i)=>(
-                <tr key={c._id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3.5 px-5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:PALETTE[i%PALETTE.length]}} />
-                      <span className="font-semibold text-slate-700 text-sm">{c.nama}</span>
-                      <code className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{c.kode}</code>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{color:PALETTE[i%PALETTE.length], background:PALETTE[i%PALETTE.length]+'18'}}>{c[period]?.count||0} tx</span>
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-semibold text-slate-700 text-sm">{R(c[period]?.omset)}</td>
-                  <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 text-sm">{R(c[period]?.laba)}</td>
-                  <td className="py-3.5 px-4 text-right text-slate-400 text-sm">{R((c.kasTunai||0)+(c.brankas||0)+(c.saldoDigital||0))}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot><tr className="bg-gradient-to-r from-slate-50 to-white border-t-2 border-slate-100">
-              <td className="py-3.5 px-5 font-black text-slate-600 text-sm">TOTAL</td>
-              <td className="py-3.5 px-4 text-right font-black text-slate-700 text-sm">{totalTx} tx</td>
-              <td className="py-3.5 px-4 text-right font-black text-slate-800 text-sm">{R(totalOmset)}</td>
-              <td className="py-3.5 px-4 text-right font-black text-emerald-700 text-sm">{R(totalLaba)}</td>
-              <td className="py-3.5 px-4 text-right font-black text-slate-700 text-sm">{R(totalAset)}</td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </div>
-    </div>
+  const growthData = React.useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        label: d.toLocaleDateString('id-ID', { month: 'short' }) + (i === 5 || d.getMonth() === 0 ? ` ${String(d.getFullYear()).slice(-2)}` : ''),
+        baru: 0,
+      });
+    }
+    cabangList.forEach(c => {
+      if (!c.createdAt) return;
+      const d = new Date(c.createdAt);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const item = months.find(m => m.key === key);
+      if (item) item.baru++;
+    });
+    return months;
+  }, [cabangList]);
+
+  const latestClients = React.useMemo(() =>
+    [...cabangList]
+      .filter(c => c.createdAt)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5),
+    [cabangList]
   );
-}
 
-// ── Dashboard Penjualan ───────────────────────────────────────────────────
-function DashPenjualan({ cabangList, period }) {
-  const rows = cabangList.map(c => ({
-    nama: c.nama, kode: c.kode,
-    tx: c[period]?.count||0, omset: c[period]?.omset||0, laba: c[period]?.laba||0,
-    margin: c[period]?.omset ? Math.round((c[period]?.laba/c[period]?.omset)*100) : 0,
-  })).sort((a,b) => b.omset - a.omset);
-  const maxOmset = Math.max(...rows.map(r=>r.omset), 1);
-  const stats = [
-    {label:'Total Omset', value:R(rows.reduce((t,r)=>t+r.omset,0)), gradient:'from-blue-400 to-blue-600', icon:DollarSign},
-    {label:'Total Laba',  value:R(rows.reduce((t,r)=>t+r.laba,0)),  gradient:'from-emerald-400 to-emerald-600', icon:TrendingUp},
-    {label:'Total Tx',    value:`${rows.reduce((t,r)=>t+r.tx,0)} tx`, gradient:'from-violet-400 to-violet-600', icon:ShoppingCart},
-    {label:'Avg Margin',  value:`${rows.length?Math.round(rows.reduce((t,r)=>t+r.margin,0)/rows.length):0}%`, gradient:'from-amber-400 to-orange-500', icon:BarChart2},
-  ];
+  const fmtDate = d => d
+    ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '-';
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {stats.map(s => (
-          <SoftStatCard key={s.label} title={s.label} value={s.value}
-            icon={s.icon} gradient={`bg-gradient-to-br ${s.gradient}`}
-            iconBg="bg-white/20" iconColor="text-white" />
-        ))}
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-50">
-          <SectionHeader title="Ranking Penjualan" subtitle="Diurutkan dari omset tertinggi" icon={Star} iconColor="text-amber-400" />
+    <div className="animate-fade-in-up pb-24 lg:pb-0">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <p className="text-xs text-amber-500 font-bold mb-0.5">⭐ DASHBOARD PLATFORM</p>
+          <h1 className="text-xl font-black text-slate-800">Ringkasan SuperAdmin</h1>
+          <p className="text-sm text-slate-400 mt-0.5">Monitor pertumbuhan & subscription seluruh client</p>
         </div>
-        <div className="divide-y divide-slate-50 p-5 space-y-5">
-          {rows.map((r,i)=>(
-            <div key={r.kode}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0"
-                    style={{background:PALETTE[i%PALETTE.length]}}>
-                    {i+1}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-700 text-sm">{r.nama}</span>
-                    <span className="text-xs text-slate-400 ml-2">{r.tx} transaksi</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-slate-800 text-sm">{R(r.omset)}</p>
-                  <p className="text-xs text-slate-400">Laba {R(r.laba)}</p>
-                </div>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{width:`${(r.omset/maxOmset)*100}%`, background:PALETTE[i%PALETTE.length]}} />
-              </div>
-              <div className="flex justify-end mt-1">
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-md"
-                  style={{color:PALETTE[i%PALETTE.length], background:PALETTE[i%PALETTE.length]+'15'}}>
-                  Margin {r.margin}%
-                </span>
-              </div>
+        <button onClick={onRefresh} disabled={loading}
+          className="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-200 px-3 py-2 rounded-xl transition-all">
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
+      </div>
+
+      {/* 4 Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <SoftStatCard title="Client Aktif" value={`${totalClientAktif}`} subtitle="Aktif + Gratis"
+          icon={Users} gradient="bg-gradient-to-br from-blue-400 to-blue-600"
+          iconBg="bg-white/20" iconColor="text-white" />
+        <SoftStatCard title="Revenue Aktif" value={R(revenuePlatform)} subtitle="MRR bulan ini"
+          icon={CreditCard} gradient="bg-gradient-to-br from-emerald-400 to-emerald-600"
+          iconBg="bg-white/20" iconColor="text-white" />
+        <SoftStatCard title="Akan Expired" value={`${expiringSoon.length}`} subtitle="≤ 7 hari ke depan"
+          icon={Clock}
+          gradient={`bg-gradient-to-br ${expiringSoon.length > 0 ? 'from-orange-400 to-red-500' : 'from-slate-400 to-slate-500'}`}
+          iconBg="bg-white/20" iconColor="text-white" />
+        <SoftStatCard title="Total Cabang" value={`${totalCabang}`} subtitle="Cabang terdaftar"
+          icon={Building2} gradient="bg-gradient-to-br from-violet-400 to-purple-600"
+          iconBg="bg-white/20" iconColor="text-white" />
+      </div>
+
+      {/* Grid: Growth (2/3) + Expiring (1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+        {/* Growth Chart */}
+        <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl border border-slate-100 p-5 lg:col-span-2">
+          <SectionHeader title="Pertumbuhan Client" subtitle="6 bulan terakhir"
+            icon={ArrowUpRight} iconColor="text-blue-500" />
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={growthData} margin={{top:5,right:10,left:0,bottom:0}}>
+              <defs>
+                <linearGradient id="gGrowth" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="label" tick={{fontSize:11,fill:'#94a3b8'}} axisLine={false} tickLine={false} />
+              <YAxis tick={{fontSize:10,fill:'#94a3b8'}} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="baru" name="Cabang Baru"
+                stroke="#3b82f6" strokeWidth={2.5} fill="url(#gGrowth)"
+                dot={{r:4, fill:'#3b82f6'}} activeDot={{r:5}} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Expiring Soon */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <SectionHeader title="Akan Expired" subtitle="≤ 7 hari ke depan"
+            icon={Clock} iconColor="text-orange-500"
+            action={expiringSoon.length > 0 && (
+              <span className="text-xs font-bold bg-orange-100 text-orange-600 px-2.5 py-1 rounded-lg">
+                {expiringSoon.length}
+              </span>
+            )} />
+          {expiringSoon.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-2xl mb-1">✅</p>
+              <p className="text-sm text-slate-400">Tidak ada yang segera expired</p>
             </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Dashboard Service HP ──────────────────────────────────────────────────
-function DashService({ cabangList }) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-      <SectionHeader title="Ringkasan Service per Cabang" icon={Wrench} iconColor="text-blue-500" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-        {cabangList.map((c,i)=>(
-          <div key={c._id} className="bg-gradient-to-br from-slate-50 to-white border border-slate-100 rounded-xl p-4 hover:border-blue-200 hover:shadow-sm transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2.5 h-2.5 rounded-full" style={{background:PALETTE[i%PALETTE.length]}} />
-              <p className="font-bold text-slate-700 text-sm">{c.nama}</p>
-              <code className="text-xs text-slate-400 ml-auto">{c.kode}</code>
-            </div>
-            <p className="text-xs text-slate-400 text-center py-3">Data service cabang ini</p>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-slate-400 mt-4 text-center">
-        💡 Detail service tersedia di halaman Service HP per cabang
-      </p>
-    </div>
-  );
-}
-
-// ── Dashboard Karyawan ────────────────────────────────────────────────────
-function DashKaryawan({ cabangList }) {
-  const [empData, setEmpData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [period,  setPeriod]  = useState('bulan');
-  const MEDALS = ['🥇','🥈','🥉'];
-  const COLORS = ['#6366f1','#22c55e','#f59e0b','#ec4899','#14b8a6'];
-
-  useEffect(() => {
-    cabangAPI.getEmployeeStats()
-      .then(r => setEmpData(r.data.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          {label:'Total Cabang',  val:cabangList.filter(c=>c.isActive).length,  gradient:'from-blue-400 to-blue-600',     icon:Building2,  suffix:'aktif'},
-          {label:'Total Produk',  val:cabangList.reduce((t,c)=>t+(c.jumlahProduk||0),0), gradient:'from-emerald-400 to-emerald-600', icon:Package, suffix:'item'},
-          {label:'Kas Tunai',     val:R(cabangList.reduce((t,c)=>t+(c.kasTunai||0),0)),  gradient:'from-amber-400 to-orange-500', icon:Wallet,  suffix:''},
-          {label:'Total Brankas', val:R(cabangList.reduce((t,c)=>t+(c.brankas||0),0)),   gradient:'from-violet-400 to-violet-600', icon:BarChart2, suffix:''},
-        ].map(s=>(
-          <SoftStatCard key={s.label} title={s.label} value={s.val} subtitle={s.suffix}
-            icon={s.icon} gradient={`bg-gradient-to-br ${s.gradient}`}
-            iconBg="bg-white/20" iconColor="text-white" />
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
-          <SectionHeader title="Kinerja Karyawan" subtitle="Per cabang" icon={Users} iconColor="text-blue-500" />
-          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-            {[['bulan','Bulan'],['hari','Hari']].map(([k,l])=>(
-              <button key={k} onClick={()=>setPeriod(k)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${period===k?'bg-white text-slate-800 shadow-sm':'text-slate-500'}`}>{l}</button>
-            ))}
-          </div>
-        </div>
-        {loading
-          ? <div className="p-12 flex justify-center"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"/></div>
-          : <div className="grid grid-cols-1 xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-slate-50">
-              {empData.map((cabang,ci)=>{
-                const employees = period==='bulan' ? cabang.bulanIni : cabang.hariIni;
-                const maxOmset  = employees[0]?.totalOmset || 1;
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {expiringSoon.map(sub => {
+                const days = Math.max(0, Math.ceil((new Date(sub.expiredAt) - now) / (1000 * 3600 * 24)));
+                const urgency = days <= 1 ? 'bg-red-100 text-red-600'
+                  : days <= 3 ? 'bg-orange-100 text-orange-600'
+                  : 'bg-amber-100 text-amber-700';
                 return (
-                  <div key={cabang._id} className="p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-7 h-7 rounded-xl flex items-center justify-center text-white text-xs font-bold"
-                        style={{background:COLORS[ci%COLORS.length]}}>{cabang.kode}</div>
-                      <span className="font-bold text-slate-700 text-sm">{cabang.nama}</span>
-                      <span className="text-xs text-slate-400 ml-auto">{employees.length} karyawan</span>
+                  <div key={sub._id} className="flex items-center justify-between gap-2 p-3 bg-gradient-to-r from-orange-50/60 to-amber-50/30 rounded-xl">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-700 truncate">{sub.cabang?.nama || '-'}</p>
+                      <p className="text-xs text-slate-400 truncate">
+                        @{sub.owner?.username || '-'} · {fmtDate(sub.expiredAt)}
+                      </p>
                     </div>
-                    {employees.length===0
-                      ? <p className="text-xs text-slate-400 text-center py-4">Belum ada transaksi {period==='hari'?'hari ini':'bulan ini'}</p>
-                      : <div className="space-y-3">
-                          {employees.map((e,i)=>(
-                            <div key={e._id||i}>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-base">{MEDALS[i]||`${i+1}`}</span>
-                                  <span className="font-semibold text-slate-700 text-sm">{e._id||'Unknown'}</span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="font-bold text-sm" style={{color:COLORS[ci%COLORS.length]}}>{e.totalTx} tx</span>
-                                  <span className="text-xs text-slate-400 ml-1.5">{R(e.totalOmset)}</span>
-                                </div>
-                              </div>
-                              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full transition-all"
-                                  style={{width:`${(e.totalOmset/maxOmset)*100}%`, background:COLORS[ci%COLORS.length]}} />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                    }
+                    <div className="flex flex-col items-end shrink-0 gap-1">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${urgency}`}>
+                        {days === 0 ? 'Hari ini' : `${days}h lagi`}
+                      </span>
+                      <button onClick={() => navigate('/subscriptions')}
+                        className="text-xs font-bold text-white bg-primary-600 hover:bg-primary-500 px-2.5 py-1 rounded-lg transition">
+                        Konfirmasi
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
-        }
-      </div>
-    </div>
-  );
-}
-
-// ── SuperAdmin Dashboard ──────────────────────────────────────────────────
-function SuperAdminDashboard({ cabangList, loading, onRefresh }) {
-  const [activeTab, setActiveTab] = useState('toko');
-  const [period,    setPeriod]    = useState('harian');
-  const TABS = [
-    { key:'toko',      label:'Dashboard Toko',      icon:Store,    active:'bg-blue-500', inactive:'hover:bg-blue-50 text-blue-600' },
-    { key:'penjualan', label:'Penjualan',            icon:BarChart3, active:'bg-emerald-500', inactive:'hover:bg-emerald-50 text-emerald-600' },
-    { key:'service',   label:'Service HP',           icon:Wrench,   active:'bg-violet-500', inactive:'hover:bg-violet-50 text-violet-600' },
-    { key:'karyawan',  label:'Karyawan',             icon:Users,    active:'bg-amber-500', inactive:'hover:bg-amber-50 text-amber-600' },
-  ];
-
-  return (
-    <div className="animate-fade-in-up pb-24 lg:pb-0">
-      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-black text-slate-800">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Monitor seluruh cabang secara real-time</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <PeriodSel value={period} onChange={setPeriod} />
-          <button className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition" onClick={onRefresh} disabled={loading}>
-            <RefreshCw size={14} className={`text-slate-500 ${loading?'animate-spin':''}`} />
-          </button>
+          )}
         </div>
       </div>
 
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {TABS.map(t => (
-          <button key={t.key} onClick={()=>setActiveTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
-              activeTab===t.key ? `${t.active} text-white shadow-md` : `bg-white border border-slate-200 ${t.inactive}`
-            }`}>
-            <t.icon size={14} />{t.label}
-          </button>
-        ))}
+      {/* 5 Client Terbaru */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-50">
+          <SectionHeader title="Client Terbaru" subtitle="5 pendaftaran terakhir"
+            icon={Sparkles} iconColor="text-amber-500"
+            action={
+              <button onClick={() => navigate('/client')}
+                className="text-xs font-semibold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition">
+                Lihat Semua →
+              </button>
+            } />
+        </div>
+        {latestClients.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-400">Belum ada client terdaftar</div>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {latestClients.map(c => {
+              const sub = subByCabang.get(String(c._id));
+              const badgeClass = !sub ? 'bg-slate-100 text-slate-500'
+                : sub.status === 'aktif'    ? 'bg-blue-100 text-blue-600'
+                : sub.status === 'gratis'   ? 'bg-green-100 text-green-600'
+                : sub.status === 'nonaktif' ? 'bg-red-100 text-red-600'
+                : 'bg-amber-100 text-amber-700';
+              const badgeLabel = !sub ? '—'
+                : sub.status === 'nonaktif' ? 'Belum Bayar'
+                : sub.status?.toUpperCase();
+              return (
+                <div key={c._id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center shrink-0">
+                    <Building2 size={18} className="text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-700 text-sm truncate">{c.nama}</p>
+                    <p className="text-xs text-slate-400">
+                      <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 mr-1.5">{c.kode}</code>
+                      Daftar {fmtDate(c.createdAt)}
+                    </p>
+                  </div>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-lg shrink-0 ${badgeClass}`}>
+                    {badgeLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-
-      {activeTab==='toko'      && <DashToko      cabangList={cabangList} period={period} />}
-      {activeTab==='penjualan' && <DashPenjualan cabangList={cabangList} period={period} />}
-      {activeTab==='service'   && <DashService   cabangList={cabangList} />}
-      {activeTab==='karyawan'  && <DashKaryawan  cabangList={cabangList} />}
     </div>
   );
 }
@@ -927,17 +807,21 @@ function NormalDashboard({ data, onRefresh, loading }) {
 // ── Main ──────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { isSuperAdmin } = useAuth();
-  const [data, setData]             = useState(null);
-  const [cabangList, setCabangList] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const location = useLocation();
+  const [data, setData]                 = useState(null);
+  const [cabangList, setCabangList]     = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading]           = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (isSuperAdmin) {
-        const r = await cabangAPI.getSummary();
-        setCabangList(r.data.data || []);
+        const [cab, subs] = await Promise.all([
+          cabangAPI.getAll(),
+          api.get('/owner/subscriptions'),
+        ]);
+        setCabangList(cab.data.data || []);
+        setSubscriptions(subs.data.data || []);
       } else {
         const r = await dashboardAPI.get();
         setData(r.data.data);
@@ -946,9 +830,16 @@ export default function DashboardPage() {
     finally { setLoading(false); }
   }, [isSuperAdmin]);
 
-  useEffect(() => { loadData(); }, [loadData, location.key]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   if (loading) return <Loader />;
-  if (isSuperAdmin) return <SuperAdminDashboard cabangList={cabangList} loading={loading} onRefresh={loadData} />;
+  if (isSuperAdmin) return (
+    <SuperAdminDashboard
+      subscriptions={subscriptions}
+      cabangList={cabangList}
+      loading={loading}
+      onRefresh={loadData}
+    />
+  );
   return <NormalDashboard data={data} onRefresh={loadData} loading={loading} />;
 }

@@ -9,7 +9,7 @@ import {
   ShoppingCart, Search, Plus, Minus, X, CheckCircle2, Loader2,
   History, Package, Printer, Trash2, Eye, AlertTriangle,
   Smartphone, Zap, Gamepad2, Wallet, ArrowLeftRight, Banknote,
-  CreditCard, RefreshCw, Briefcase
+  CreditCard, RefreshCw, Briefcase, Store
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useReactToPrint } from 'react-to-print';
@@ -24,6 +24,36 @@ const DIGITAL_MENUS = [
   { id: 'tarik_tunai',   label: 'Tarik Tunai',     icon: Banknote },
   { id: 'tagihan',       label: 'Tagihan',         icon: CreditCard },
 ];
+
+// Map key allowedMenus (disimpan per-saldo) → DIGITAL_MENUS.id
+const ALLOWED_MENU_KEY_MAP = {
+  pulsa:         'pulsa',
+  kuota:         'kuota',
+  topup_ewallet: 'ewallet',
+  topup_game:    'game',
+  token_listrik: 'token_listrik',
+  transfer:      'transfer',
+  tarik_tunai:   'tarik_tunai',
+  tagihan:       'tagihan',
+};
+
+const DEFAULT_MENU_ORDER = [
+  'pulsa', 'kuota', 'topup_ewallet', 'topup_game',
+  'token_listrik', 'transfer', 'tarik_tunai', 'tagihan',
+];
+
+// Resolve daftar DIGITAL_MENUS.id yang tampil, sudah dalam urutan menuOrder + filter allowedMenus.
+// allowedMenus empty/undefined → semua menu diizinkan.
+// menuOrder empty/undefined → urutan default.
+const resolveAllowedMenuIds = (allowedMenus, menuOrder) => {
+  const baseOrder = (Array.isArray(menuOrder) && menuOrder.length > 0) ? menuOrder : DEFAULT_MENU_ORDER;
+  const orderKeys = [...baseOrder, ...DEFAULT_MENU_ORDER.filter(k => !baseOrder.includes(k))];
+  const filterSet = (Array.isArray(allowedMenus) && allowedMenus.length > 0) ? new Set(allowedMenus) : null;
+  return orderKeys
+    .filter(k => !filterSet || filterSet.has(k))
+    .map(k => ALLOWED_MENU_KEY_MAP[k])
+    .filter(Boolean);
+};
 
 const PAYMENT_METHODS = ['cash', 'qris', 'transfer', 'hutang'];
 
@@ -397,6 +427,7 @@ export default function TransaksiPage() {
   const isPrivileged = isAdmin || isOwner || isSuperAdmin; // boleh void transaksi lama
   const [activeMainTab, setActiveMainTab] = useState('kasir');
   const [activeTab, setActiveTab] = useState('fisik');
+  const [modeGrosir, setModeGrosir] = useState(false);
   const [digitalMenu, setDigitalMenu] = useState('pulsa');
   const [selectedSumberDana, setSelectedSumberDana] = useState('');
   const [products, setProducts] = useState([]);
@@ -504,10 +535,15 @@ export default function TransaksiPage() {
     if (!tx) return;
     const fmt = (n) => new Intl.NumberFormat('id-ID').format(n || 0);
     const tgl = new Date(tx.transactionDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const items = tx.items?.map(i => `  • ${i.productName} ${i.quantity}x${fmt(i.sellPrice)} = Rp ${fmt(i.subtotal)}`).join('\n');
+    const isGrosirTx = tx.isGrosir || tx.items?.some(i => i.isGrosir);
+    const items = tx.items?.map(i => {
+      const grosirTag = i.isGrosir ? ' _(Harga Grosir)_' : '';
+      return `  • ${i.productName} ${i.quantity}x${fmt(i.sellPrice)} = Rp ${fmt(i.subtotal)}${grosirTag}`;
+    }).join('\n');
     const PAYMENT_LABEL = { cash: 'Tunai', qris: 'QRIS', transfer: 'Transfer', hutang: 'Hutang' };
     const text = [
       `🧾 *STRUK ${settings?.storeName || 'KONTER'}*`,
+      isGrosirTx ? `🛒 *TRANSAKSI GROSIR*` : '',
       `📅 ${tgl}`,
       `🔖 ${tx.invoiceNumber}`,
       `👤 Kasir: ${tx.cashierName || '-'}`,
@@ -522,7 +558,7 @@ export default function TransaksiPage() {
       tx.change > 0 ? `Kembalian: Rp ${fmt(tx.change)}` : '',
       ``,
       settings?.receiptFooter || 'Terima kasih sudah berbelanja!',
-    ].filter(l => l !== null && l !== undefined).join('\n');
+    ].filter(l => l !== '' && l !== null && l !== undefined).join('\n');
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -594,6 +630,8 @@ export default function TransaksiPage() {
   // ── Cart ────────────────────────────────────────────────────
   const addToCart = useCallback((product) => {
     if (product.type === 'fisik' && product.stock <= 0) return toast.error(`Stok ${product.name} habis!`);
+    const useGrosir = modeGrosir && product.type === 'fisik' && product.hargaGrosir > 0;
+    const effectivePrice = useGrosir ? product.hargaGrosir : product.sellPrice;
     setCart(prev => {
       const existing = prev.find(i => i.productId === product._id);
       if (existing) {
@@ -603,14 +641,15 @@ export default function TransaksiPage() {
       return [...prev, {
         productId: product._id, productCode: product.code,
         productName: product.name, category: product.category,
-        type: product.type, sellPrice: product.sellPrice,
+        type: product.type, sellPrice: effectivePrice,
         purchasePrice: product.type === 'jasa' ? 0 : product.purchasePrice,
-        quantity: 1, subtotal: product.sellPrice,
+        quantity: 1, subtotal: effectivePrice,
         maxQty: product.type === 'fisik' ? product.stock : 999,
-        targetNumber: '', sumberDana: null
+        targetNumber: '', sumberDana: null,
+        isGrosir: useGrosir,
       }];
     });
-  }, []);
+  }, [modeGrosir]);
 
   const addItemToCart = useCallback((item) => {
     setCart(prev => [...prev, item]);
@@ -624,6 +663,16 @@ export default function TransaksiPage() {
   })), []);
 
   const removeItem = useCallback((idx) => setCart(prev => prev.filter((_, i) => i !== idx)), []);
+
+  const handleToggleGrosir = () => {
+    if (modeGrosir) {
+      if (cart.length > 0 && !window.confirm('Mode grosir dimatikan, keranjang akan dikosongkan. Lanjutkan?')) return;
+      setCart([]);
+      setModeGrosir(false);
+    } else {
+      setModeGrosir(true);
+    }
+  };
 
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
   const discountAmt = parseInt(discount) || 0;
@@ -652,7 +701,8 @@ export default function TransaksiPage() {
         customerName: customerName || 'Umum',
         customerId: selectedMember?._id || null,
         paymentMethod, amountPaid: parseInt(amountPaid) || total, discount: discountAmt,
-        transferData: paymentMethod === 'transfer' && akunTransfer ? { akunId: akunTransfer } : 
+        isGrosir: modeGrosir,
+        transferData: paymentMethod === 'transfer' && akunTransfer ? { akunId: akunTransfer } :
                       paymentMethod === 'qris' && akunQris ? { akunId: akunQris } : undefined,
       });
 
@@ -1145,7 +1195,7 @@ export default function TransaksiPage() {
   );
 
   return (
-    <div className="animate-fade-in-up">
+    <div className={`animate-fade-in-up ${modeGrosir ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-slate-800 dark:to-slate-900 rounded-2xl p-2 -m-1' : ''}`}>
       {/* Marquee motivasi — dikontrol dari Pengaturan */}
       {marqueeSettings.enabled !== false && marqueeSettings.messages?.length > 0 && (
         <div style={{
@@ -1243,7 +1293,7 @@ export default function TransaksiPage() {
             {/* Tabs */}
             <div className="flex border-b border-slate-100 flex-shrink-0">
               <button onClick={() => setActiveTab('fisik')}
-                className={`flex-1 py-3 sm:py-3 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${activeTab === 'fisik' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                className={`flex-1 py-3 sm:py-3 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition whitespace-nowrap ${activeTab === 'fisik' ? (modeGrosir ? 'bg-green-600 text-white' : 'bg-blue-600 text-white') : 'text-slate-500 hover:bg-slate-50'}`}>
                 <Package size={14} /> Fisik
               </button>
               <button onClick={() => setActiveTab('jasa')}
@@ -1259,31 +1309,59 @@ export default function TransaksiPage() {
             {/* ── FISIK ── */}
             {activeTab === 'fisik' && (
               <>
-                <div className="p-2 sm:p-3 border-b border-slate-100 flex gap-2 flex-shrink-0">
+                <div className="p-2 sm:p-3 border-b border-slate-100 flex gap-2 flex-shrink-0 items-center">
                   <div className="relative flex-1 min-w-0">
                     <input ref={codeRef} className="input pr-20" placeholder="F2 | Scan / kode produk → Enter"
                       value={codeInput} onChange={e => setCodeInput(e.target.value)} onKeyDown={handleCodeKeyDown} />
                     <button onClick={() => {
                       productAPI.getByCode(codeInput.trim()).then(r => { if (r.data.success) addToCart(r.data.data); else toast.error('Tidak ditemukan'); }).catch(() => toast.error('Tidak ditemukan'));
                       setCodeInput('');
-                    }} className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-primary py-1.5 px-2.5 text-xs">Tambah</button>
+                    }} className={`absolute right-2 top-1/2 -translate-y-1/2 btn py-1.5 px-2.5 text-xs ${modeGrosir ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' : 'btn-primary'}`}>Tambah</button>
                   </div>
                   <button className="btn btn-outline py-2 px-3 flex-shrink-0" onClick={() => setShowSearch(true)}><Search size={15} /></button>
+                  <button
+                    onClick={handleToggleGrosir}
+                    title={modeGrosir ? 'Matikan Mode Grosir' : 'Aktifkan Mode Grosir'}
+                    className={`btn py-2 px-3 flex-shrink-0 text-xs font-semibold flex items-center gap-1.5 transition ${modeGrosir ? 'bg-green-500 text-white border-green-500 hover:bg-green-600' : 'btn-outline'}`}>
+                    <Store size={14} /> <span className="hidden sm:inline">Mode Grosir</span>
+                  </button>
                 </div>
+                {modeGrosir && (
+                  <div className="bg-green-500 text-white text-xs sm:text-sm font-bold text-center py-2 px-3 flex-shrink-0 shadow-inner">
+                    🛒 MODE GROSIR AKTIF
+                  </div>
+                )}
                 <div className="flex-1 lg:overflow-y-auto p-2 sm:p-3">
                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-2.5">
                     {fisikProducts.map(p => {
                       const out = p.stock <= 0;
                       const cartQty = cartQtyByProduct[p._id] || 0;
+                      const showGrosir = modeGrosir && p.hargaGrosir > 0;
+                      const cartRing = cartQty > 0
+                        ? (modeGrosir ? 'border-green-500 ring-1 ring-green-300' : 'border-emerald-300 ring-1 ring-emerald-200')
+                        : '';
+                      const hoverBg = modeGrosir ? 'hover:border-green-400 hover:bg-green-50' : 'hover:border-blue-400 hover:bg-blue-50';
                       return (
                         <button key={p._id} onClick={() => !out && addToCart(p)} disabled={out}
-                          className={`relative p-2.5 sm:p-3 rounded-xl border text-left transition-all min-h-[88px] ${out ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'bg-white hover:border-blue-400 hover:bg-blue-50 active:scale-95'} ${cartQty > 0 ? 'border-emerald-300 ring-1 ring-emerald-200' : ''}`}>
+                          className={`relative p-2.5 sm:p-3 rounded-xl border text-left transition-all min-h-[88px] ${out ? 'opacity-50 cursor-not-allowed bg-slate-50' : `bg-white ${hoverBg} active:scale-95`} ${cartRing}`}>
                           <p className="text-xs font-bold text-slate-700 leading-tight mb-1 pl-8 pr-8 line-clamp-2">{p.name}</p>
                           <p className="text-[10px] sm:text-xs text-slate-400 font-mono truncate">{p.code}</p>
-                          <p className="text-sm font-bold text-blue-600 mt-1.5 sm:mt-2">{formatRupiah(p.sellPrice)}</p>
+                          {showGrosir ? (
+                            <>
+                              <p className="text-sm font-bold text-green-600 mt-1.5 sm:mt-2">{formatRupiah(p.hargaGrosir)}</p>
+                              <p className="text-[10px] text-slate-400 line-through leading-tight">{formatRupiah(p.sellPrice)}</p>
+                            </>
+                          ) : (
+                            <p className={`text-sm font-bold mt-1.5 sm:mt-2 ${modeGrosir ? 'text-slate-600' : 'text-blue-600'}`}>{formatRupiah(p.sellPrice)}</p>
+                          )}
                           <span className={`absolute top-1.5 left-1.5 sm:top-2 sm:left-2 badge text-xs ${p.stock <= (p.minStock || 5) ? 'badge-red' : 'badge-green'}`}>{p.stock}</span>
+                          {showGrosir && (
+                            <span className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 bg-green-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow">
+                              GROSIR
+                            </span>
+                          )}
                           {cartQty > 0 && (
-                            <span className="absolute top-1 right-1 min-w-[22px] h-[22px] px-1.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center shadow-md ring-2 ring-white z-10">
+                            <span className={`absolute top-1 right-1 min-w-[22px] h-[22px] px-1.5 rounded-full text-white text-[11px] font-bold flex items-center justify-center shadow-md ring-2 ring-white z-10 ${modeGrosir ? 'bg-green-600' : 'bg-emerald-500'}`}>
                               {cartQty}
                             </span>
                           )}
@@ -1306,58 +1384,26 @@ export default function TransaksiPage() {
            
             {/* ── DIGITAL ── */}
             {activeTab === 'digital' && (
-              <div className="flex flex-col lg:flex-row flex-1 lg:overflow-hidden">
-                {/* Panel sumber dana — di mobile DIGANTI form saat sumber dana dipilih (toggle).
-                    Di desktop tetap selalu tampil di kiri. */}
-                <div className={`${selectedSumberDana ? 'hidden lg:block' : 'block'} w-full lg:w-28 border-b lg:border-b-0 lg:border-r border-slate-100 lg:overflow-y-auto bg-slate-50 flex-shrink-0`}>
-                  {/* ─ Mobile (< lg): grouped grid 3-col per kategori ─ */}
-                  <div className="lg:hidden p-3 space-y-3">
+              <div className="flex-1 lg:overflow-hidden flex flex-col min-w-0">
+                {!selectedSumberDana ? (
+                  /* Tahap 1: Grid sumber dana full-width dengan pembatas kategori */
+                  <div className="flex-1 lg:overflow-y-auto p-3 sm:p-4 space-y-4">
                     {['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'].map(group => {
                       const groupSaldos = saldos.filter(s => s.group === group && s.isActive !== false);
                       if (!groupSaldos.length) return null;
                       return (
                         <div key={group}>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5 px-0.5">{group}</p>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {groupSaldos.map(s => {
-                              const isSelected = selectedSumberDana === s.akunId;
-                              return (
-                                <button key={s.akunId}
-                                  onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
-                                  className={`flex flex-col items-center gap-0.5 py-2 px-1.5 rounded-lg border transition active:scale-95 ${
-                                    isSelected
-                                      ? 'bg-blue-600 text-white border-blue-700 shadow-md'
-                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50'
-                                  }`}>
-                                  <span className="text-lg leading-none">{s.icon}</span>
-                                  <span className="text-[11px] font-semibold leading-tight truncate w-full text-center">{s.namaAkun}</span>
-                                  <span className={`text-[10px] font-medium truncate w-full text-center ${isSelected ? 'text-blue-100' : 'text-green-600'}`}>
-                                    {formatRupiah(s.saldo)}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* ─ Desktop (lg+): grouped vertical seperti semula ─ */}
-                  <div className="hidden lg:block">
-                    {['Server Pulsa', 'Bank', 'E-Wallet', 'Tunai'].map(group => {
-                      const groupSaldos = saldos.filter(s => s.group === group && s.isActive !== false);
-                      if (!groupSaldos.length) return null;
-                      return (
-                        <div key={group}>
-                          <div className="px-2 py-1 text-xs text-slate-400 font-bold bg-slate-100 border-b border-slate-200">{group}</div>
-                          <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2 px-0.5">{group}</p>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2">
                             {groupSaldos.map(s => (
-                              <button key={s.akunId} onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(MENU_PER_GROUP[s.group]?.[0] || 'pulsa'); }}
-                                className={`w-full flex flex-col items-center gap-1 py-2.5 px-1 text-xs font-semibold transition border-b border-slate-100 ${selectedSumberDana === s.akunId ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white'}`}>
-                                <span className="text-base">{s.icon}</span>
-                                <span className="text-center leading-tight truncate w-full px-0.5">{s.namaAkun}</span>
-                                <span className={`text-xs truncate w-full text-center ${selectedSumberDana === s.akunId ? 'text-blue-100' : 'text-green-600'}`}>{formatRupiah(s.saldo)}</span>
+                              <button key={s.akunId}
+                                onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(resolveAllowedMenuIds(s.allowedMenus, s.menuOrder)[0] || 'pulsa'); }}
+                                className="flex flex-col items-center gap-1 py-3 px-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition active:scale-95">
+                                <span className="text-2xl leading-none">{s.icon}</span>
+                                <span className="text-xs font-semibold leading-tight truncate w-full text-center">{s.namaAkun}</span>
+                                <span className="text-[11px] font-medium truncate w-full text-center text-green-600">
+                                  {formatRupiah(s.saldo)}
+                                </span>
                               </button>
                             ))}
                           </div>
@@ -1365,66 +1411,57 @@ export default function TransaksiPage() {
                       );
                     })}
                   </div>
-                </div>
-
-                {/* Bawah (mobile) / Kanan (desktop): Form input (tahap 2) — muncul setelah sumber dana dipilih */}
-                <div className="flex-1 lg:overflow-y-auto flex flex-col min-w-0">
-                  {!selectedSumberDana ? (
-                    <div className="flex-1 flex-col items-center justify-center text-slate-400 gap-2 p-6 hidden lg:flex">
-                      <Wallet size={32} className="text-slate-300" />
-                      <p className="text-sm font-semibold">Pilih Sumber Dana</p>
-                      <p className="text-xs text-center">Pilih akun sumber dana di sebelah kiri terlebih dahulu</p>
+                ) : (
+                  /* Tahap 2: Form input full-width + tombol Ganti */
+                  <div key={selectedSumberDana} className="flex-1 flex flex-col animate-fade-in-up lg:overflow-hidden min-w-0">
+                    {/* Info sumber dana terpilih + Ganti */}
+                    <div className="p-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2 flex-shrink-0">
+                      <span className="text-lg">{saldos.find(s => s.akunId === selectedSumberDana)?.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-blue-700 truncate">{saldos.find(s => s.akunId === selectedSumberDana)?.namaAkun}</p>
+                        <p className="text-xs text-blue-500 truncate">Saldo: {formatRupiah(saldos.find(s => s.akunId === selectedSumberDana)?.saldo || 0)}</p>
+                      </div>
+                      <button onClick={() => setSelectedSumberDana('')} className="btn btn-outline py-1 px-2.5 text-xs flex-shrink-0">← Ganti</button>
                     </div>
-                  ) : (
-                    <div key={selectedSumberDana} className="flex-1 flex flex-col animate-fade-in-up">
-                      {/* Sub menu kategori — disesuaikan per group */}
-                      <div className="flex overflow-x-auto border-b border-slate-100 bg-white flex-shrink-0">
-                        {(() => {
-                          const group = saldos.find(s => s.akunId === selectedSumberDana)?.group || '';
-                          const allowed = MENU_PER_GROUP[group] || [];
-                          const filtered = DIGITAL_MENUS.filter(m => allowed.includes(m.id));
-                          if (filtered.length > 0 && !filtered.find(m => m.id === digitalMenu)) {
-                            setTimeout(() => setDigitalMenu(filtered[0].id), 0);
-                          }
-                          return filtered.map(menu => {
-                            const Icon = menu.icon;
-                            return (
-                              <button key={menu.id} onClick={() => setDigitalMenu(menu.id)}
-                                className={`flex flex-col items-center gap-1 py-2 px-3 text-xs font-semibold transition flex-shrink-0 border-b-2 ${digitalMenu === menu.id ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
-                                <Icon size={14} />
-                                <span>{menu.label}</span>
-                              </button>
-                            );
-                          });
-                        })()}
-                      </div>
-                      {/* Info sumber dana terpilih */}
-                      <div className="p-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2 flex-shrink-0">
-                        <span>{saldos.find(s => s.akunId === selectedSumberDana)?.icon}</span>
-                        <div>
-                          <p className="text-xs font-bold text-blue-700">{saldos.find(s => s.akunId === selectedSumberDana)?.namaAkun}</p>
-                          <p className="text-xs text-blue-500">Saldo: {formatRupiah(saldos.find(s => s.akunId === selectedSumberDana)?.saldo || 0)}</p>
-                        </div>
-                        <button onClick={() => setSelectedSumberDana('')} className="ml-auto text-blue-400 hover:text-blue-600 text-xs">Ganti</button>
-                      </div>
-                      {/* Form sesuai kategori */}
-                      <div className="flex-1 lg:overflow-y-auto">
-                        {(() => {
-                          const group = saldos.find(s => s.akunId === selectedSumberDana)?.group || '';
-                          const allowed = MENU_PER_GROUP[group] || [];
-                          if (allowed.length === 0) return (
-                            <div className="flex flex-col items-center justify-center h-32 text-slate-400 gap-2 p-6">
-                              <p className="text-sm font-semibold">Tidak ada kategori tersedia</p>
-                            </div>
+                    {/* Sub menu kategori — disesuaikan per allowedMenus akun */}
+                    <div className="flex overflow-x-auto border-b border-slate-100 bg-white flex-shrink-0">
+                      {(() => {
+                        const account = saldos.find(s => s.akunId === selectedSumberDana);
+                        const orderedIds = resolveAllowedMenuIds(account?.allowedMenus, account?.menuOrder);
+                        const menuById = new Map(DIGITAL_MENUS.map(m => [m.id, m]));
+                        const filtered = orderedIds.map(id => menuById.get(id)).filter(Boolean);
+                        if (filtered.length > 0 && !filtered.find(m => m.id === digitalMenu)) {
+                          setTimeout(() => setDigitalMenu(filtered[0].id), 0);
+                        }
+                        return filtered.map(menu => {
+                          const Icon = menu.icon;
+                          return (
+                            <button key={menu.id} onClick={() => setDigitalMenu(menu.id)}
+                              className={`flex flex-col items-center gap-1 py-2 px-3 text-xs font-semibold transition flex-shrink-0 border-b-2 ${digitalMenu === menu.id ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+                              <Icon size={14} />
+                              <span>{menu.label}</span>
+                            </button>
                           );
-                          if (digitalMenu === 'transfer') return <TransferForm key={`transfer-${selectedSumberDana}`} saldos={saldos} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
-                          if (digitalMenu === 'tarik_tunai') return <TarikTunaiForm key={`tarik-${selectedSumberDana}`} saldos={saldos} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
-                          return <DigitalForm key={`${digitalMenu}-${selectedSumberDana}`} saldos={saldos} digitalMenu={digitalMenu} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
-                        })()}
-                      </div>
+                        });
+                      })()}
                     </div>
-                  )}
-                </div>
+                    {/* Form sesuai kategori */}
+                    <div className="flex-1 lg:overflow-y-auto">
+                      {(() => {
+                        const account = saldos.find(s => s.akunId === selectedSumberDana);
+                        const allowedIds = resolveAllowedMenuIds(account?.allowedMenus, account?.menuOrder);
+                        if (allowedIds.length === 0) return (
+                          <div className="flex flex-col items-center justify-center h-32 text-slate-400 gap-2 p-6">
+                            <p className="text-sm font-semibold">Tidak ada kategori tersedia</p>
+                          </div>
+                        );
+                        if (digitalMenu === 'transfer') return <TransferForm key={`transfer-${selectedSumberDana}`} saldos={saldos} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
+                        if (digitalMenu === 'tarik_tunai') return <TarikTunaiForm key={`tarik-${selectedSumberDana}`} saldos={saldos} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
+                        return <DigitalForm key={`${digitalMenu}-${selectedSumberDana}`} saldos={saldos} digitalMenu={digitalMenu} defaultSumber={selectedSumberDana} onAddToCart={addItemToCart} />;
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1450,10 +1487,10 @@ export default function TransaksiPage() {
             style={{ marginBottom: 'var(--safe-bottom)' }}
           >
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-400 font-medium leading-tight">{totalCartQty} item</p>
-              <p className="text-base font-bold text-blue-600 truncate leading-tight">{formatRupiah(total)}</p>
+              <p className="text-xs text-slate-400 font-medium leading-tight">{totalCartQty} item {modeGrosir && <span className="text-green-600 font-bold">• GROSIR</span>}</p>
+              <p className={`text-base font-bold truncate leading-tight ${modeGrosir ? 'text-green-600' : 'text-blue-600'}`}>{formatRupiah(total)}</p>
             </div>
-            <button onClick={() => setShowMobileCart(true)} className="btn btn-primary py-2.5 px-5 flex-shrink-0">
+            <button onClick={() => setShowMobileCart(true)} className={`btn py-2.5 px-5 flex-shrink-0 ${modeGrosir ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' : 'btn-primary'}`}>
               Lanjut →
             </button>
           </div>,
@@ -1819,6 +1856,11 @@ export default function TransaksiPage() {
       <Modal open={showReceipt} onClose={() => setShowReceipt(false)} title="Struk Transaksi" size="sm">
         {lastTransaction && (
           <>
+            {(lastTransaction.isGrosir || lastTransaction.items?.some(i => i.isGrosir)) && (
+              <div className="mb-3 bg-green-500 text-white text-center py-2 px-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 shadow">
+                <Store size={16} /> GROSIR — Transaksi Harga Grosir
+              </div>
+            )}
             <div ref={printRef} id="print-root" className="bg-white"><ReceiptView transaction={lastTransaction} settings={settings} /></div>
             <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
               <button className="btn btn-outline flex-1" onClick={() => setShowReceipt(false)}>Tutup</button>

@@ -22,7 +22,7 @@ export default function LoginPage() {
       const result = await login(form.username, form.password);
       navigate('/dashboard');
       // FIXED: Toast setelah navigate agar muncul di Toaster dashboard
-      setTimeout(() => toast.success(`Selamat datang, ${result.user.name}! 👋`), 300);
+      setTimeout(() => toast.success(`Selamat datang, ${result?.user?.name || 'Pengguna'}! 👋`), 300);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login gagal');
     } finally { setLoading(false); }

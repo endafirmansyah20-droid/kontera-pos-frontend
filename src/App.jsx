@@ -28,10 +28,11 @@ function OwnerRoute({ children }) {
 }
 
 function ProtectedRoute({ children }) {
-  const { user, isOwner, loading } = useAuth();
+  const { user, isOwner, isSuperAdmin, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>;
   if (!user) return <Navigate to="/login" replace />;
   if (isOwner) return <Navigate to="/owner" replace />;
+  if (isSuperAdmin) return <Navigate to="/dashboard" replace />;
   return <Layout>{children}</Layout>;
 }
 
@@ -59,11 +60,18 @@ function AnyAuthRoute({ children }) {
   return <Layout>{children}</Layout>;
 }
 
+// Inner gate: blokir SuperAdmin dari halaman operasional toko (laporan/keuangan)
+function NoSuperAdmin({ children }) {
+  const { isSuperAdmin } = useAuth();
+  if (isSuperAdmin) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 function DefaultRedirect() {
   const { user, isAdmin, isSuperAdmin, isOwner, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (isSuperAdmin) return <Navigate to="/cabang" replace />;
+  if (isSuperAdmin) return <Navigate to="/dashboard" replace />;
   if (isOwner) return <Navigate to="/owner" replace />;
   return <Navigate to={isAdmin ? "/dashboard" : "/transaksi"} replace />;
 }
@@ -75,7 +83,7 @@ function PublicRoute({ children }) {
   // dengan tetap render children, redirect hanya saat user sudah ada.
   if (loading) return children;
   if (user) {
-    if (isSuperAdmin) return <Navigate to="/cabang" replace />;
+    if (isSuperAdmin) return <Navigate to="/dashboard" replace />;
     if (isOwner) return <Navigate to="/owner" replace />;
     return <Navigate to="/dashboard" replace />;
   }
@@ -94,11 +102,11 @@ function AppRoutes() {
       <Route path="/transaksi"     element={<ProtectedRoute><TransaksiPage /></ProtectedRoute>} />
       <Route path="/stok"          element={<ProtectedRoute><StokPage /></ProtectedRoute>} />
       <Route path="/saldo"         element={<ProtectedRoute><SaldoPage /></ProtectedRoute>} />
-      <Route path="/keuangan"      element={<AnyAuthRoute><KeuanganPage /></AnyAuthRoute>} />
-      <Route path="/laporan"       element={<AdminRoute><LaporanPage /></AdminRoute>} />
+      <Route path="/keuangan"      element={<AnyAuthRoute><NoSuperAdmin><KeuanganPage /></NoSuperAdmin></AnyAuthRoute>} />
+      <Route path="/laporan"       element={<AdminRoute><NoSuperAdmin><LaporanPage /></NoSuperAdmin></AdminRoute>} />
       <Route path="/service"       element={<ProtectedRoute><ServicePage /></ProtectedRoute>} />
       <Route path="/pelanggan"     element={<ProtectedRoute><PelangganPage /></ProtectedRoute>} />
-      <Route path="/cabang"        element={<SuperAdminRoute><CabangPage /></SuperAdminRoute>} />
+      <Route path="/client"        element={<SuperAdminRoute><CabangPage /></SuperAdminRoute>} />
       <Route path="/closing-kas"   element={<ProtectedRoute><ClosingKasPage /></ProtectedRoute>} />
       {/* ── BARU: Panel Langganan / Konfirmasi Pembayaran (superadmin) ── */}
       <Route path="/subscriptions" element={<SuperAdminRoute><SubscriptionPage /></SuperAdminRoute>} />

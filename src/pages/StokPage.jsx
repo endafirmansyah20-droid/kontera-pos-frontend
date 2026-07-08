@@ -23,7 +23,7 @@ const FISIK_CATEGORIES = [
 
 const defaultForm = {
   code: '', name: '', category: 'kartu_perdana', type: 'digital',
-  sellPrice: '', purchasePrice: '', stock: '', minStock: '',
+  sellPrice: '', purchasePrice: '', hargaGrosir: '', stock: '', minStock: '',
   provider: '', denomination: '', unit: 'pcs', description: '',
   pointValue: 0, // poin per transaksi produk ini
 };
@@ -129,6 +129,7 @@ const [bataling, setBataling] = useState(false);
       type:        p.type,
       sellPrice:   String(p.sellPrice || ''),
       purchasePrice: String(p.purchasePrice || ''),
+      hargaGrosir: String(p.hargaGrosir || ''),
       stock:       String(p.stock || ''),
       minStock:    p.minStock ?? '',
       provider:    p.provider || '',
@@ -161,6 +162,7 @@ const [bataling, setBataling] = useState(false);
         ...form,
         sellPrice:    Number(form.sellPrice)    || 0,
         purchasePrice:Number(form.purchasePrice)|| 0,
+        hargaGrosir:  Number(form.hargaGrosir)  || 0,
         minStock:     form.minStock !== '' ? Number(form.minStock) : 0,
         denomination: form.denomination ? Number(form.denomination) : undefined,
         pointValue:   Number(form.pointValue) || 0,
@@ -640,6 +642,15 @@ const [bataling, setBataling] = useState(false);
               </div>
             </div>
           </div>
+          {form.type === 'fisik' && (
+            <div>
+              <label className="label">Harga Grosir (Rp)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold pointer-events-none">Rp</span>
+                <input className="input pl-10" inputMode="numeric" placeholder="0 = tidak ada harga grosir" value={formatDisp(form.hargaGrosir)} onChange={e => F('hargaGrosir', e.target.value.replace(/\D/g, ''))} />
+              </div>
+            </div>
+          )}
           {form.type === 'fisik' && (
             <div className="grid grid-cols-3 gap-3">
               <div>

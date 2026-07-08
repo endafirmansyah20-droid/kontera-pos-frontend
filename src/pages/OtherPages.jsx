@@ -171,6 +171,8 @@ function LaporanUtama() {
   const [exporting, setExporting] = useState('');
   const [modalSummary, setModalSummary] = useState(null);
   const [modalLoading, setModalLoading] = useState(false); // 'excel' | 'pdf' | ''
+  const [txList, setTxList] = useState([]);
+  const [txListLoading, setTxListLoading] = useState(false);
 
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
@@ -198,8 +200,29 @@ function LaporanUtama() {
     }
   }, []);
 
+  const loadTxList = useCallback(async () => {
+    setTxListLoading(true);
+    try {
+      const res = await transactionAPI.getAll({ limit: 9999 });
+      const all = res.data.data || [];
+      const filtered = all.filter(t => {
+        if (t.isVoid) return false;
+        const d = new Date(t.transactionDate);
+        if (d.getFullYear() !== year) return false;
+        if (filterBulan > 0 && d.getMonth() + 1 !== filterBulan) return false;
+        return true;
+      });
+      setTxList(filtered);
+    } catch {
+      toast.error('Gagal memuat daftar transaksi grosir/retail');
+    } finally {
+      setTxListLoading(false);
+    }
+  }, [year, filterBulan]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadModalSummary(); }, [loadModalSummary]);
+  useEffect(() => { loadTxList(); }, [loadTxList]);
 
   // ── Handler download file dari blob ──
   const downloadBlob = (blob, filename) => {
@@ -254,6 +277,25 @@ function LaporanUtama() {
     } : {};
   })();
   const r = ringkasanDisplay;
+
+  const grosirRetail = (() => {
+    const agg = {
+      retail: { count: 0, omset: 0, laba: 0 },
+      grosir: { count: 0, omset: 0, laba: 0 },
+    };
+    txList.forEach(t => {
+      const isGrosir = t.isGrosir || (t.items || []).some(i => i.isGrosir);
+      const bucket = isGrosir ? agg.grosir : agg.retail;
+      const laba = t.totalProfit ?? (t.items || []).reduce(
+        (s, i) => s + (i.profit ?? (i.subtotal - (i.purchasePrice || i.modalAmount || 0) * (i.quantity || 1))),
+        0
+      );
+      bucket.count += 1;
+      bucket.omset += t.total || 0;
+      bucket.laba  += laba;
+    });
+    return agg;
+  })();
 
   return (
     <div>
@@ -407,6 +449,95 @@ function LaporanUtama() {
           </div>
         </>
       )}
+
+      {/* ── Ringkasan Penjualan: Grosir vs Retail ── */}
+      <div className="card mt-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-slate-700">🛒 Ringkasan Penjualan (Grosir vs Retail)</h3>
+          <button className="btn btn-outline py-1.5 px-3 text-xs" onClick={loadTxList} disabled={txListLoading}>
+            <RefreshCw size={13} className={txListLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-black text-indigo-700">🛍️ RETAIL</p>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">{grosirRetail.retail.count} tx</span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Omset</span>
+                <span className="font-bold text-indigo-700">{formatRupiah(grosirRetail.retail.omset)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Laba</span>
+                <span className={`font-bold ${profitColor(grosirRetail.retail.laba)}`}>{formatRupiah(grosirRetail.retail.laba)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-black text-green-700">🛒 GROSIR</p>
+              <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">{grosirRetail.grosir.count} tx</span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Omset</span>
+                <span className="font-bold text-green-700">{formatRupiah(grosirRetail.grosir.omset)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Laba</span>
+                <span className={`font-bold ${profitColor(grosirRetail.grosir.laba)}`}>{formatRupiah(grosirRetail.grosir.laba)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Daftar Transaksi</h4>
+        {txListLoading ? <Loader /> : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>No. Faktur</th>
+                  <th>Tanggal</th>
+                  <th>Pelanggan</th>
+                  <th>Tipe</th>
+                  <th>Bayar</th>
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {txList.length === 0
+                  ? <tr><td colSpan={6}><EmptyState message="Tidak ada transaksi pada periode ini" /></td></tr>
+                  : txList.slice(0, 50).map(tx => {
+                      const isGrosir = tx.isGrosir || (tx.items || []).some(i => i.isGrosir);
+                      return (
+                        <tr key={tx._id}>
+                          <td><code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{tx.invoiceNumber}</code></td>
+                          <td className="text-xs text-slate-400">{formatDate(tx.transactionDate)}</td>
+                          <td className="text-sm font-medium">{tx.customerName || '-'}</td>
+                          <td>
+                            {isGrosir
+                              ? <span className="badge bg-green-100 text-green-700 font-bold">🛒 GROSIR</span>
+                              : <span className="badge bg-slate-100 text-slate-500">Retail</span>}
+                          </td>
+                          <td><span className={`badge ${PAYMENT_COLORS[tx.paymentMethod] || 'badge-gray'}`}>{PAYMENT_LABELS[tx.paymentMethod] || tx.paymentMethod}</span></td>
+                          <td className="text-right text-sm font-bold text-blue-600">{formatRupiah(tx.total)}</td>
+                        </tr>
+                      );
+                    })
+                }
+              </tbody>
+            </table>
+            {txList.length > 50 && (
+              <p className="text-xs text-slate-400 text-center mt-2">Menampilkan 50 dari {txList.length} transaksi. Ringkasan kartu di atas menghitung semua.</p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Modal detail bulan */}
       {/* ── Ringkasan Modal ── */}
@@ -966,6 +1097,7 @@ export function PelangganPage() {
   const [saving, setSaving]         = useState(false);
   const [deleting, setDeleting]     = useState(false);
   const [filterMember, setFilterMember] = useState(''); // '' | 'member' | 'umum'
+  const [sortBy, setSortBy] = useState('terbaru'); // terbaru | nama_asc | nama_desc | poin | belanja | transaksi
 
   const load = async (q = search) => {
     setLoading(true);
@@ -1006,10 +1138,22 @@ export function PelangganPage() {
     setShowTxModal(true);
   };
 
-  const displayed = customers.filter(c =>
-    filterMember === 'member' ? c.isMember :
-    filterMember === 'umum'   ? !c.isMember : true
-  );
+  const displayed = customers
+    .filter(c =>
+      filterMember === 'member' ? c.isMember :
+      filterMember === 'umum'   ? !c.isMember : true
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'nama_asc':  return (a.name || '').localeCompare(b.name || '', 'id');
+        case 'nama_desc': return (b.name || '').localeCompare(a.name || '', 'id');
+        case 'poin':      return (b.points || 0) - (a.points || 0);
+        case 'belanja':   return (b.totalSpent || 0) - (a.totalSpent || 0);
+        case 'transaksi': return (b.totalTransactions || 0) - (a.totalTransactions || 0);
+        case 'terbaru':
+        default:          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      }
+    });
 
   const totalMember = customers.filter(c => c.isMember).length;
   const totalPoin   = customers.reduce((s, c) => s + (c.points || 0), 0);
@@ -1048,6 +1192,17 @@ export function PelangganPage() {
               {f.l}
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 font-semibold whitespace-nowrap hidden sm:inline">Urutkan:</span>
+          <select className="input py-1.5 w-auto text-sm" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+            <option value="terbaru">Terbaru</option>
+            <option value="nama_asc">Nama A-Z</option>
+            <option value="nama_desc">Nama Z-A</option>
+            <option value="poin">Poin Terbanyak</option>
+            <option value="belanja">Belanja Terbanyak</option>
+            <option value="transaksi">Transaksi Terbanyak</option>
+          </select>
         </div>
       </div>
 
@@ -1206,6 +1361,60 @@ export function PengaturanPage() {
     finally { setDownloading(false); }
   };
 
+  // ── SuperAdmin: Paket Subscription (localStorage) ─────────────────────
+  const [paketConfig, setPaketConfig] = useState(() => {
+    try {
+      const stored = localStorage.getItem('paketSubscription');
+      return stored ? JSON.parse(stored) : { hargaPerBulan: 30000, durasi: [1, 2, 3, 6] };
+    } catch { return { hargaPerBulan: 30000, durasi: [1, 2, 3, 6] }; }
+  });
+  const [savingPaket, setSavingPaket] = useState(false);
+  const [durasiInput, setDurasiInput] = useState((paketConfig.durasi || []).join(','));
+
+  const handleSavePaket = () => {
+    const hargaNum = Number(String(paketConfig.hargaPerBulan).replace(/\D/g,'')) || 0;
+    if (hargaNum < 1000) return toast.error('Harga per bulan minimal Rp 1.000');
+    const durasiArr = durasiInput.split(',').map(s => parseInt(s.trim())).filter(n => n > 0);
+    if (!durasiArr.length) return toast.error('Minimal 1 durasi paket');
+    setSavingPaket(true);
+    try {
+      const next = { hargaPerBulan: hargaNum, durasi: durasiArr };
+      localStorage.setItem('paketSubscription', JSON.stringify(next));
+      setPaketConfig(next);
+      toast.success('Paket subscription disimpan!');
+    } catch { toast.error('Gagal menyimpan paket'); }
+    finally { setSavingPaket(false); }
+  };
+
+  // ── SuperAdmin: Pengumuman Platform (localStorage) ────────────────────
+  const [pengumumanList, setPengumumanList] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('platformAnnouncements') || '[]'); }
+    catch { return []; }
+  });
+  const [pengumumanForm, setPengumumanForm] = useState({ title: '', message: '' });
+
+  const handleKirimPengumuman = () => {
+    if (!pengumumanForm.title.trim() || !pengumumanForm.message.trim())
+      return toast.error('Judul dan pesan wajib diisi');
+    const next = [{
+      id: Date.now(),
+      title: pengumumanForm.title.trim(),
+      message: pengumumanForm.message.trim(),
+      sentAt: new Date().toISOString(),
+    }, ...pengumumanList];
+    setPengumumanList(next);
+    localStorage.setItem('platformAnnouncements', JSON.stringify(next));
+    setPengumumanForm({ title: '', message: '' });
+    toast.success('Pengumuman tersimpan & akan dikirim ke semua owner');
+  };
+
+  const handleDeletePengumuman = (id) => {
+    if (!window.confirm('Hapus pengumuman ini?')) return;
+    const next = pengumumanList.filter(p => p.id !== id);
+    setPengumumanList(next);
+    localStorage.setItem('platformAnnouncements', JSON.stringify(next));
+  };
+
   // Modal tambah user
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ name: '', username: '', password: '', role: 'karyawan', cabang: '' });
@@ -1327,7 +1536,10 @@ export function PengaturanPage() {
 
   return (
     <div className="animate-fade-in-up max-w-3xl pb-24 lg:pb-0">
-      <PageHeader title="Pengaturan" subtitle="Konfigurasi toko & manajemen pengguna" />
+      <PageHeader
+        title="Pengaturan"
+        subtitle={isSuperAdmin ? 'Manajemen platform & konfigurasi sistem' : 'Konfigurasi toko & manajemen pengguna'}
+      />
 
       {/* Backup Database - SuperAdmin Only */}
       {isSuperAdmin && (
@@ -1390,7 +1602,111 @@ export function PengaturanPage() {
         </div>
       )}
 
+      {/* Paket Subscription - SuperAdmin Only */}
+      {isSuperAdmin && (
+        <div className="card mb-6 border-2 border-amber-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-xl">💳</div>
+            <div>
+              <h3 className="font-bold text-slate-700">Paket Subscription</h3>
+              <p className="text-xs text-slate-400">Atur harga & durasi paket berlangganan untuk client</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Harga per Bulan (Rp)</label>
+              <input className="input" inputMode="numeric"
+                value={paketConfig.hargaPerBulan ? new Intl.NumberFormat('id-ID').format(paketConfig.hargaPerBulan) : ''}
+                onChange={e => setPaketConfig(p => ({ ...p, hargaPerBulan: Number(e.target.value.replace(/\D/g,'')) || 0 }))} />
+              <p className="text-xs text-slate-400 mt-1">Contoh: 30.000 = Rp 30 ribu / bulan</p>
+            </div>
+            <div>
+              <label className="label">Durasi Paket Tersedia (bulan)</label>
+              <input className="input"
+                placeholder="1,2,3,6"
+                value={durasiInput}
+                onChange={e => setDurasiInput(e.target.value)} />
+              <p className="text-xs text-slate-400 mt-1">Pisahkan koma. Contoh: 1,2,3,6</p>
+            </div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-4">
+            <p className="text-xs font-bold text-amber-700 mb-1">📋 Preview Paket Aktif</p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {(paketConfig.durasi || []).map(b => (
+                <span key={b} className="text-xs font-semibold bg-white border border-amber-300 text-amber-700 px-2.5 py-1 rounded-lg">
+                  {b} bln · {formatRupiah(b * (paketConfig.hargaPerBulan || 0))}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button className="btn btn-primary" onClick={handleSavePaket} disabled={savingPaket}>
+              {savingPaket ? 'Menyimpan...' : 'Simpan Paket'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pengumuman Platform - SuperAdmin Only */}
+      {isSuperAdmin && (
+        <div className="card mb-6 border-2 border-violet-100">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center text-xl">📢</div>
+            <div>
+              <h3 className="font-bold text-slate-700">Pengumuman Platform</h3>
+              <p className="text-xs text-slate-400">Kirim notifikasi/pengumuman ke semua owner</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="label">Judul</label>
+              <input className="input" placeholder="Contoh: Maintenance Server"
+                value={pengumumanForm.title}
+                onChange={e => setPengumumanForm(f => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label">Pesan</label>
+              <textarea className="input h-24 resize-none"
+                placeholder="Tulis isi pengumuman..."
+                value={pengumumanForm.message}
+                onChange={e => setPengumumanForm(f => ({ ...f, message: e.target.value }))} />
+            </div>
+            <div className="flex justify-end">
+              <button className="btn btn-primary" onClick={handleKirimPengumuman}>
+                📤 Kirim Pengumuman
+              </button>
+            </div>
+          </div>
+          {pengumumanList.length > 0 && (
+            <div className="mt-5 border-t pt-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                Riwayat Pengumuman ({pengumumanList.length})
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {pengumumanList.map(p => (
+                  <div key={p.id} className="p-3 bg-slate-50 rounded-xl">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="font-bold text-sm text-slate-700">{p.title}</p>
+                      <button onClick={() => handleDeletePengumuman(p.id)}
+                        className="text-xs text-red-500 hover:text-red-600 shrink-0">Hapus</button>
+                    </div>
+                    <p className="text-xs text-slate-600 whitespace-pre-wrap">{p.message}</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {new Date(p.sentAt).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-slate-400 mt-3 italic">
+            ℹ️ Tersimpan lokal sementara. Integrasi notifikasi push ke owner akan tersedia di update berikutnya.
+          </p>
+        </div>
+      )}
+
       {/* Info Toko */}
+      {!isSuperAdmin && (
       <div className="card mb-6">
         <h3 className="font-bold text-slate-700 mb-4">Informasi Toko</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1589,9 +1905,10 @@ export function PengaturanPage() {
           {saving ? 'Menyimpan...' : 'Simpan Pengaturan'}
         </button>
       </div>
+      )}
 
       {/* ─── Reward Catalog ─────────────────────────────────── */}
-      {(isAdmin || currentUser?.role === 'owner') && (
+      {(isAdmin || currentUser?.role === 'owner') && !isSuperAdmin && (
         <div className="card mt-4">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1699,7 +2016,14 @@ export function PengaturanPage() {
       {isAdmin && (
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-slate-700">Manajemen Pengguna</h3>
+            <div>
+              <h3 className="font-bold text-slate-700">
+                {isSuperAdmin ? 'Manajemen User Platform' : 'Manajemen Pengguna'}
+              </h3>
+              {isSuperAdmin && (
+                <p className="text-xs text-slate-400 mt-0.5">Owner & karyawan dari semua client</p>
+              )}
+            </div>
             <button className="btn btn-primary" onClick={() => setShowUserModal(true)}>
               <Plus size={16} /> Tambah User
             </button>
@@ -1757,6 +2081,8 @@ export function PengaturanPage() {
             <select className="input" value={userForm.role} onChange={e => setUserForm(f=>({...f,role:e.target.value}))}>
               <option value="karyawan">Karyawan</option>
               <option value="admin">Admin</option>
+              {isSuperAdmin && <option value="owner">Owner</option>}
+              {isSuperAdmin && <option value="superadmin">Super Admin</option>}
             </select>
           </div>
           <div>
@@ -1787,6 +2113,7 @@ export function PengaturanPage() {
             <select className="input" value={editForm.role} onChange={e => setEditForm(f=>({...f,role:e.target.value}))}>
               <option value="karyawan">Karyawan</option>
               <option value="admin">Admin</option>
+              {isSuperAdmin && <option value="owner">Owner</option>}
               {isSuperAdmin && <option value="superadmin">Super Admin</option>}
             </select>
           </div>
