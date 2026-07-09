@@ -715,7 +715,6 @@ export default function TransaksiPage() {
             if (nominalTarik > 0) {
               await saldoAPI.topUp({ akunId: item.sumberDana, amount: nominalTarik, keterangan: `Tarik Tunai masuk | ${data.data.invoiceNumber}` });
             }
-            await saldoAPI.topUp({ akunId: 'tunai', amount: -nominalTarik, keterangan: `Kas keluar Tarik Tunai | ${data.data.invoiceNumber}` });
           } else {
             const modalKeluar = (item.modalAmount || item.purchasePrice || 0) * (item.quantity || 1);
             if (modalKeluar > 0) {
@@ -735,11 +734,6 @@ export default function TransaksiPage() {
       }
       if (paymentMethod === 'qris' && akunQris) {
         await saldoAPI.topUp({ akunId: akunQris, amount: total, keterangan: `Pembayaran QRIS ${data.data.invoiceNumber}` }).catch(() => {});
-      }
-
-      // Cash → tambah kas tunai
-      if (paymentMethod === 'cash') {
-        await saldoAPI.topUp({ akunId: 'tunai', amount: total, keterangan: `Penjualan Cash ${data.data.invoiceNumber}` }).catch(() => {});
       }
 
       refreshSaldos();

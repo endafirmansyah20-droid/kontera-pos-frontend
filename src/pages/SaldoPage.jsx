@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { saldoAPI, transactionAPI } from '../services/api';
 import { formatRupiah, formatDateTime } from '../utils/helpers';
 import { PageHeader, Modal, Loader, EmptyState } from '../components/UI';
@@ -24,6 +24,52 @@ const DIGITAL_MENU_OPTIONS = [
 ];
 
 const DEFAULT_MENU_ORDER = DIGITAL_MENU_OPTIONS.map(o => o.key);
+
+const ICON_OPTIONS = [
+  { file: 'bank.png',        label: 'Bank' },
+  { file: 'bca.png',         label: 'BCA' },
+  { file: 'bni.png',         label: 'BNI' },
+  { file: 'bri.png',         label: 'BRI' },
+  { file: 'brilink.png',     label: 'BRILink' },
+  { file: 'dana.png',        label: 'DANA' },
+  { file: 'digipos.png',     label: 'Digipos' },
+  { file: 'gopay.png',       label: 'GoPay' },
+  { file: 'isaku.png',       label: 'iSaku' },
+  { file: 'kastunai.png',    label: 'Kas Tunai' },
+  { file: 'linkaja.png',     label: 'LinkAja' },
+  { file: 'mitrabl.png',     label: 'Mitra BL' },
+  { file: 'ovo.png',         label: 'OVO' },
+  { file: 'permata.png',     label: 'Permata' },
+  { file: 'qris.png',        label: 'QRIS' },
+  { file: 'radarpulsa.png',  label: 'Radar Pulsa' },
+  { file: 'seabank.png',     label: 'SeaBank' },
+  { file: 'shopeepay.png',   label: 'ShopeePay' },
+];
+
+const getAkunIcon = (akunId = '') => {
+  const id = String(akunId).toLowerCase();
+  if (id.includes('brilink'))  return 'brilink.png';
+  if (id.includes('brimo'))    return 'bri.png';
+  if (id.includes('bri'))      return 'bri.png';
+  if (id.includes('bca'))      return 'bca.png';
+  if (id.includes('bni'))      return 'bni.png';
+  if (id.includes('permata'))  return 'permata.png';
+  if (id.includes('seabank'))  return 'seabank.png';
+  if (id.includes('dana'))     return 'dana.png';
+  if (id.includes('ovo'))      return 'ovo.png';
+  if (id.includes('gopay'))    return 'gopay.png';
+  if (id.includes('shopee'))   return 'shopeepay.png';
+  if (id.includes('linkaja'))  return 'linkaja.png';
+  if (id.includes('qris'))     return 'qris.png';
+  if (id.includes('digipos'))  return 'digipos.png';
+  if (id.includes('isaku'))    return 'isaku.png';
+  if (id.includes('radar'))    return 'radarpulsa.png';
+  if (id.includes('mitra'))    return 'mitrabl.png';
+  if (id.includes('tunai'))    return 'kastunai.png';
+  return 'bank.png';
+};
+
+const iconSrc = (akun) => `/icons/${akun?.iconFile || getAkunIcon(akun?.akunId)}`;
 
 export default function SaldoPage() {
   const { isAdmin } = useAuth();
@@ -72,16 +118,24 @@ export default function SaldoPage() {
   const [showEditAkun, setShowEditAkun] = useState(false);
   const [selectedAkunEdit, setSelectedAkunEdit] = useState(null);
   const [savingAkun, setSavingAkun] = useState(false);
-  const [akunForm, setAkunForm] = useState({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳' });
+  const [akunForm, setAkunForm] = useState({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳', iconFile: 'bank.png' });
   const [draggedMenuKey, setDraggedMenuKey] = useState(null);
 
   const [saving, setSaving] = useState(false);
+
+  // Session memory: akunId → iconFile. Preserves user's icon choice even if
+  // backend response doesn't return iconFile yet (until backend migration lands).
+  const iconMemoryRef = useRef({});
+
+  const applyIconMemory = (arr) => arr.map(s =>
+    s.iconFile ? s : (iconMemoryRef.current[s.akunId] ? { ...s, iconFile: iconMemoryRef.current[s.akunId] } : s)
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await saldoAPI.getAll();
-      const all = data.data || [];
+      const all = applyIconMemory(data.data || []);
       const kas = all.find(s => s.akunId === 'tunai' || s.akunId.startsWith('tunai'));
       setKasTunaiData(kas || null);
       setSaldos(all.filter(s => !s.akunId.startsWith('tunai')));
@@ -119,7 +173,7 @@ export default function SaldoPage() {
   const loadSemuaAkun = async () => {
     try {
       const { data } = await saldoAPI.getAllAdmin();
-      setSemuaAkun(data.data || []);
+      setSemuaAkun(applyIconMemory(data.data || []));
     } catch { toast.error('Gagal memuat akun'); }
   };
 
@@ -189,10 +243,12 @@ export default function SaldoPage() {
     if (!akunForm.akunId || !akunForm.namaAkun) return toast.error('ID Akun dan Nama wajib diisi!');
     setSavingAkun(true);
     try {
-      await saldoAPI.tambahAkun(akunForm);
+      const payload = { ...akunForm, iconFile: akunForm.iconFile || 'bank.png' };
+      await saldoAPI.tambahAkun(payload);
+      iconMemoryRef.current[payload.akunId] = payload.iconFile;
       toast.success('Akun berhasil ditambahkan! ✅');
       setShowTambahAkun(false);
-      setAkunForm({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳' });
+      setAkunForm({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳', iconFile: 'bank.png' });
       loadSemuaAkun(); load();
     } catch (err) { toast.error(err.response?.data?.message || 'Gagal tambah akun'); }
     finally { setSavingAkun(false); }
@@ -201,7 +257,13 @@ export default function SaldoPage() {
   const handleUpdateAkun = async () => {
     setSavingAkun(true);
     try {
-      await saldoAPI.updateAkun(selectedAkunEdit.akunId, akunForm);
+      const payload = { ...akunForm, iconFile: akunForm.iconFile || getAkunIcon(selectedAkunEdit.akunId) };
+      await saldoAPI.updateAkun(selectedAkunEdit.akunId, payload);
+      const akunId = selectedAkunEdit.akunId;
+      iconMemoryRef.current[akunId] = payload.iconFile;
+      setSaldos(prev => prev.map(s => s.akunId === akunId ? { ...s, ...payload } : s));
+      setSemuaAkun(prev => prev.map(a => a.akunId === akunId ? { ...a, ...payload } : a));
+      setKasTunaiData(prev => prev && prev.akunId === akunId ? { ...prev, ...payload } : prev);
       toast.success('Akun berhasil diupdate! ✅');
       setShowEditAkun(false);
       loadSemuaAkun(); load();
@@ -240,8 +302,8 @@ export default function SaldoPage() {
 
   const getJenisMutasi = (keterangan = '') => {
     const k = keterangan.toLowerCase();
-    if (k.includes('penjualan cash')) return { label: 'Penjualan', cls: 'bg-blue-100 text-blue-700' };
-    if (k.includes('tarik tunai')) return { label: 'Tarik Tunai', cls: 'bg-purple-100 text-purple-700' };
+    if (k.includes('penjualan cash') || k.includes('transaksi tunai')) return { label: 'Penjualan', cls: 'bg-blue-100 text-blue-700' };
+    if (k.includes('tarik tunai') || k.includes('kas keluar')) return { label: 'Tarik Tunai', cls: 'bg-orange-100 text-orange-700' };
     if (k.includes('transfer')) return { label: 'Transfer', cls: 'bg-orange-100 text-orange-700' };
     if (k.includes('top up') || k.includes('pemasukan')) return { label: 'Top Up', cls: 'bg-green-100 text-green-700' };
     if (k.includes('pengeluaran')) return { label: 'Pengeluaran', cls: 'bg-red-100 text-red-700' };
@@ -284,7 +346,7 @@ export default function SaldoPage() {
     <div className={`card hover:shadow-card-hover transition-all ${akun.saldo < 0 ? 'border-red-200 bg-red-50' : akun.saldo < 50000 ? 'border-yellow-200 bg-yellow-50' : ''}`}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{akun.icon}</span>
+          <img src={iconSrc(akun)} alt={akun.namaAkun} className="w-10 h-10 object-contain rounded-lg" />
           <div>
             <p className="text-sm font-bold text-slate-700">{akun.namaAkun}</p>
             <p className="text-xs text-slate-400">{akun.group}</p>
@@ -404,7 +466,12 @@ export default function SaldoPage() {
 
       {/* ── Modal: Mutasi ── */}
       <Modal open={showMutasi} onClose={() => setShowMutasi(false)}
-        title={`Mutasi: ${selectedAkun?.icon} ${selectedAkun?.namaAkun}`} size="lg">
+        title={
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {selectedAkun && <img src={iconSrc(selectedAkun)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', borderRadius: 4 }} />}
+            Mutasi: {selectedAkun?.namaAkun}
+          </span>
+        } size="lg">
         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl mb-4">
           <span className="text-sm text-slate-500">Saldo Saat Ini</span>
           <span className="text-lg font-black">{formatRupiah(selectedAkun?.saldo)}</span>
@@ -674,7 +741,7 @@ export default function SaldoPage() {
         <div className="flex justify-between items-center mb-4">
           <p className="text-sm text-slate-500">{semuaAkun.length} akun terdaftar</p>
           <button className="btn btn-primary text-xs py-2"
-            onClick={() => { setAkunForm({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳' }); setShowTambahAkun(true); }}>
+            onClick={() => { setAkunForm({ akunId: '', namaAkun: '', group: 'Bank', icon: '💳', iconFile: 'bank.png' }); setShowTambahAkun(true); }}>
             <Plus size={14} /> Tambah Akun
           </button>
         </div>
@@ -687,7 +754,7 @@ export default function SaldoPage() {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">{group}</p>
                 {groupAkun.map(akun => (
                   <div key={akun.akunId} className={`flex items-center gap-3 p-3 rounded-xl border mb-1.5 ${!akun.isActive ? 'opacity-50 bg-slate-50' : 'bg-white border-slate-100'}`}>
-                    <span className="text-xl">{akun.icon}</span>
+                    <img src={iconSrc(akun)} alt={akun.namaAkun} className="w-8 h-8 object-contain rounded-lg" />
                     <div className="flex-1">
                       <p className="text-sm font-bold text-slate-700">{akun.namaAkun}</p>
                       <p className="text-xs text-slate-400">{akun.akunId} • {formatRupiah(akun.saldo)}</p>
@@ -704,6 +771,7 @@ export default function SaldoPage() {
                           namaAkun: akun.namaAkun,
                           group: akun.group,
                           icon: akun.icon,
+                          iconFile: akun.iconFile || getAkunIcon(akun.akunId),
                           isActive: akun.isActive !== false,
                           allowedMenus: savedAllowed.length > 0 ? [...savedAllowed] : DEFAULT_MENU_ORDER.slice(),
                           menuOrder: backfilled,
@@ -752,17 +820,23 @@ export default function SaldoPage() {
             </select>
           </div>
           <div>
-            <label className="label">Icon Emoji</label>
-            <div className="flex gap-2 flex-wrap mb-2">
-              {['💳', '🏦', '🏧', '💙', '💚', '💜', '🟠', '📡', '🛒', '💻', '💵', '⭐'].map(e => (
-                <button key={e} onClick={() => setAkunForm(f => ({ ...f, icon: e }))}
-                  className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition ${akunForm.icon === e ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-slate-100 hover:bg-slate-200'}`}>
-                  {e}
-                </button>
-              ))}
+            <label className="label">Icon</label>
+            <div className="grid grid-cols-6 gap-2 p-3 bg-slate-50 rounded-xl">
+              {ICON_OPTIONS.map(opt => {
+                const selected = akunForm.iconFile === opt.file;
+                return (
+                  <button
+                    key={opt.file}
+                    type="button"
+                    onClick={() => setAkunForm(f => ({ ...f, iconFile: opt.file }))}
+                    className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition ${selected ? 'border-blue-500 bg-blue-50' : 'border-transparent bg-white hover:bg-slate-100'}`}
+                  >
+                    <img src={`/icons/${opt.file}`} alt={opt.label} className="w-12 h-12 object-contain rounded-lg" />
+                    <span className={`text-[10px] font-medium leading-tight text-center ${selected ? 'text-blue-700' : 'text-slate-500'}`}>{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            <input className="input" placeholder="Atau ketik emoji lain..."
-              value={akunForm.icon} onChange={e => setAkunForm(f => ({ ...f, icon: e.target.value }))} />
           </div>
         </div>
         <div className="flex gap-3 mt-5">
@@ -797,17 +871,23 @@ export default function SaldoPage() {
             </select>
           </div>
           <div>
-            <label className="label">Icon Emoji</label>
-            <div className="flex gap-2 flex-wrap mb-2">
-              {['💳', '🏦', '🏧', '💙', '💚', '💜', '🟠', '📡', '🛒', '💻', '💵', '⭐'].map(e => (
-                <button key={e} onClick={() => setAkunForm(f => ({ ...f, icon: e }))}
-                  className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition ${akunForm.icon === e ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-slate-100 hover:bg-slate-200'}`}>
-                  {e}
-                </button>
-              ))}
+            <label className="label">Icon</label>
+            <div className="grid grid-cols-6 gap-2 p-3 bg-slate-50 rounded-xl">
+              {ICON_OPTIONS.map(opt => {
+                const selected = akunForm.iconFile === opt.file;
+                return (
+                  <button
+                    key={opt.file}
+                    type="button"
+                    onClick={() => setAkunForm(f => ({ ...f, iconFile: opt.file }))}
+                    className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition ${selected ? 'border-blue-500 bg-blue-50' : 'border-transparent bg-white hover:bg-slate-100'}`}
+                  >
+                    <img src={`/icons/${opt.file}`} alt={opt.label} className="w-12 h-12 object-contain rounded-lg" />
+                    <span className={`text-[10px] font-medium leading-tight text-center ${selected ? 'text-blue-700' : 'text-slate-500'}`}>{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            <input className="input" placeholder="Atau ketik emoji lain..."
-              value={akunForm.icon} onChange={e => setAkunForm(f => ({ ...f, icon: e.target.value }))} />
           </div>
           {akunForm.group !== 'Tunai' && (
             <div className="p-3 bg-slate-50 rounded-xl">
