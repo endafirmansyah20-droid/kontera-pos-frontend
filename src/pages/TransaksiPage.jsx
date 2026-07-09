@@ -57,6 +57,32 @@ const resolveAllowedMenuIds = (allowedMenus, menuOrder) => {
 
 const PAYMENT_METHODS = ['cash', 'qris', 'transfer', 'hutang'];
 
+// ─── Akun Icon Helpers (sinkron dgn SaldoPage.jsx) ────────────
+const getAkunIcon = (akunId = '') => {
+  const id = String(akunId).toLowerCase();
+  if (id.includes('brilink'))  return 'brilink.png';
+  if (id.includes('brimo'))    return 'bri.png';
+  if (id.includes('bri'))      return 'bri.png';
+  if (id.includes('bca'))      return 'bca.png';
+  if (id.includes('bni'))      return 'bni.png';
+  if (id.includes('permata'))  return 'permata.png';
+  if (id.includes('seabank'))  return 'seabank.png';
+  if (id.includes('dana'))     return 'dana.png';
+  if (id.includes('ovo'))      return 'ovo.png';
+  if (id.includes('gopay'))    return 'gopay.png';
+  if (id.includes('shopee'))   return 'shopeepay.png';
+  if (id.includes('linkaja'))  return 'linkaja.png';
+  if (id.includes('qris'))     return 'qris.png';
+  if (id.includes('digipos'))  return 'digipos.png';
+  if (id.includes('isaku'))    return 'isaku.png';
+  if (id.includes('radar'))    return 'radarpulsa.png';
+  if (id.includes('mitra'))    return 'mitrabl.png';
+  if (id.includes('tunai'))    return 'kastunai.png';
+  return 'bank.png';
+};
+
+const iconSrc = (akun) => `/icons/${akun?.iconFile || getAkunIcon(akun?.akunId)}`;
+
 // ─── Rupiah Input ─────────────────────────────────────────────
 const RupiahInput = memo(({ value, onChange, placeholder = '0' }) => {
   const formatDisplay = (raw) => {
@@ -1393,7 +1419,7 @@ export default function TransaksiPage() {
                               <button key={s.akunId}
                                 onClick={() => { setSelectedSumberDana(s.akunId); setDigitalMenu(resolveAllowedMenuIds(s.allowedMenus, s.menuOrder)[0] || 'pulsa'); }}
                                 className="flex flex-col items-center gap-1 py-3 px-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition active:scale-95">
-                                <span className="text-2xl leading-none">{s.icon}</span>
+                                <img src={iconSrc(s)} alt={s.namaAkun} className="w-10 h-10 object-contain rounded-lg" />
                                 <span className="text-xs font-semibold leading-tight truncate w-full text-center">{s.namaAkun}</span>
                                 <span className="text-[11px] font-medium truncate w-full text-center text-green-600">
                                   {formatRupiah(s.saldo)}
@@ -1410,7 +1436,7 @@ export default function TransaksiPage() {
                   <div key={selectedSumberDana} className="flex-1 flex flex-col animate-fade-in-up lg:overflow-hidden min-w-0">
                     {/* Info sumber dana terpilih + Ganti */}
                     <div className="p-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2 flex-shrink-0">
-                      <span className="text-lg">{saldos.find(s => s.akunId === selectedSumberDana)?.icon}</span>
+                      <img src={iconSrc(saldos.find(s => s.akunId === selectedSumberDana))} alt="" className="w-10 h-10 object-contain rounded-lg flex-shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-blue-700 truncate">{saldos.find(s => s.akunId === selectedSumberDana)?.namaAkun}</p>
                         <p className="text-xs text-blue-500 truncate">Saldo: {formatRupiah(saldos.find(s => s.akunId === selectedSumberDana)?.saldo || 0)}</p>
