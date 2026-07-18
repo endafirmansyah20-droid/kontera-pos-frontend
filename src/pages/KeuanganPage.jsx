@@ -375,6 +375,12 @@ function KeuanganOwner() {
   const [form, setForm]                 = useState(defaultForm);
   const [saving, setSaving]             = useState(false);
   const [deleting, setDeleting]         = useState(false);
+  const [saldos, setSaldos]             = useState([]);
+  const [showLunasiFinModal, setShowLunasiFinModal] = useState(false);
+  const [lunasiFinRec, setLunasiFinRec] = useState(null);
+  const [lunasiFinMetode, setLunasiFinMetode]   = useState('cash');
+  const [lunasiFinAkunId, setLunasiFinAkunId]   = useState('');
+  const [lunasiFinLoading, setLunasiFinLoading] = useState(false);
 
   // Load daftar cabang milik owner
   useEffect(() => {
@@ -390,12 +396,14 @@ function KeuanganOwner() {
     if (!selectedCabang) return;
     setLoadingRec(true);
     try {
-      const [r, s] = await Promise.all([
+      const [r, s, sl] = await Promise.all([
         api.get('/finance', { params: { cabang: selectedCabang, ...(typeFilter ? { type: typeFilter } : {}) } }),
-        api.get('/finance/summary', { params: { cabang: selectedCabang } })
+        api.get('/finance/summary', { params: { cabang: selectedCabang } }),
+        api.get('/saldo', { params: { cabang: selectedCabang, _t: Date.now() } })
       ]);
       setRecords(r.data.data || []);
       setSummary(s.data.data);
+      setSaldos((sl.data.data || []).filter(a => a.akunId !== 'brankas' && a.isActive));
     } catch { toast.error('Gagal memuat data keuangan'); }
     finally { setLoadingRec(false); }
   }, [selectedCabang, typeFilter]);
@@ -430,6 +438,40 @@ function KeuanganOwner() {
       setShowDeleteConfirm(false); loadRecords();
     } catch { toast.error('Gagal menghapus'); }
     finally { setDeleting(false); }
+  };
+
+  const openLunasiFin = (r) => {
+    setLunasiFinRec(r);
+    setLunasiFinMetode('cash');
+    setLunasiFinAkunId('');
+    setShowLunasiFinModal(true);
+  };
+
+  const handleKonfirmasiLunasiFin = async () => {
+    if (!lunasiFinRec) return;
+    const needAkun = lunasiFinMetode === 'transfer' || lunasiFinMetode === 'qris';
+    if (needAkun && !lunasiFinAkunId) return toast.error('Pilih akun tujuan pembayaran!');
+    setLunasiFinLoading(true);
+    try {
+      await api.put(`/finance/${lunasiFinRec._id}`, {
+        type: lunasiFinRec.type,
+        category: lunasiFinRec.category,
+        description: lunasiFinRec.description,
+        amount: lunasiFinRec.amount,
+        date: lunasiFinRec.date,
+        relatedParty: lunasiFinRec.relatedParty,
+        dueDate: lunasiFinRec.dueDate,
+        isPaid: true,
+        metode: lunasiFinMetode,
+        akunId: needAkun ? lunasiFinAkunId : undefined,
+        cabang: selectedCabang,
+      });
+      toast.success(`${lunasiFinRec.type === 'hutang' ? 'Hutang' : 'Piutang'} berhasil dilunasi! ✅`);
+      setShowLunasiFinModal(false);
+      setLunasiFinRec(null);
+      loadRecords();
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal melunasi'); }
+    finally { setLunasiFinLoading(false); }
   };
 
   const F = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -510,7 +552,12 @@ function KeuanganOwner() {
                         : <span className="badge badge-gray">-</span>}
                     </td>
                     <td>
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(r.type === 'hutang' || r.type === 'piutang') && !r.isPaid && (
+                          <button onClick={() => openLunasiFin(r)} className="btn btn-success py-1.5 px-2.5 text-xs" title="Lunasi">
+                            <CheckCircle size={13} /> Lunasi
+                          </button>
+                        )}
                         <button onClick={() => openEdit(r)} className="btn btn-outline py-1.5 px-2.5 text-xs"><Edit2 size={13} /></button>
                         <button onClick={() => { setSelectedRecord(r); setShowDeleteConfirm(true); }} className="btn btn-danger py-1.5 px-2.5 text-xs"><Trash2 size={13} /></button>
                       </div>
@@ -561,9 +608,12 @@ function KeuanganOwner() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className="label">Nama Pihak</label><input className="input" value={form.relatedParty} onChange={e => F('relatedParty', e.target.value)} placeholder="Nama supplier/pelanggan" /></div>
               <div><label className="label">Jatuh Tempo</label><input className="input" type="date" value={form.dueDate} onChange={e => F('dueDate', e.target.value)} /></div>
-              <div className="sm:col-span-2 flex items-center gap-2">
-                <input type="checkbox" id="isPaid" checked={form.isPaid} onChange={e => F('isPaid', e.target.checked)} className="rounded" />
-                <label htmlFor="isPaid" className="text-sm text-slate-700 dark:text-slate-300">Sudah Lunas</label>
+              <div className="sm:col-span-2">
+                <div className="flex items-center gap-2 opacity-60">
+                  <input type="checkbox" id="isPaid" checked={form.isPaid} disabled className="rounded cursor-not-allowed" />
+                  <label htmlFor="isPaid" className="text-sm text-slate-700 dark:text-slate-300 cursor-not-allowed">Sudah Lunas</label>
+                </div>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Gunakan tombol "Lunasi" pada daftar untuk menandai status lunas</p>
               </div>
             </div>
           )}
@@ -576,6 +626,51 @@ function KeuanganOwner() {
 
       <ConfirmDialog open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} onConfirm={handleDelete}
         title="Hapus Catatan" message="Yakin ingin menghapus catatan keuangan ini?" loading={deleting} />
+
+      {/* Modal Lunasi Hutang/Piutang (Finance) */}
+      {showLunasiFinModal && lunasiFinRec && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-3 sm:p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-800 mb-1">Lunasi {lunasiFinRec.type === 'hutang' ? 'Hutang' : 'Piutang'}</h3>
+            <div className="bg-slate-50 rounded-xl p-3 mb-4 min-w-0">
+              <p className="text-xs text-slate-500 truncate">{lunasiFinRec.description}{lunasiFinRec.relatedParty ? ` · ${lunasiFinRec.relatedParty}` : ''}</p>
+              <p className="text-lg sm:text-xl font-black text-slate-800 mt-1 break-all">{formatRupiah(lunasiFinRec.amount)}</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="label">Metode Pembayaran</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[["cash","💵 Tunai"],["transfer","🏦 Transfer"],["qris","📱 QRIS"]].map(([val, label]) => (
+                    <button key={val} onClick={() => { setLunasiFinMetode(val); setLunasiFinAkunId(""); }}
+                      className={"py-2 px-1 rounded-xl text-[11px] sm:text-xs font-semibold border transition whitespace-nowrap " + (lunasiFinMetode === val ? "bg-primary-600 text-white border-primary-600" : "border-slate-200 text-slate-600 hover:border-primary-300")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(lunasiFinMetode === "transfer" || lunasiFinMetode === "qris") && (
+                <div>
+                  <label className="label">Akun Tujuan</label>
+                  <select className="input bg-white" value={lunasiFinAkunId} onChange={e => setLunasiFinAkunId(e.target.value)}>
+                    <option value="">Pilih akun...</option>
+                    {saldos.filter(s => s.group !== "Tunai" && s.akunId !== "brankas").map(s => (
+                      <option key={s.akunId} value={s.akunId}>{s.namaAkun} — {formatRupiah(s.saldo)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 mt-4">
+              <button onClick={() => setShowLunasiFinModal(false)} className="btn btn-outline flex-1">Batal</button>
+              <button onClick={handleKonfirmasiLunasiFin} disabled={lunasiFinLoading}
+                className="btn btn-success flex-1 flex items-center justify-center gap-2">
+                {lunasiFinLoading ? "..." : <><CheckCircle size={15} /> Lunasi</>}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -606,6 +701,11 @@ export default function KeuanganPage() {
   const [bayarMetode, setBayarMetode] = useState('cash');
   const [bayarAkunId, setBayarAkunId] = useState('');
   const [saldos, setSaldos] = useState([]); // daftar akun saldo untuk pilihan sumber dana
+  const [showLunasiFinModal, setShowLunasiFinModal] = useState(false);
+  const [lunasiFinRec, setLunasiFinRec] = useState(null);
+  const [lunasiFinMetode, setLunasiFinMetode] = useState('cash');
+  const [lunasiFinAkunId, setLunasiFinAkunId] = useState('');
+  const [lunasiFinLoading, setLunasiFinLoading] = useState(false);
 
   const loadHutang = useCallback(async () => {
     setHutangLoading(true);
@@ -639,6 +739,39 @@ export default function KeuanganPage() {
       load(); // refresh saldo
     } catch (err) { toast.error(err.response?.data?.message || 'Gagal melunasi hutang'); }
     finally { setBayarLoading(null); }
+  };
+
+  const openLunasiFin = (r) => {
+    setLunasiFinRec(r);
+    setLunasiFinMetode('cash');
+    setLunasiFinAkunId('');
+    setShowLunasiFinModal(true);
+  };
+
+  const handleKonfirmasiLunasiFin = async () => {
+    if (!lunasiFinRec) return;
+    const needAkun = lunasiFinMetode === 'transfer' || lunasiFinMetode === 'qris';
+    if (needAkun && !lunasiFinAkunId) return toast.error('Pilih akun tujuan pembayaran!');
+    setLunasiFinLoading(true);
+    try {
+      await financeAPI.update(lunasiFinRec._id, {
+        type: lunasiFinRec.type,
+        category: lunasiFinRec.category,
+        description: lunasiFinRec.description,
+        amount: lunasiFinRec.amount,
+        date: lunasiFinRec.date,
+        relatedParty: lunasiFinRec.relatedParty,
+        dueDate: lunasiFinRec.dueDate,
+        isPaid: true,
+        metode: lunasiFinMetode,
+        akunId: needAkun ? lunasiFinAkunId : undefined,
+      });
+      toast.success(`${lunasiFinRec.type === 'hutang' ? 'Hutang' : 'Piutang'} berhasil dilunasi! ✅`);
+      setShowLunasiFinModal(false);
+      setLunasiFinRec(null);
+      load();
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal melunasi'); }
+    finally { setLunasiFinLoading(false); }
   };
 
   const load = useCallback(async () => {
@@ -820,7 +953,12 @@ export default function KeuanganPage() {
                             : <span className="badge badge-gray">-</span>}
                         </td>
                         <td>
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-1.5 flex-wrap">
+                            {(r.type === 'hutang' || r.type === 'piutang') && !r.isPaid && (
+                              <button onClick={() => openLunasiFin(r)} className="btn btn-success py-1.5 px-2.5 text-xs" title="Lunasi">
+                                <CheckCircle size={13} /> Lunasi
+                              </button>
+                            )}
                             <button onClick={() => openEdit(r)} className="btn btn-outline py-1.5 px-2.5 text-xs"><Edit2 size={13} /></button>
                             <button onClick={() => { setSelectedRecord(r); setShowDeleteConfirm(true); }} className="btn btn-danger py-1.5 px-2.5 text-xs"><Trash2 size={13} /></button>
                           </div>
@@ -913,9 +1051,12 @@ export default function KeuanganPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className="label">Nama Pihak</label><input className="input" value={form.relatedParty} onChange={e => F('relatedParty', e.target.value)} placeholder="Nama supplier/pelanggan" /></div>
               <div><label className="label">Jatuh Tempo</label><input className="input" type="date" value={form.dueDate} onChange={e => F('dueDate', e.target.value)} /></div>
-              <div className="sm:col-span-2 flex items-center gap-2">
-                <input type="checkbox" id="isPaid" checked={form.isPaid} onChange={e => F('isPaid', e.target.checked)} className="rounded" />
-                <label htmlFor="isPaid" className="text-sm text-slate-700">Sudah Lunas</label>
+              <div className="sm:col-span-2">
+                <div className="flex items-center gap-2 opacity-60">
+                  <input type="checkbox" id="isPaid" checked={form.isPaid} disabled className="rounded cursor-not-allowed" />
+                  <label htmlFor="isPaid" className="text-sm text-slate-700 cursor-not-allowed">Sudah Lunas</label>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Gunakan tombol "Lunasi" pada daftar untuk menandai status lunas</p>
               </div>
             </div>
           )}
@@ -967,6 +1108,51 @@ export default function KeuanganPage() {
               <button onClick={handleKonfirmasiBayar} disabled={!!bayarLoading}
                 className="btn btn-success flex-1 flex items-center justify-center gap-2">
                 {bayarLoading ? "..." : <><CheckCircle size={15} /> Lunasi</>}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal Lunasi Hutang/Piutang (Finance) */}
+      {showLunasiFinModal && lunasiFinRec && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-3 sm:p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-800 mb-1">Lunasi {lunasiFinRec.type === 'hutang' ? 'Hutang' : 'Piutang'}</h3>
+            <div className="bg-slate-50 rounded-xl p-3 mb-4 min-w-0">
+              <p className="text-xs text-slate-500 truncate">{lunasiFinRec.description}{lunasiFinRec.relatedParty ? ` · ${lunasiFinRec.relatedParty}` : ''}</p>
+              <p className="text-lg sm:text-xl font-black text-slate-800 mt-1 break-all">{formatRupiah(lunasiFinRec.amount)}</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="label">Metode Pembayaran</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[["cash","💵 Tunai"],["transfer","🏦 Transfer"],["qris","📱 QRIS"]].map(([val, label]) => (
+                    <button key={val} onClick={() => { setLunasiFinMetode(val); setLunasiFinAkunId(""); }}
+                      className={"py-2 px-1 rounded-xl text-[11px] sm:text-xs font-semibold border transition whitespace-nowrap " + (lunasiFinMetode === val ? "bg-primary-600 text-white border-primary-600" : "border-slate-200 text-slate-600 hover:border-primary-300")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(lunasiFinMetode === "transfer" || lunasiFinMetode === "qris") && (
+                <div>
+                  <label className="label">Akun Tujuan</label>
+                  <select className="input bg-white" value={lunasiFinAkunId} onChange={e => setLunasiFinAkunId(e.target.value)}>
+                    <option value="">Pilih akun...</option>
+                    {saldos.filter(s => s.group !== "Tunai" && s.akunId !== "brankas").map(s => (
+                      <option key={s.akunId} value={s.akunId}>{s.namaAkun} — {formatRupiah(s.saldo)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 mt-4">
+              <button onClick={() => setShowLunasiFinModal(false)} className="btn btn-outline flex-1">Batal</button>
+              <button onClick={handleKonfirmasiLunasiFin} disabled={lunasiFinLoading}
+                className="btn btn-success flex-1 flex items-center justify-center gap-2">
+                {lunasiFinLoading ? "..." : <><CheckCircle size={15} /> Lunasi</>}
               </button>
             </div>
           </div>
