@@ -55,7 +55,7 @@ export const transactionAPI = {
   getPerSumber: (akunId, p) => api.get(`/transactions/per-sumber/${akunId}`, { params: p }),
   editItem: (transactionId, itemId, d) => api.put(`/transactions/${transactionId}/item/${itemId}`, d),
   getHutang: (p) => api.get('/transactions/hutang/list', { params: p }),
-  bayarHutang: (id) => api.post(`/transactions/${id}/bayar-hutang`),
+  bayarHutang: (id, data) => api.post(`/transactions/${id}/bayar-hutang`, data),
   getVoided: (p) => api.get('/transactions/voided/list', { params: p }),
   getAnomalyCount: () => api.get('/transactions/anomaly/count'),
 };
