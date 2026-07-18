@@ -38,6 +38,7 @@ export default function StokPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('semua');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [sortBy, setSortBy] = useState('');
   const [settings, setSettings] = useState(null);
 
   // Modal Produk
@@ -309,9 +310,24 @@ const [bataling, setBataling] = useState(false);
     finally { setSavingEditPembelian(false); }
   };
 
-  const displayProducts = filterLowStock
+  const filteredProducts = filterLowStock
     ? products.filter(p => p.type === 'fisik' && p.stock <= (p.minStock || settings?.lowStockThreshold || 5))
     : products;
+
+  const displayProducts = (() => {
+    if (!sortBy) return filteredProducts;
+    const arr = [...filteredProducts];
+    switch (sortBy) {
+      case 'stock-asc':  arr.sort((a, b) => (a.stock || 0) - (b.stock || 0)); break;
+      case 'stock-desc': arr.sort((a, b) => (b.stock || 0) - (a.stock || 0)); break;
+      case 'name-asc':   arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'id')); break;
+      case 'name-desc':  arr.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'id')); break;
+      case 'modal-asc':  arr.sort((a, b) => (a.purchasePrice || 0) - (b.purchasePrice || 0)); break;
+      case 'modal-desc': arr.sort((a, b) => (b.purchasePrice || 0) - (a.purchasePrice || 0)); break;
+      default: break;
+    }
+    return arr;
+  })();
 
   return (
     <div className="animate-fade-in-up">
@@ -344,6 +360,15 @@ const [bataling, setBataling] = useState(false);
             <SearchInput value={search} onChange={setSearch} placeholder="Cari produk / kode..." className="flex-1" />
             <select className="input w-full sm:w-auto" value={category} onChange={e => setCategory(e.target.value)}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c === 'semua' ? 'Semua Kategori' : FISIK_CATEGORIES.find(f => f.value === c)?.label || c}</option>)}
+            </select>
+            <select className="input w-full sm:w-auto" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <option value="">Urutan Default</option>
+              <option value="stock-asc">Stok Terendah → Tertinggi</option>
+              <option value="stock-desc">Stok Tertinggi → Terendah</option>
+              <option value="name-asc">Nama A-Z</option>
+              <option value="name-desc">Nama Z-A</option>
+              <option value="modal-asc">Modal Terendah → Tertinggi</option>
+              <option value="modal-desc">Modal Tertinggi → Terendah</option>
             </select>
             <button onClick={() => setFilterLowStock(!filterLowStock)} className={`btn justify-center ${filterLowStock ? 'btn-primary' : 'btn-outline'}`}>
               <AlertTriangle size={16} /> {filterLowStock ? 'Stok Menipis' : 'Semua Stok'}
