@@ -495,48 +495,6 @@ function LaporanUtama() {
           </div>
         </div>
 
-        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Daftar Transaksi</h4>
-        {txListLoading ? <Loader /> : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>No. Faktur</th>
-                  <th>Tanggal</th>
-                  <th>Pelanggan</th>
-                  <th>Tipe</th>
-                  <th>Bayar</th>
-                  <th className="text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white">
-                {txList.length === 0
-                  ? <tr><td colSpan={6}><EmptyState message="Tidak ada transaksi pada periode ini" /></td></tr>
-                  : txList.slice(0, 50).map(tx => {
-                      const isGrosir = tx.isGrosir || (tx.items || []).some(i => i.isGrosir);
-                      return (
-                        <tr key={tx._id}>
-                          <td><code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">{tx.invoiceNumber}</code></td>
-                          <td className="text-xs text-slate-400">{formatDate(tx.transactionDate)}</td>
-                          <td className="text-sm font-medium">{tx.customerName || '-'}</td>
-                          <td>
-                            {isGrosir
-                              ? <span className="badge bg-green-100 text-green-700 font-bold">🛒 GROSIR</span>
-                              : <span className="badge bg-slate-100 text-slate-500">Retail</span>}
-                          </td>
-                          <td><span className={`badge ${PAYMENT_COLORS[tx.paymentMethod] || 'badge-gray'}`}>{PAYMENT_LABELS[tx.paymentMethod] || tx.paymentMethod}</span></td>
-                          <td className="text-right text-sm font-bold text-blue-600">{formatRupiah(tx.total)}</td>
-                        </tr>
-                      );
-                    })
-                }
-              </tbody>
-            </table>
-            {txList.length > 50 && (
-              <p className="text-xs text-slate-400 text-center mt-2">Menampilkan 50 dari {txList.length} transaksi. Ringkasan kartu di atas menghitung semua.</p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Modal detail bulan */}
@@ -619,30 +577,6 @@ function LaporanUtama() {
               </div>
             )}
 
-            {/* Top 10 produk berdasar nilai modal */}
-            {modalSummary.produkDetail?.length > 0 && (
-              <div>
-                <p className="text-xs font-bold text-slate-500 mb-2">Top Produk Berdasar Nilai Modal</p>
-                <div className="space-y-1.5">
-                  {modalSummary.produkDetail.slice(0, 8).map((p, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-slate-300 w-4 text-right">{i+1}</span>
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-slate-700">{p.name}</p>
-                        <div className="h-1.5 bg-slate-100 rounded-full mt-0.5">
-                          <div className="h-full bg-blue-400 rounded-full"
-                            style={{ width: `${Math.min(100, (p.totalModal / (modalSummary.produkDetail[0]?.totalModal || 1)) * 100)}%` }} />
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-blue-600">{formatRupiah(p.totalModal)}</p>
-                        <p className="text-xs text-slate-400">{p.stock} pcs</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ) : null}
       </div>
