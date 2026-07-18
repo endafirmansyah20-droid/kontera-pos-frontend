@@ -571,7 +571,7 @@ function NormalDashboard({ data, onRefresh, loading }) {
 
       {/* Produk Terlaris */}
       {data?.topProductsToday?.length > 0 && (() => {
-        const MEDALS = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+        const MEDALS = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣'];
         const fisikList   = data.topProductsToday.filter(p => p.type === 'fisik');
         const digitalList = data.topProductsToday.filter(p => p.type === 'digital' || p.type === 'jasa');
 
@@ -581,7 +581,7 @@ function NormalDashboard({ data, onRefresh, loading }) {
           );
           const maxQty = list[0]?.totalQty || 1;
           return (
-            <div className="space-y-3">
+            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1 -mr-1">
               {list.map((p, i) => {
                 const barW = Math.round((p.totalQty / maxQty) * 100);
                 return (
@@ -610,7 +610,7 @@ function NormalDashboard({ data, onRefresh, loading }) {
 
         return (
           <div className="bg-gradient-to-br from-amber-50/50 to-orange-50/30 rounded-2xl border border-amber-100/60 p-5 mb-5">
-            <SectionHeader title="Produk Terlaris Hari Ini" subtitle="Berdasarkan jumlah terjual" icon={Sparkles} iconColor="text-amber-500" />
+            <SectionHeader title="Produk Terlaris Bulan Ini" subtitle="Berdasarkan jumlah terjual" icon={Sparkles} iconColor="text-amber-500" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
               {/* Produk Fisik */}
               <div className="bg-white/70 rounded-xl p-4 border border-blue-100/60">
@@ -656,33 +656,43 @@ function NormalDashboard({ data, onRefresh, loading }) {
         </div>
         {loadingKategori ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin w-6 h-6 border-2 border-fuchsia-500 border-t-transparent rounded-full"/></div>
-        ) : kategoriStats ? (() => {
-          const fmt = (n) => n >= 1000000 ? `${(n/1000000).toFixed(1)}jt` : n >= 1000 ? `${(n/1000).toFixed(0)}rb` : String(n);
-          const chartData = [
-            { name: 'Omset', Fisik: kategoriStats.fisik.omset, Digital: kategoriStats.digital.omset, Jasa: kategoriStats.jasa.omset },
-            { name: 'Laba',  Fisik: kategoriStats.fisik.laba,  Digital: kategoriStats.digital.laba,  Jasa: kategoriStats.jasa.laba },
-            { name: 'Transaksi', Fisik: kategoriStats.fisik.transaksi, Digital: kategoriStats.digital.transaksi, Jasa: kategoriStats.jasa.transaksi },
-          ];
-          const CustomLabel = ({ x, y, width, value }) => value > 0 ? (
-            <text x={x + width/2} y={y - 4} fill='#374151' textAnchor='middle' fontSize={10} fontWeight={600}>
-              {fmt(value)}
-            </text>
-          ) : null;
-          return (
-            <ResponsiveContainer width='100%' height={260}>
-              <BarChart data={chartData} margin={{ top: 18, right: 10, left: 0, bottom: 0 }} barGap={3} barCategoryGap='25%'>
-                <CartesianGrid strokeDasharray='3 3' stroke='#F3F4F6' />
-                <XAxis dataKey='name' tick={{ fontSize: 12, fontWeight: 600, fill: '#6B7280' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={fmt} tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} width={36} />
-                <Tooltip formatter={(v, name) => [v >= 1000 ? R(v) : v, name]} labelStyle={{ fontWeight: 700 }} />
-                <Legend iconType='circle' iconSize={8} wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey='Fisik'   fill='#3B82F6' radius={[4,4,0,0]}><CustomLabel /></Bar>
-                <Bar dataKey='Digital' fill='#A855F7' radius={[4,4,0,0]}><CustomLabel /></Bar>
-                <Bar dataKey='Jasa'    fill='#10B981' radius={[4,4,0,0]}><CustomLabel /></Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          );
-        })() : <div className="text-center text-slate-400 text-sm py-12">Tidak ada data</div>}
+        ) : kategoriStats ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { key:'fisik',   label:'Fisik',   icon:'📦', gradient:'bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600' },
+              { key:'digital', label:'Digital', icon:'⚡', gradient:'bg-gradient-to-br from-violet-400 via-purple-500 to-purple-600' },
+              { key:'jasa',    label:'Jasa',    icon:'🛠️', gradient:'bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600' },
+            ].map(k => {
+              const s = kategoriStats[k.key] || { omset:0, laba:0, transaksi:0 };
+              return (
+                <div key={k.key} className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 ${k.gradient}`}>
+                  <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-10 bg-white" />
+                  <div className="absolute -bottom-6 -left-3 w-16 h-16 rounded-full opacity-10 bg-white" />
+                  <div className="relative">
+                    <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-white/20 mb-3 text-lg">
+                      {k.icon}
+                    </div>
+                    <p className="text-xs font-medium opacity-70 mb-2 text-white">{k.label}</p>
+                    <div className="space-y-1.5">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-white/60 font-semibold">Omset</p>
+                        <p className="text-base sm:text-lg font-black text-white leading-tight break-all">{R(s.omset)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-white/60 font-semibold">Laba</p>
+                        <p className="text-sm sm:text-base font-bold text-white leading-tight break-all">{R(s.laba)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-white/60 font-semibold">Transaksi</p>
+                        <p className="text-sm sm:text-base font-bold text-white leading-tight">{formatNumber(s.transaksi)} tx</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="text-center text-slate-400 text-sm py-12">Tidak ada data</div>}
       </div>
 
       {/* Bottom Grid */}
