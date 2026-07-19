@@ -47,7 +47,7 @@ export const productAPI = {
 
 // ─── Transactions ─────────────────────────
 export const transactionAPI = {
-  getAll: (p) => api.get('/transactions', { params: p }),
+  getAll: (p, config) => api.get('/transactions', { params: p, ...config }),
   getById: (id) => api.get(`/transactions/${id}`),
   create: (d) => api.post('/transactions', d),
   void: (id, d) => api.put(`/transactions/${id}/void`, d),

@@ -203,7 +203,12 @@ function LaporanUtama() {
   const loadTxList = useCallback(async () => {
     setTxListLoading(true);
     try {
-      const res = await transactionAPI.getAll({ limit: 9999 });
+      // year & month dikirim supaya backend bisa filter server-side (payload jauh lebih kecil).
+      // Kalau backend belum implement filter ini, param di-ignore dan behavior kembali seperti
+      // sebelumnya. Timeout 45s (vs default 15s) karena payload full-history bisa besar di APK.
+      const params = { limit: 9999, year };
+      if (filterBulan > 0) params.month = filterBulan;
+      const res = await transactionAPI.getAll(params, { timeout: 45000 });
       const all = res.data.data || [];
       const filtered = all.filter(t => {
         if (t.isVoid) return false;
@@ -214,7 +219,7 @@ function LaporanUtama() {
       });
       setTxList(filtered);
     } catch {
-      toast.error('Gagal memuat daftar transaksi grosir/retail');
+      toast.error('Gagal memuat ringkasan penjualan');
     } finally {
       setTxListLoading(false);
     }
