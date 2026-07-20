@@ -80,17 +80,17 @@ const TotalSelisihCard = ({ kasSummary }) => {
   );
 };
 
-const CashPlusMinusCard = ({ cashPlus = 0, cashMinus = 0, netCash = 0, label = '' }) => (
+const CashPlusMinusCard = ({ cashPlus = 0, cashMinus = 0, netCash = 0, label = '', variant = 'cash' }) => (
   <div className="rounded-xl border border-slate-100 bg-white p-3 sm:p-4 min-w-0">
     {label && <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">{label}</p>}
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
       <div className="bg-green-50 rounded-xl p-3 text-center min-w-0">
-        <p className="text-xs text-green-600 font-bold mb-0.5">Cash Plus ⬆️</p>
-        <p className="text-[11px] sm:text-xs text-green-400 mb-1.5">Selisih Lebih</p>
+        <p className="text-xs text-green-600 font-bold mb-0.5">{variant === 'produk' ? 'Stok Lebih ⬆️' : 'Cash Plus ⬆️'}</p>
+        <p className="text-[11px] sm:text-xs text-green-400 mb-1.5">{variant === 'produk' ? 'Koreksi, bukan uang' : 'Selisih Lebih'}</p>
         <p className="text-sm font-black text-green-700 truncate">{formatRupiah(cashPlus)}</p>
       </div>
       <div className="bg-red-50 rounded-xl p-3 text-center min-w-0">
-        <p className="text-xs text-red-500 font-bold mb-0.5">Cash Minus ⬇️</p>
+        <p className="text-xs text-red-500 font-bold mb-0.5">{variant === 'produk' ? 'Stok Kurang ⬇️' : 'Cash Minus ⬇️'}</p>
         <p className="text-[11px] sm:text-xs text-red-300 mb-1.5">Selisih Kurang</p>
         <p className="text-sm font-black text-red-600 truncate">{formatRupiah(cashMinus)}</p>
       </div>
@@ -496,49 +496,15 @@ const [resetting, setResetting] = useState(false);
               </div>
             </div>
 
-            {/* Input Uang Plus Setor */}
-            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-green-700">💰 Setor Uang Plus ke Kas Tunai</p>
-                  <p className="text-xs text-green-500">
-                    Uang Plus terkumpul: <span className="font-bold">{formatRupiah(kasSummary?.totalCashPlus || 0)}</span>
-                  </p>
-                </div>
-                {(kasSummary?.totalCashPlus || 0) > 0 && (
-                  <span className="badge badge-green text-xs flex-shrink-0 self-start sm:self-auto">Ada {formatRupiah(kasSummary?.totalCashPlus || 0)}</span>
-                )}
-              </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold select-none pointer-events-none">Rp</span>
-                <input
-                  className="input pl-10 border-green-300 focus:ring-green-400"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="0 — isi jika mau setor uang plus"
-                  value={uangPlusSetor ? Number(uangPlusSetor).toLocaleString('id-ID') : ''}
-                  onChange={e => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    setUangPlusSetor(raw);
-                  }}
-                />
-              </div>
-              {uangPlusSetor && parseInt(uangPlusSetor) > 0 && (
-                <div className="mt-2 text-xs text-green-700 bg-green-100 rounded-lg p-2">
-                  ✅ <span className="font-bold">Rp {parseInt(uangPlusSetor).toLocaleString('id-ID')}</span> akan masuk ke Kas Tunai &amp; Cash Plus direset sebesar nominal yang disetor
-                </div>
-              )}
-            </div>
-
             {selisihProduk.length > 0 && (
-              <CashPlusMinusCard label="Nilai Selisih Stok (Selisih × Harga Jual)" cashPlus={cashPlusProduk} cashMinus={cashMinusProduk} netCash={netProduk} />
+              <CashPlusMinusCard variant="produk" label="Nilai Selisih Stok (Selisih × Harga Jual)" cashPlus={cashPlusProduk} cashMinus={cashMinusProduk} netCash={netProduk} />
             )}
 
             {selisihProduk.length > 0 && (cashPlusProduk > 0 || cashMinusProduk > 0) && (
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {cashPlusProduk > 0 && (
                   <div className="bg-green-50 rounded-xl p-3 min-w-0">
-                    <p className="text-xs font-bold text-green-600 mb-2">Stok Lebih (Cash Plus):</p>
+                    <p className="text-xs font-bold text-green-600 mb-2">Stok Lebih <span className="font-normal text-green-400">(koreksi, bukan uang):</span></p>
                     {selisihProduk.filter(p => p.selisih > 0).map(p => (
                       <div key={p._id} className="text-xs text-green-700 mb-1">
                         <p className="font-semibold break-words">{p.name}</p>
@@ -549,7 +515,7 @@ const [resetting, setResetting] = useState(false);
                 )}
                 {cashMinusProduk > 0 && (
                   <div className="bg-red-50 rounded-xl p-3 min-w-0">
-                    <p className="text-xs font-bold text-red-500 mb-2">Stok Kurang (Cash Minus):</p>
+                    <p className="text-xs font-bold text-red-500 mb-2">Stok Kurang:</p>
                     {selisihProduk.filter(p => p.selisih < 0).map(p => (
                       <div key={p._id} className="text-xs text-red-600 mb-1">
                         <p className="font-semibold break-words">{p.name}</p>
@@ -628,7 +594,7 @@ const [resetting, setResetting] = useState(false);
             <div className="table-wrap">
               <table className="table">
                 <thead>
-                  <tr><th>Tanggal</th><th>Tipe</th><th>Shift</th><th>Kasir</th><th>Cash Plus ⬆️</th><th>Cash Minus ⬇️</th><th>Net</th><th>Status</th><th>Aksi</th></tr>
+                  <tr><th>Tanggal</th><th>Tipe</th><th>Shift</th><th>Kasir</th><th>Lebih ⬆️</th><th>Kurang ⬇️</th><th>Net</th><th>Status</th><th>Aksi</th></tr>
                 </thead>
                 <tbody className="bg-white">
                   {filteredRiwayat.length === 0
@@ -688,29 +654,70 @@ const [resetting, setResetting] = useState(false);
           <p className="text-lg font-bold text-slate-700">{totalSelisihProduk === 0 ? 'Semua Stok Sesuai!' : `${totalSelisihProduk} Produk Selisih`}</p>
           <p className="text-sm text-slate-500 mt-1">{selisihProduk.length} produk dihitung</p>
         </div>
-        {/* FIXED: Cash Plus bisa dipakai tutup Cash Minus produk */}
         {(() => {
-          const cpUsed = parseInt(cashPlusUsed) || 0;
-          const netSetelah = cashPlusProduk + Math.min(cpUsed, kasSummary?.totalCashPlus || 0) - cashMinusProduk;
+          const totalCashPlus = kasSummary?.totalCashPlus || 0;
+          const cpUsed        = Math.min(parseInt(cashPlusUsed) || 0, totalCashPlus);
+          const sisaSetelahTutup = Math.max(0, totalCashPlus - cpUsed);
+          const setor         = Math.min(parseInt(uangPlusSetor) || 0, sisaSetelahTutup);
+          const netSetelah    = cashPlusProduk + cpUsed - cashMinusProduk;
           return (
             <>
-              <CashPlusMinusCard label="Nilai Selisih Stok" cashPlus={cashPlusProduk} cashMinus={cashMinusProduk} netCash={cashPlusProduk + Math.min(cpUsed, kasSummary?.totalCashPlus || 0) - cashMinusProduk} />
-              {(kasSummary?.totalCashPlus || 0) > 0 && cashMinusProduk > 0 && (
+              <CashPlusMinusCard variant="produk" label="Nilai Selisih Stok" cashPlus={cashPlusProduk} cashMinus={cashMinusProduk} netCash={netSetelah} />
+
+              {/* 1. Pakai Cash Plus untuk tutup selisih minus */}
+              {totalCashPlus > 0 && cashMinusProduk > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 my-3">
-                  <p className="text-xs font-bold text-amber-700 mb-1">&#128176; Pakai Cash Plus untuk tutup selisih?</p>
-                  <p className="text-xs text-amber-600 mb-2">Cash Plus tersedia: <span className="font-bold">{formatRupiah(kasSummary?.totalCashPlus || 0)}</span></p>
+                  <p className="text-xs font-bold text-amber-700 mb-1">&#128176; 1. Pakai Cash Plus untuk Tutup Selisih Minus (opsional)</p>
+                  <p className="text-xs text-amber-600 mb-2">Cash Plus tersedia: <span className="font-bold">{formatRupiah(totalCashPlus)}</span></p>
                   <input
                     type="text" inputMode="numeric"
                     className="input text-sm"
-                    placeholder={`Maks ${formatRupiah(Math.min(kasSummary?.totalCashPlus || 0, cashMinusProduk))}`}
+                    placeholder={`Maks ${formatRupiah(Math.min(totalCashPlus, cashMinusProduk))}`}
                     value={cashPlusUsed ? Number(cashPlusUsed).toLocaleString('id-ID') : ''}
                     onChange={e => {
                       const raw = e.target.value.replace(/\D/g, '');
-                      const max = Math.min(kasSummary?.totalCashPlus || 0, cashMinusProduk);
-                      setCashPlusUsed(raw && parseInt(raw) > max ? String(max) : raw);
+                      const max = Math.min(totalCashPlus, cashMinusProduk);
+                      const capped = raw && parseInt(raw) > max ? String(max) : raw;
+                      setCashPlusUsed(capped);
+                      // Sesuaikan setor agar tidak melebihi sisa Cash Plus
+                      const newSisa = Math.max(0, totalCashPlus - (parseInt(capped) || 0));
+                      if ((parseInt(uangPlusSetor) || 0) > newSisa) {
+                        setUangPlusSetor(newSisa > 0 ? String(newSisa) : '');
+                      }
                     }}
                   />
                   {cpUsed > 0 && <p className="text-xs text-green-700 font-bold mt-1">&#10003; Net selisih: {netSetelah >= 0 ? '+' : ''}{formatRupiah(netSetelah)}</p>}
+                </div>
+              )}
+
+              {/* 2. Setor sisa Cash Plus ke Kas Tunai */}
+              {totalCashPlus > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 my-3">
+                  <p className="text-xs font-bold text-green-700 mb-1">&#128176; 2. Setor Sisa Cash Plus ke Kas Tunai (opsional)</p>
+                  <p className="text-xs text-green-600 mb-2">
+                    Sisa Cash Plus: <span className="font-bold">{formatRupiah(sisaSetelahTutup)}</span>
+                    {cpUsed > 0 && <span className="text-green-400"> (setelah dipakai tutup selisih)</span>}
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold select-none pointer-events-none">Rp</span>
+                    <input
+                      className="input pl-10 text-sm border-green-300 focus:ring-green-400 disabled:bg-slate-50 disabled:cursor-not-allowed"
+                      type="text" inputMode="numeric"
+                      placeholder={sisaSetelahTutup > 0 ? `Maks ${formatRupiah(sisaSetelahTutup)}` : '0'}
+                      disabled={sisaSetelahTutup === 0}
+                      value={uangPlusSetor ? Number(uangPlusSetor).toLocaleString('id-ID') : ''}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        const capped = raw && parseInt(raw) > sisaSetelahTutup ? String(sisaSetelahTutup) : raw;
+                        setUangPlusSetor(capped);
+                      }}
+                    />
+                  </div>
+                  {setor > 0 && (
+                    <p className="text-xs text-green-700 bg-green-100 rounded-lg p-2 mt-2">
+                      &#10003; <span className="font-bold">Rp {setor.toLocaleString('id-ID')}</span> akan masuk ke Kas Tunai &amp; Cash Plus dikurangi sebesar nominal yang disetor
+                    </p>
+                  )}
                 </div>
               )}
             </>
@@ -752,7 +759,18 @@ const [resetting, setResetting] = useState(false);
               <div className="min-w-0"><p className="text-xs text-slate-400">Shift</p><span className="badge badge-gray capitalize">{selectedClosing.shift}</span></div>
               <div className="min-w-0"><p className="text-xs text-slate-400">Kasir</p><p className="font-medium truncate">{selectedClosing.createdByName}</p></div>
             </div>
-            <CashPlusMinusCard label={`Selisih ${selectedClosing.type === 'produk' ? 'Stok' : 'Cash'}`} cashPlus={selectedClosing.cashPlus || 0} cashMinus={selectedClosing.cashMinus || 0} netCash={selectedClosing.netCash || 0} />
+            <CashPlusMinusCard variant={selectedClosing.type === 'produk' ? 'produk' : 'cash'} label={`Selisih ${selectedClosing.type === 'produk' ? 'Stok' : 'Cash'}`} cashPlus={selectedClosing.cashPlus || 0} cashMinus={selectedClosing.cashMinus || 0} netCash={selectedClosing.netCash || 0} />
+            {selectedClosing.type === 'produk' && (selectedClosing.cashPlusUsed || 0) > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-start gap-2">
+                <span className="text-lg leading-none">✅</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-green-700">Selisih minus ditutup dari Cash Plus</p>
+                  <p className="text-xs text-green-600 mt-0.5">
+                    <span className="font-bold">{formatRupiah(selectedClosing.cashPlusUsed)}</span> diambil dari pool Cash Plus untuk menutup selisih minus closing ini.
+                  </p>
+                </div>
+              </div>
+            )}
             {(!selectedClosing.type || selectedClosing.type === 'cash') && (
               <div className="card bg-slate-50 border-slate-100 p-4">
                 <h4 className="font-bold text-slate-700 text-xs uppercase tracking-wide mb-3">Ringkasan Kas</h4>
