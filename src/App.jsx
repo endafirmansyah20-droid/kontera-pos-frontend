@@ -18,6 +18,7 @@ import SaldoPage from './pages/SaldoPage';
 import ClosingKasPage from './pages/ClosingKasPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import OnboardingPage from './pages/OnboardingPage';
+import LandingPage from './pages/LandingPage';
 
 function OwnerRoute({ children }) {
   const { user, isOwner, loading } = useAuth();
@@ -90,6 +91,18 @@ function PublicRoute({ children }) {
   return children;
 }
 
+// Landing page: tamu → tampilkan marketing page, user login → redirect ke dashboard sesuai role
+function LandingRoute({ children }) {
+  const { user, isSuperAdmin, isOwner, loading } = useAuth();
+  if (loading) return children;
+  if (user) {
+    if (isSuperAdmin) return <Navigate to="/dashboard" replace />;
+    if (isOwner) return <Navigate to="/owner" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -110,7 +123,7 @@ function AppRoutes() {
       <Route path="/closing-kas"   element={<ProtectedRoute><ClosingKasPage /></ProtectedRoute>} />
       {/* ── BARU: Panel Langganan / Konfirmasi Pembayaran (superadmin) ── */}
       <Route path="/subscriptions" element={<SuperAdminRoute><SubscriptionPage /></SuperAdminRoute>} />
-      <Route path="/"  element={<DefaultRedirect />} />
+      <Route path="/"  element={<LandingRoute><LandingPage /></LandingRoute>} />
       <Route path="*"  element={<DefaultRedirect />} />
     </Routes>
   );
