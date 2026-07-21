@@ -334,8 +334,7 @@ export default function LandingPage() {
                 <button onClick={goDaftar} className="lp-btn-primary">
                   <Zap size={17} /> Mulai Trial Gratis <ArrowRight size={16} />
                 </button>
-                {/* TODO: ganti href="#" dengan link hosting APK final */}
-                <a href="#" className="lp-btn-secondary" onClick={(e) => e.preventDefault()}>
+                <a href="/downloads/konterapos.apk" download className="lp-btn-secondary">
                   <Download size={16} /> Download APK
                 </a>
               </div>
@@ -640,8 +639,7 @@ export default function LandingPage() {
               <button onClick={goDaftar} className="lp-btn-primary">
                 <Zap size={17} /> Mulai Trial Gratis <ArrowRight size={16} />
               </button>
-              {/* TODO: ganti href="#" dengan link hosting APK final */}
-              <a href="#" className="lp-btn-secondary" onClick={(e) => e.preventDefault()}>
+              <a href="/downloads/konterapos.apk" download className="lp-btn-secondary">
                 <Download size={16} /> Download APK
               </a>
             </div>
