@@ -1744,68 +1744,6 @@ export function PengaturanPage() {
           </div>
         </div>
 
-        {/* Pengaturan Fonnte WA Notifikasi — hanya owner */}
-        {currentUser?.role === 'owner' && (
-          <div className="border-t pt-5 mt-5">
-            <h3 className="font-bold text-slate-700 mb-1">📱 Notifikasi WhatsApp (Fonnte)</h3>
-            <p className="text-xs text-slate-400 mb-4">Kirim WA otomatis ke member setelah transaksi berhasil</p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox"
-                    checked={settings.fonnteSettings?.enabled === true}
-                    onChange={e => setSettings(s => ({...s, fonnteSettings: {...(s.fonnteSettings||{}), enabled: e.target.checked}}))}/>
-                  <span className="text-sm font-medium text-slate-600">Aktifkan notifikasi WA</span>
-                </label>
-              </div>
-              <div>
-                <label className="label">Token API Fonnte</label>
-                <input className="input" type="password"
-                  placeholder="Masukkan token dari fonnte.com"
-                  value={settings.fonnteSettings?.token || ''}
-                  onChange={e => setSettings(s => ({...s, fonnteSettings: {...(s.fonnteSettings||{}), token: e.target.value}}))}
-                />
-                <p className="text-xs text-slate-400 mt-1">Dapatkan token di <a href="https://fonnte.com" target="_blank" rel="noreferrer" className="text-blue-500 underline">fonnte.com</a> → Settings → Token</p>
-              </div>
-              <div>
-                <label className="label">Nomor Device (HP Fonnte)</label>
-                <input className="input"
-                  placeholder="Contoh: 6281234567890"
-                  value={settings.fonnteSettings?.device || ''}
-                  onChange={e => setSettings(s => ({...s, fonnteSettings: {...(s.fonnteSettings||{}), device: e.target.value}}))}
-                />
-                <p className="text-xs text-slate-400 mt-1">Format: 62xxx (tanpa + atau 0 di depan)</p>
-              </div>
-              <div>
-                <label className="label">Template Pesan WA</label>
-                <textarea className="input h-40 resize-none text-sm"
-                  value={settings.fonnteSettings?.template || ''}
-                  onChange={e => setSettings(s => ({...s, fonnteSettings: {...(s.fonnteSettings||{}), template: e.target.value}}))}
-                  placeholder="Template pesan..."/>
-                <div className="bg-slate-50 rounded-xl p-3 mt-2">
-                  <p className="text-xs font-bold text-slate-500 mb-1">📝 Variabel yang tersedia:</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {[
-                      ['{nama}', 'Nama pelanggan'],
-                      ['{toko}', 'Nama toko'],
-                      ['{rincian}', 'Rincian produk/transaksi'],
-                      ['{total}', 'Total belanja'],
-                      ['{poin}', 'Poin didapat'],
-                      ['{totalPoin}', 'Total poin saat ini'],
-                      ['{invoice}', 'Nomor invoice'],
-                    ].map(([v, d]) => (
-                      <div key={v} className="flex items-center gap-1">
-                        <code className="text-xs bg-slate-200 px-1.5 py-0.5 rounded font-mono">{v}</code>
-                        <span className="text-xs text-slate-400">{d}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Pengaturan Marquee Motivasi */}
         <div className="border-t pt-5 mt-5">
           <h3 className="font-bold text-slate-700 mb-3">📢 Teks Berjalan di Kasir</h3>
