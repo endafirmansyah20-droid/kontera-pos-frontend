@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Loader2, Download } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import { GoogleLogin } from '@react-oauth/google';
 import { useInstallPrompt } from '../context/PwaInstallContext';
 import { isMobileDevice } from '../utils/device';
 
@@ -10,7 +11,7 @@ export default function LoginPage() {
   const [form, setForm]       = useState({ username:'', password:'' });
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login }  = useAuth();
+  const { login, loginWithGoogle }  = useAuth();
   const { canInstall, promptInstall } = useInstallPrompt();
   const navigate   = useNavigate();
   const inputRef   = useRef();
@@ -24,8 +25,7 @@ export default function LoginPage() {
     try {
       const result = await login(form.username, form.password);
       navigate('/dashboard');
-      // FIXED: Toast setelah navigate agar muncul di Toaster dashboard
-      setTimeout(() => toast.success(`Selamat datang, ${result?.user?.name || 'Pengguna'}! 👋`), 300);
+      toast.success(`Selamat datang, ${result?.user?.name || 'Pengguna'}! 👋`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login gagal');
     } finally { setLoading(false); }
@@ -149,12 +149,6 @@ export default function LoginPage() {
       {/* RIGHT PANEL */}
       <div className="rp">
         <div style={{width:'100%',maxWidth:380,background:'rgba(255,255,255,0.055)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderRadius:28,border:'1px solid rgba(255,255,255,0.1)',boxShadow:'0 32px 80px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.08)',padding:'38px 34px 34px'}}>
-          <Toaster position="top-center" toastOptions={{
-            style:{borderRadius:14,fontSize:'13.5px',fontWeight:600,background:'rgba(15,5,35,0.96)',color:'white',border:'1px solid rgba(255,255,255,0.12)',backdropFilter:'blur(16px)',boxShadow:'0 8px 32px rgba(0,0,0,0.5)',zIndex:99999},
-            error:{iconTheme:{primary:'#f87171',secondary:'rgba(15,5,35,0.96)'}},
-            success:{iconTheme:{primary:'#4ade80',secondary:'rgba(15,5,35,0.96)'}},
-          }}/>
-
           {/* Logo di card */}
           <div style={{marginBottom:24}}>
             <div style={{borderRadius:14,overflow:'hidden',display:'inline-block',marginBottom:12,boxShadow:'0 2px 12px rgba(37,99,235,0.25)'}}>
@@ -171,10 +165,10 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:16}}>
             <div>
-              <label style={{display:'block',color:'rgba(255,255,255,0.4)',fontSize:11,fontWeight:700,letterSpacing:'1.2px',textTransform:'uppercase',marginBottom:8}}>Username</label>
+              <label style={{display:'block',color:'rgba(255,255,255,0.4)',fontSize:11,fontWeight:700,letterSpacing:'1.2px',textTransform:'uppercase',marginBottom:8}}>Username atau Email</label>
               <div style={{position:'relative'}}>
                 <span style={{position:'absolute',left:15,top:'50%',transform:'translateY(-50%)',color:'rgba(255,255,255,0.25)',fontSize:14,fontWeight:700}}>@</span>
-                <input ref={inputRef} type="text" className="gi" placeholder="Masukkan username..."
+                <input ref={inputRef} type="text" className="gi" placeholder="Username atau email"
                   value={form.username} onChange={e=>setForm({...form,username:e.target.value})} autoComplete="username"/>
               </div>
             </div>
@@ -198,7 +192,25 @@ export default function LoginPage() {
           <div style={{display:'flex',alignItems:'center',gap:10,margin:'20px 0 0'}}>
             <div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/><span style={{color:'rgba(255,255,255,0.18)',fontSize:11}}>atau</span><div style={{flex:1,height:1,background:'rgba(255,255,255,0.08)'}}/>
           </div>
-          <p style={{textAlign:'center',color:'rgba(255,255,255,0.25)',fontSize:13,margin:'14px 0 0'}}>
+          <div style={{display:'flex',justifyContent:'center',marginTop:16}}>
+            <GoogleLogin
+              theme="filled_black"
+              size="large"
+              text="signin_with"
+              shape="rectangular"
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const result = await loginWithGoogle(credentialResponse.credential);
+                  navigate('/dashboard');
+                  toast.success(`Selamat datang, ${result?.user?.name || 'Pengguna'}! 👋`);
+                } catch (err) {
+                  toast.error(err.response?.data?.message || 'Login Google gagal');
+                }
+              }}
+              onError={() => toast.error('Login Google gagal, coba lagi')}
+            />
+          </div>
+          <p style={{textAlign:'center',color:'rgba(255,255,255,0.25)',fontSize:13,margin:'16px 0 0'}}>
             Belum punya akun?{' '}
             <a href="/daftar" style={{color:'#fbbf24',fontWeight:700,textDecoration:'none'}}>Daftar gratis</a>
           </p>

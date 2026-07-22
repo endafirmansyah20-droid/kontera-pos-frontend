@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PwaInstallProvider } from './context/PwaInstallContext';
 import Layout from './components/Layout';
@@ -132,6 +133,7 @@ function AppRoutes() {
 
 export default function App() {
   return (
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
     <BrowserRouter>
       <PwaInstallProvider>
         <AuthProvider>
@@ -148,5 +150,6 @@ export default function App() {
         </AuthProvider>
       </PwaInstallProvider>
     </BrowserRouter>
+    </GoogleOAuthProvider>
   );
 }

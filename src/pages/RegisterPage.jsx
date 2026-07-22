@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, CheckCircle, User, Lock, Store, MapPin, Phone, ChevronRight, ChevronLeft } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import { Eye, EyeOff, Loader2, CheckCircle, User, Mail, Lock, Store, MapPin, Phone, ChevronRight, ChevronLeft } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../services/api';
 
 const STEPS = ['Info Akun', 'Info Toko'];
 
 export default function RegisterPage() {
   const [step, setStep]     = useState(1);
-  const [form, setForm]     = useState({ name:'', username:'', password:'', confirmPassword:'', namaToko:'', alamat:'', telepon:'' });
+  const [form, setForm]     = useState({ name:'', email:'', username:'', password:'', confirmPassword:'', namaToko:'', alamat:'', telepon:'' });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -16,6 +16,8 @@ export default function RegisterPage() {
 
   const nextStep = () => {
     if (!form.name || !form.username || !form.password) return toast.error('Semua field wajib diisi!');
+    if (!form.email) return toast.error('Email wajib diisi');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return toast.error('Format email tidak valid');
     if (form.password.length < 6) return toast.error('Password minimal 6 karakter!');
     if (form.password !== form.confirmPassword) return toast.error('Password tidak cocok!');
     setStep(2);
@@ -26,7 +28,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const { data } = await api.post('/owner/register', {
-        name: form.name, username: form.username, password: form.password,
+        name: form.name, email: form.email, username: form.username, password: form.password,
         namaToko: form.namaToko, alamat: form.alamat, telepon: form.telepon,
       });
       localStorage.setItem('token', data.token);
@@ -152,12 +154,6 @@ export default function RegisterPage() {
 
       {/* RIGHT PANEL */}
       <div className="rp">
-        <Toaster position="top-center" toastOptions={{
-          style:{borderRadius:14,fontSize:'13.5px',fontWeight:600,background:'rgba(15,5,35,0.96)',color:'white',border:'1px solid rgba(255,255,255,0.12)',backdropFilter:'blur(16px)',boxShadow:'0 8px 32px rgba(0,0,0,0.5)',zIndex:99999},
-          error:{iconTheme:{primary:'#f87171',secondary:'rgba(15,5,35,0.96)'}},
-          success:{iconTheme:{primary:'#4ade80',secondary:'rgba(15,5,35,0.96)'}},
-        }}/>
-
         <div style={{width:'100%',maxWidth:400,background:'rgba(255,255,255,0.055)',backdropFilter:'blur(28px)',WebkitBackdropFilter:'blur(28px)',borderRadius:28,border:'1px solid rgba(255,255,255,0.1)',boxShadow:'0 32px 80px rgba(0,0,0,0.55),inset 0 1px 0 rgba(255,255,255,0.08)',padding:'36px 32px'}}>
 
           {/* Logo di card */}
@@ -204,6 +200,13 @@ export default function RegisterPage() {
                   <div style={{position:'relative'}}>
                     <User size={14} style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',color:'rgba(255,255,255,0.25)'}}/>
                     <input type="text" className="ri" placeholder="Nama lengkap Anda" value={form.name} onChange={e=>set('name',e.target.value)}/>
+                  </div>
+                </div>
+                <div>
+                  <label style={{display:'block',color:'rgba(255,255,255,0.4)',fontSize:10.5,fontWeight:700,letterSpacing:'1.2px',textTransform:'uppercase',marginBottom:7}}>Email</label>
+                  <div style={{position:'relative'}}>
+                    <Mail size={14} style={{position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',color:'rgba(255,255,255,0.25)'}}/>
+                    <input type="email" className="ri" placeholder="email@contoh.com" value={form.email} onChange={e=>set('email',e.target.value)} autoComplete="email"/>
                   </div>
                 </div>
                 <div>

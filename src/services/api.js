@@ -1,6 +1,12 @@
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 
-const api = axios.create({ baseURL: '/api', timeout: 15000 });
+// Di dev browser (npm start): baseURL '/api' → CRA proxy ke localhost:5000.
+// Di web production: tetap '/api' → same-origin ke backend (Nginx proxy /api).
+// Di APK Android: WebView tidak punya proxy, harus absolute URL ke domain production.
+const API_ORIGIN = Capacitor.isNativePlatform() ? 'https://kontera.id' : '';
+
+const api = axios.create({ baseURL: `${API_ORIGIN}/api`, timeout: 15000 });
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
@@ -24,6 +30,7 @@ export default api;
 // ─── Auth ────────────────────────────────
 export const authAPI = {
   login: (d) => api.post('/auth/login', d),
+  google: (d) => api.post('/auth/google', d),
   register: (d) => api.post('/auth/register', d),
   getMe: () => api.get('/auth/me'),
   getUsers: () => api.get('/auth/users'),

@@ -42,6 +42,13 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const loginWithGoogle = async (credential) => {
+    const { data } = await authAPI.google({ credential });
+    localStorage.setItem('token', data.token);
+    setUser(data.user);
+    return data;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
@@ -55,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{
-      user, login, logout, loading,
+      user, login, loginWithGoogle, logout, loading,
       isAdmin, isSuperAdmin, isOwner, cabang, fetchMe,
       darkMode, toggleDarkMode
     }}>

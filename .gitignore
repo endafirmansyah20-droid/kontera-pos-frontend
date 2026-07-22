@@ -1,2 +1,7 @@
 node_modules/
 build/
+
+# Env vars — semua .env varian ditolak, .env.example boleh (dokumentasi non-sensitif)
+.env
+.env.local
+.env.*.local
