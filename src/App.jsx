@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { PwaInstallProvider } from './context/PwaInstallContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -132,18 +133,20 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: { borderRadius: '12px', fontSize: '13px', fontWeight: 500, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' },
-            success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
-            error: { duration: 5000, iconTheme: { primary: '#ef4444', secondary: '#fff' } }
-          }}
-        />
-      </AuthProvider>
+      <PwaInstallProvider>
+        <AuthProvider>
+          <AppRoutes />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: { borderRadius: '12px', fontSize: '13px', fontWeight: 500, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' },
+              success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+              error: { duration: 5000, iconTheme: { primary: '#ef4444', secondary: '#fff' } }
+            }}
+          />
+        </AuthProvider>
+      </PwaInstallProvider>
     </BrowserRouter>
   );
 }

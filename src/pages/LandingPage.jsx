@@ -4,11 +4,12 @@ import {
   ShoppingCart, BarChart3, Store, FileText, FileSpreadsheet, Bell,
   Users, ShieldCheck, CreditCard, Wallet, Calculator, Package,
   Award, Printer, Moon, Check, ChevronDown, MessageCircle, Mail,
-  ArrowRight, Download, Sparkles, Zap
+  ArrowRight, Download, Sparkles, Zap, Monitor
 } from 'lucide-react';
 import heroDashboardImg from '../assets/landing-dashboard.jpg';
 import transaksiImg      from '../assets/landing-transaksi.jpg';
 import laporanImg        from '../assets/landing-laporan.jpg';
+import desktopImg        from '../assets/landing-desktop.jpg';
 
 /* ---------------------------------------------------------------- */
 /*  Landing / Marketing Page                                        */
@@ -17,7 +18,7 @@ import laporanImg        from '../assets/landing-laporan.jpg';
 /* ---------------------------------------------------------------- */
 
 const FEATURES = [
-  { icon: ShoppingCart,   title: 'Kasir Super Cepat',       desc: 'Transaksi dalam hitungan detik dengan keyboard shortcut & scan barcode.' },
+  { icon: ShoppingCart,   title: 'Kasir Super Cepat',       desc: 'Transaksi dalam hitungan detik — cari produk lewat kode/nama & keyboard shortcut.' },
   { icon: BarChart3,      title: 'Laporan Real-time',       desc: 'Omset, laba bersih, dan stok terupdate otomatis setiap transaksi.' },
   { icon: Store,          title: 'Multi-Cabang',            desc: 'Pantau semua cabang dari satu dashboard terpusat.' },
   { icon: FileText,       title: 'Invoice Digital',         desc: 'Struk & invoice digital yang bisa dikirim langsung ke pelanggan.' },
@@ -203,6 +204,8 @@ export default function LandingPage() {
         .lp-hero-shot-inner {
           position: relative;
           animation: lfloat 6s ease-in-out infinite;
+          max-width: 62%;
+          margin: 0 auto;
         }
         .lp-hero-shot-glow {
           position: absolute; inset: -10% -8% -8% -8%;
@@ -235,6 +238,7 @@ export default function LandingPage() {
         }
         .lp-showcase-row.reverse .lp-showcase-media { order: 2; }
         .lp-showcase-media { position: relative; }
+        .lp-showcase-media.is-mobile-shot { max-width: 62%; margin: 0 auto; }
         .lp-showcase-media-glow {
           position: absolute; inset: -8%;
           background: radial-gradient(circle at 50% 50%, rgba(37,99,235,0.22) 0%, rgba(124,58,237,0.14) 50%, transparent 75%);
@@ -401,7 +405,7 @@ export default function LandingPage() {
 
           {/* Row 1: Transaksi (image kiri, text kanan) */}
           <div className="lp-showcase-row">
-            <div className="lp-showcase-media">
+            <div className="lp-showcase-media is-mobile-shot">
               <div className="lp-showcase-media-glow" aria-hidden="true" />
               <div className="lp-showcase-frame">
                 <img
@@ -420,7 +424,7 @@ export default function LandingPage() {
               </p>
               <div className="lp-showcase-checks">
                 {[
-                  'Scan barcode & keyboard shortcut',
+                  'Cari produk cepat via kode/nama & keyboard shortcut',
                   'Multi-metode bayar: cash, QRIS, transfer, hutang',
                   'Stok otomatis berkurang setiap transaksi',
                   'Cetak struk thermal Bluetooth 58mm',
@@ -438,7 +442,7 @@ export default function LandingPage() {
 
           {/* Row 2: Laporan (image kanan, text kiri) */}
           <div className="lp-showcase-row reverse">
-            <div className="lp-showcase-media">
+            <div className="lp-showcase-media is-mobile-shot">
               <div className="lp-showcase-media-glow" aria-hidden="true" />
               <div className="lp-showcase-frame">
                 <img
@@ -461,6 +465,43 @@ export default function LandingPage() {
                   'Analisis produk terlaris & margin per kategori',
                   'Perbandingan performa antar cabang',
                   'Export ke Excel untuk laporan detail',
+                ].map((item) => (
+                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Check size={12} color="#4ade80" strokeWidth={3} />
+                    </div>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)' }}>{item}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3: Akses dari Mana Saja (image kiri, text kanan) */}
+          <div className="lp-showcase-row">
+            <div className="lp-showcase-media">
+              <div className="lp-showcase-media-glow" aria-hidden="true" />
+              <div className="lp-showcase-frame">
+                <img
+                  src={desktopImg}
+                  alt="KonterA diakses dari browser laptop/komputer desktop — tampilan penuh di layar besar"
+                  loading="lazy"
+                  className="lp-showcase-img"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="lp-eyebrow"><Monitor size={12} /> Akses dari Mana Saja</div>
+              <h3 className="lp-section-title" style={{ fontSize: 'clamp(24px, 3vw, 32px)' }}>Tidak Cuma di HP — Akses dari Laptop &amp; Komputer Juga</h3>
+              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, lineHeight: 1.7 }}>
+                KonterA berjalan langsung di browser, jadi Anda bisa mengelola konter dari HP, laptop, atau komputer kapan saja tanpa install aplikasi tambahan.
+              </p>
+              <div className="lp-showcase-checks">
+                {[
+                  'Bisa langsung dibuka di browser, atau di-install sebagai aplikasi (PWA) dari Chrome/Edge — pilihan Anda',
+                  'Tampilan otomatis menyesuaikan HP, tablet, & desktop',
+                  'Data tersinkron real-time antar perangkat',
+                  'APK Android opsional untuk cetak struk Bluetooth',
                 ].map((item) => (
                   <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

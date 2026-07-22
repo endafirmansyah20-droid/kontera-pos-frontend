@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Download } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { useInstallPrompt } from '../context/PwaInstallContext';
 
 export default function LoginPage() {
   const [form, setForm]       = useState({ username:'', password:'' });
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
   const { login }  = useAuth();
+  const { canInstall, promptInstall } = useInstallPrompt();
   const navigate   = useNavigate();
   const inputRef   = useRef();
 
@@ -52,6 +54,8 @@ export default function LoginPage() {
         .btnl:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 36px rgba(37,99,235,0.52)}
         .btnl:disabled{opacity:.65;cursor:not-allowed}
         .fcard{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:13px 16px}
+        .btn-install{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.78);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s,transform .15s}
+        .btn-install:hover{background:rgba(37,99,235,0.12);border-color:rgba(59,130,246,0.35);color:#fff;transform:translateY(-1px)}
         @media(max-width:900px){.lp{display:none!important}.rp{width:100%!important;padding:32px 24px!important}}
       `}</style>
 
@@ -197,6 +201,11 @@ export default function LoginPage() {
             Belum punya akun?{' '}
             <a href="/daftar" style={{color:'#fbbf24',fontWeight:700,textDecoration:'none'}}>Daftar gratis</a>
           </p>
+          {canInstall && (
+            <button type="button" onClick={promptInstall} className="btn-install" style={{marginTop:16}}>
+              <Download size={15}/> Install Aplikasi
+            </button>
+          )}
           <p style={{textAlign:'center',color:'rgba(255,255,255,0.1)',fontSize:11,margin:'18px 0 0'}}>© 2025 KonterA · All rights reserved</p>
         </div>
       </div>
