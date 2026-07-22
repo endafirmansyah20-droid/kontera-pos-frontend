@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Loader2, Download } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useInstallPrompt } from '../context/PwaInstallContext';
+import { isMobileDevice } from '../utils/device';
 
 export default function LoginPage() {
   const [form, setForm]       = useState({ username:'', password:'' });
@@ -201,7 +202,7 @@ export default function LoginPage() {
             Belum punya akun?{' '}
             <a href="/daftar" style={{color:'#fbbf24',fontWeight:700,textDecoration:'none'}}>Daftar gratis</a>
           </p>
-          {canInstall && (
+          {canInstall && !isMobileDevice() && (
             <button type="button" onClick={promptInstall} className="btn-install" style={{marginTop:16}}>
               <Download size={15}/> Install Aplikasi
             </button>
