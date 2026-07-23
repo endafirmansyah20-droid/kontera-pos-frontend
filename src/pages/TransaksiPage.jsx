@@ -9,10 +9,10 @@ import {
   ShoppingCart, Search, Plus, Minus, X, CheckCircle2, Loader2,
   History, Package, Printer, Trash2, Eye, AlertTriangle,
   Smartphone, Zap, Gamepad2, Wallet, ArrowLeftRight, Banknote,
-  CreditCard, RefreshCw, Briefcase, Store
+  CreditCard, RefreshCw, Briefcase, Store, Bluetooth
 } from 'lucide-react';
+import { printStruk, scanPrinters, connectPrinter, getSavedPrinter, isLikelyPrinter, isNative } from '../utils/receiptPrinter';
 import toast from 'react-hot-toast';
-import { useReactToPrint } from 'react-to-print';
 
 const DIGITAL_MENUS = [
   { id: 'pulsa',         label: 'Pulsa',          icon: Smartphone },
@@ -463,6 +463,14 @@ export default function TransaksiPage() {
   const [loading, setLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastTransaction, setLastTransaction] = useState(null);
+  // Bluetooth printer state
+  const [btPrinting, setBtPrinting] = useState(false);
+  const [showPrinterPicker, setShowPrinterPicker] = useState(false);
+  const [printerList, setPrinterList] = useState([]);
+  const [printerScanning, setPrinterScanning] = useState(false);
+  const [printerConnecting, setPrinterConnecting] = useState(null);
+  const [showAllDevices, setShowAllDevices] = useState(false);
+  const [pendingBtPrintTx, setPendingBtPrintTx] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -527,34 +535,7 @@ export default function TransaksiPage() {
 
   const codeRef = useRef();
   const amountPaidRef = useRef(); // FIXED: ref untuk keyboard shortcut focus input bayar
-  const printRef = useRef();
-  const printRefDetail = useRef(); // ref untuk cetak dari riwayat
 
-  const PAGE_STYLE = `
-    @page { size: 58mm auto !important; margin: 0mm !important; }
-    html, body { width: 58mm !important; min-width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 0 !important; background: white !important; }
-    .print-container { width: 58mm !important; max-width: 58mm !important; font-family: 'Courier New', Courier, monospace !important; font-size: 9pt !important; line-height: 1.3 !important; color: #000 !important; padding: 2mm !important; margin: 0 !important; }
-    .print-title { font-size: 11pt !important; font-weight: bold !important; }
-    .print-total { font-size: 10pt !important; font-weight: bold !important; }
-  `;
-
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    pageStyle: PAGE_STYLE,
-    removeAfterPrint: true,
-    copyStyles: false,
-  });
-
-  const handlePrintDetail = useReactToPrint({
-    content: () => printRefDetail.current,
-    pageStyle: PAGE_STYLE,
-    removeAfterPrint: true,
-    copyStyles: false,
-  });
-
-  const doPrintDetail = () => {
-    setTimeout(() => handlePrintDetail(), 300);
-  };
 
   // Share struk via WhatsApp
   const handleShareWA = (tx) => {
@@ -586,6 +567,70 @@ export default function TransaksiPage() {
       settings?.receiptFooter || 'Terima kasih sudah berbelanja!',
     ].filter(l => l !== '' && l !== null && l !== undefined).join('\n');
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  // Tombol "Cetak": di APK Android -> Bluetooth, di web/desktop -> dialog print browser.
+  // Path browser mengandalkan @media print di index.css yang isolasi .print-container.
+  const handleCetak = (tx) => {
+    if (isNative()) {
+      doBluetoothPrint(tx);
+    } else {
+      window.print();
+    }
+  };
+
+  // ─── Bluetooth Printer Handlers ─────────────────────────────
+  const doBluetoothPrint = async (tx) => {
+    if (!tx) return;
+    setBtPrinting(true);
+    const res = await printStruk(tx, settings);
+    setBtPrinting(false);
+    if (res.ok) {
+      toast.success(res.message);
+    } else if (res.needsPicker) {
+      setPendingBtPrintTx(tx);
+      openPrinterPicker();
+    } else {
+      toast.error(res.message);
+    }
+  };
+
+  const openPrinterPicker = async () => {
+    setShowPrinterPicker(true);
+    setPrinterList([]);
+    setPrinterScanning(true);
+    const res = await scanPrinters();
+    setPrinterScanning(false);
+    if (!res.ok) {
+      toast.error(res.message);
+    } else {
+      setPrinterList(res.devices);
+      if (res.devices.length === 0) {
+        toast('Belum ada printer paired. Pair printer di Pengaturan Bluetooth HP dulu.', { icon: 'ℹ️' });
+      }
+    }
+  };
+
+  const handleSelectPrinter = async (device) => {
+    setPrinterConnecting(device.address);
+    const res = await connectPrinter(device);
+    setPrinterConnecting(null);
+    if (!res.ok) {
+      toast.error(res.message);
+      return;
+    }
+    toast.success(res.message);
+    setShowPrinterPicker(false);
+    // Kalau ada pending transaksi yang mau diprint, langsung print.
+    const pending = pendingBtPrintTx;
+    setPendingBtPrintTx(null);
+    if (pending) {
+      setBtPrinting(true);
+      const printRes = await printStruk(pending, settings);
+      setBtPrinting(false);
+      if (printRes.ok) toast.success(printRes.message);
+      else toast.error(printRes.message);
+    }
   };
 
   const refreshSaldos = useCallback(() => {
@@ -1840,17 +1885,41 @@ export default function TransaksiPage() {
                 <Trash2 size={16} /> Batalkan Transaksi
               </button>
             )}
-            {/* Struk tersembunyi untuk print dari riwayat */}
+            {/* Struk untuk print browser dari riwayat. Off-screen di viewport UI,
+                di-reposisikan ke pojok kertas oleh @media print di index.css. */}
             <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-              <div ref={printRefDetail}><ReceiptView transaction={selectedTx} settings={settings} /></div>
+              <ReceiptView transaction={selectedTx} settings={settings} />
             </div>
-            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-              <button className="btn btn-outline flex-1 text-green-600 border-green-300 hover:bg-green-50" onClick={() => handleShareWA(selectedTx)}>
-                <span>💬</span> Kirim WA
-              </button>
-              <button className="btn btn-outline flex-1" onClick={doPrintDetail}>
-                <Printer size={15} /> Cetak Struk
-              </button>
+            <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+              {isNative() && (
+                <>
+                  <button
+                    className="btn btn-primary w-full"
+                    onClick={() => doBluetoothPrint(selectedTx)}
+                    disabled={btPrinting}
+                  >
+                    {btPrinting ? <Loader2 size={16} className="animate-spin" /> : <Bluetooth size={16} />}
+                    {btPrinting
+                      ? 'Mengirim ke printer...'
+                      : (getSavedPrinter() ? `Print BT (${getSavedPrinter().name})` : 'Print Bluetooth')}
+                  </button>
+                  <button
+                    className="btn btn-outline w-full text-xs text-slate-500"
+                    onClick={openPrinterPicker}
+                    disabled={btPrinting}
+                  >
+                    <RefreshCw size={12} /> Ganti / Pilih Printer BT
+                  </button>
+                </>
+              )}
+              <div className="flex gap-2">
+                <button className="btn btn-outline flex-1 text-green-600 border-green-300 hover:bg-green-50" onClick={() => handleShareWA(selectedTx)}>
+                  <span>💬</span> Kirim WA
+                </button>
+                <button className="btn btn-outline flex-1" onClick={() => handleCetak(selectedTx)} disabled={btPrinting}>
+                  <Printer size={15} /> Cetak
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -1881,16 +1950,103 @@ export default function TransaksiPage() {
                 <Store size={16} /> GROSIR — Transaksi Harga Grosir
               </div>
             )}
-            <div ref={printRef} id="print-root" className="bg-white"><ReceiptView transaction={lastTransaction} settings={settings} /></div>
-            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
-              <button className="btn btn-outline flex-1" onClick={() => setShowReceipt(false)}>Tutup</button>
-              <button className="btn btn-outline flex-1 text-green-600 border-green-300 hover:bg-green-50" onClick={() => handleShareWA(lastTransaction)}>
-                <span>💬</span> WA
-              </button>
-              <button className="btn btn-primary flex-1" onClick={handlePrint}><Printer size={16} /> Cetak</button>
+            <ReceiptView transaction={lastTransaction} settings={settings} />
+            <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+              {isNative() && (
+                <>
+                  <button
+                    className="btn btn-primary w-full"
+                    onClick={() => doBluetoothPrint(lastTransaction)}
+                    disabled={btPrinting}
+                  >
+                    {btPrinting ? <Loader2 size={16} className="animate-spin" /> : <Bluetooth size={16} />}
+                    {btPrinting
+                      ? 'Mengirim ke printer...'
+                      : (getSavedPrinter() ? `Print BT (${getSavedPrinter().name})` : 'Print Bluetooth')}
+                  </button>
+                  <button
+                    className="btn btn-outline w-full text-xs text-slate-500"
+                    onClick={openPrinterPicker}
+                    disabled={btPrinting}
+                  >
+                    <RefreshCw size={12} /> Ganti / Pilih Printer BT
+                  </button>
+                </>
+              )}
+              <div className="flex gap-2">
+                <button className="btn btn-outline flex-1" onClick={() => setShowReceipt(false)}>Tutup</button>
+                <button className="btn btn-outline flex-1 text-green-600 border-green-300 hover:bg-green-50" onClick={() => handleShareWA(lastTransaction)}>
+                  <span>💬</span> WA
+                </button>
+                <button className="btn btn-outline flex-1" onClick={() => handleCetak(lastTransaction)} disabled={btPrinting}><Printer size={16} /> Cetak</button>
+              </div>
             </div>
           </>
         )}
+      </Modal>
+
+      <Modal open={showPrinterPicker} onClose={() => { setShowPrinterPicker(false); setPendingBtPrintTx(null); }} title="Pilih Printer Bluetooth" size="sm">
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">
+            Printer harus sudah di-pair di Pengaturan Bluetooth HP terlebih dulu.
+          </p>
+          {(() => {
+            const visibleList = showAllDevices ? printerList : printerList.filter(isLikelyPrinter);
+            const filteredOut = printerList.length - visibleList.length;
+            if (printerScanning) {
+              return <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-500" /></div>;
+            }
+            if (printerList.length === 0) {
+              return <EmptyState message="Tidak ada printer paired ditemukan" icon={Bluetooth} />;
+            }
+            if (visibleList.length === 0) {
+              return (
+                <EmptyState
+                  message={`Tidak ada device yang terdeteksi sebagai printer${filteredOut > 0 ? ` (${filteredOut} device disembunyikan)` : ''}. Aktifkan "Tampilkan semua device" di bawah kalau printer tidak muncul.`}
+                  icon={Bluetooth}
+                />
+              );
+            }
+            return (
+              <div className="max-h-80 overflow-y-auto space-y-2">
+                {visibleList.map((d) => {
+                  const connecting = printerConnecting === d.address;
+                  return (
+                    <button
+                      key={d.address}
+                      onClick={() => handleSelectPrinter(d)}
+                      disabled={!!printerConnecting}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-slate-100 text-left disabled:opacity-50"
+                    >
+                      <Bluetooth size={18} className="text-blue-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-700 truncate">{d.name || '(Tanpa Nama)'}</p>
+                        <p className="text-xs text-slate-400 truncate">{d.address} • {d.type}</p>
+                      </div>
+                      {connecting && <Loader2 size={16} className="animate-spin text-blue-500 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="w-4 h-4"
+              checked={showAllDevices}
+              onChange={(e) => setShowAllDevices(e.target.checked)}
+            />
+            Tampilkan semua device (bypass filter nama printer)
+          </label>
+          <button
+            className="btn btn-outline w-full"
+            onClick={openPrinterPicker}
+            disabled={printerScanning || !!printerConnecting}
+          >
+            <RefreshCw size={14} /> Scan Ulang
+          </button>
+        </div>
       </Modal>
 
       <Modal open={showSearch} onClose={() => setShowSearch(false)} title="Cari Produk" size="lg">

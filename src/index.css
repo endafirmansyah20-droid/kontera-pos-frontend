@@ -157,13 +157,55 @@
     background: white !important;
   }
   @page { size: 58mm auto; margin: 0mm; }
+
+  /* Bug 1: visibility:hidden pada #root tetap reserve tinggi TransaksiPage
+     (2000-4000px), bikin @page auto ngitung dokumen jadi multi-halaman.
+     display:none pada top-level non-struk (#root + toast root, dsb)
+     menghapus kontribusinya ke document height. Aman: Modal render via
+     createPortal ke document.body, di luar #root. */
+  body > *:not(:has(.print-container)):not(.print-container) {
+    display: none !important;
+  }
+
+  /* Bug 2: reset seluruh rantai ancestor .print-container (portal overlay
+     fixed, modal card, body modal, dan wrapper off-screen left:-9999px di
+     modal riwayat) supaya tidak jadi containing block yang bikin
+     .print-container ke-render di luar halaman kertas. */
+  body *:has(.print-container) {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    max-height: none !important;
+    max-width: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Sembunyikan sibling non-struk dalam rantai ancestor (header modal,
+     tombol Cetak/WA/BT) supaya tidak reserve ruang kosong di kertas. */
+  body *:has(.print-container) > *:not(.print-container):not(:has(.print-container)) {
+    display: none !important;
+  }
+
+  /* Container struk mengalir natural (bukan absolute lagi). */
   .print-container {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
     width: 58mm !important;
+    max-width: 58mm !important;
     font-family: 'Courier New', Courier, monospace !important;
     font-size: 9pt !important;
     line-height: 1.3 !important;
     color: #000 !important;
     padding: 2mm !important;
+    background: white !important;
   }
 }
 
