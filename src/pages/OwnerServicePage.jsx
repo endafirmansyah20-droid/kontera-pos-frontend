@@ -96,7 +96,6 @@ export default function OwnerServicePage() {
             <ArrowLeft size={16} className="text-slate-500" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-xl font-black text-slate-800">Service HP</h1>
             <p className="text-sm text-slate-400 mt-0.5">Rekap service masuk</p>
           </div>
         </div>

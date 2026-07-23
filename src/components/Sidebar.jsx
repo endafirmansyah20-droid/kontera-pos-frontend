@@ -148,7 +148,12 @@ export default function Sidebar({ lowStockCount = 0 }) {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-60 fixed inset-y-0 left-0 z-30 shadow-lg" style={{background:'#8b1a6b'}}>
+      <aside className="hidden lg:flex flex-col w-60 fixed inset-y-0 left-0 z-30 shadow-lg"
+        style={{
+          background: isOwner
+            ? 'linear-gradient(180deg, #3C3489 0%, #26215C 100%)'
+            : '#8b1a6b'
+        }}>
         <div className="flex flex-col h-full">
           <div className="px-5 py-6 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -157,22 +162,41 @@ export default function Sidebar({ lowStockCount = 0 }) {
               </div>
               <div>
                 <p className="font-bold text-white text-sm leading-tight">KonterA</p>
-                <p className={`text-xs font-semibold ${roleColor}`}>{roleLabel}</p>
+                {isOwner ? (
+                  <div className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide"
+                    style={{background:'#FAEEDA', color:'#854F0B'}}>
+                    ★ Owner plan
+                  </div>
+                ) : (
+                  <p className={`text-xs font-semibold ${roleColor}`}>{roleLabel}</p>
+                )}
               </div>
             </div>
           </div>
           <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+            {isOwner && (
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/40 px-4 mb-1.5">MENU UTAMA</p>
+            )}
             {activeNav.map(({ to, icon: Icon, label, badge }) => {
               const count = badge ? getBadgeCount(badge) : 0;
               return (
-                <NavLink key={to} to={to} end
-                  className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-                  <Icon size={18} />
-                  <span className="flex-1">{label}</span>
-                  {count > 0 && (
-                    <span className="badge badge-red text-xs">{count > 99 ? '99+' : count}</span>
+                <React.Fragment key={to}>
+                  {/* Section label "LAINNYA" muncul sebelum /keuangan hanya untuk Owner */}
+                  {isOwner && to === '/keuangan' && (
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/40 px-4 mt-4 mb-1.5">LAINNYA</p>
                   )}
-                </NavLink>
+                  <NavLink to={to} end
+                    className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                    style={({ isActive }) => isOwner && isActive
+                      ? { boxShadow: 'inset 3px 0 0 #F59E0B' }
+                      : undefined}>
+                    <Icon size={18} />
+                    <span className="flex-1">{label}</span>
+                    {count > 0 && (
+                      <span className="badge badge-red text-xs">{count > 99 ? '99+' : count}</span>
+                    )}
+                  </NavLink>
+                </React.Fragment>
               );
             })}
           </nav>
@@ -186,6 +210,20 @@ export default function Sidebar({ lowStockCount = 0 }) {
                 <p className="text-xs text-violet-300 capitalize">{user?.role}</p>
               </div>
             </div>
+            {isOwner && (
+              <div className="border-t border-white/10 mt-3 pt-3 mb-2 px-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md overflow-hidden shrink-0">
+                    <img src="/logo-kontera.png" alt="" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-white/80 leading-tight">KonterA</p>
+                    <p className="text-[9px] text-white/40 leading-tight">Sistem Manajemen Konter</p>
+                  </div>
+                </div>
+                <p className="text-[9px] text-white/30 mt-1.5">© 2026 KonterA · v2.0.0</p>
+              </div>
+            )}
             <button onClick={toggleDarkMode} className="sidebar-link w-full mb-1">
               {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>

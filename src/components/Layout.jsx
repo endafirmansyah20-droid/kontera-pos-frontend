@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { productAPI } from '../services/api';
-import { AlertTriangle, X, Package } from 'lucide-react';
+import { AlertTriangle, X, Package, Bell } from 'lucide-react';
 import { formatRupiah } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 
@@ -55,8 +56,81 @@ function LowStockAlert({ products, onClose }) {
   );
 }
 
+// ── Owner Top Bar (desktop-only) ─────────────────────────────────
+// Route → title. Kalau ada route Owner baru, tambah di sini.
+const OWNER_TITLE_MAP = {
+  '/owner':           'Dashboard Owner',
+  '/owner/cabang':    'Cabang',
+  '/owner/karyawan':  'Karyawan',
+  '/owner/penjualan': 'Penjualan',
+  '/owner/service':   'Service HP',
+  '/keuangan':        'Keuangan',
+  '/pengaturan':      'Pengaturan',
+};
+
+function getInitials(name = '') {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function OwnerTopBar({ user }) {
+  const location = useLocation();
+  const title = OWNER_TITLE_MAP[location.pathname] || 'Dashboard';
+  const dateStr = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
+  }).format(new Date());
+  const notifCount = 0; // static — siap dihubungkan ke source notif nanti
+  const initials = getInitials(user?.name);
+
+  return (
+    <div className="hidden lg:flex items-center justify-between" style={{
+      background: '#fff',
+      borderBottom: '1px solid #f1f5f9',
+      padding: '12px 24px',
+      minHeight: 56,
+    }}>
+      {/* Kiri: judul halaman dinamis */}
+      <div style={{ fontSize: 16, fontWeight: 500, color: '#1e293b' }}>
+        {title}
+      </div>
+
+      {/* Tengah: tanggal */}
+      <div style={{ fontSize: 13, color: '#64748b' }}>
+        {dateStr}
+      </div>
+
+      {/* Kanan: notifikasi + avatar */}
+      <div className="flex items-center gap-3">
+        <div style={{ position: 'relative', display: 'flex' }}>
+          <Bell size={18} strokeWidth={1.8} style={{ color: '#64748b' }} />
+          {notifCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -6, right: -8,
+              minWidth: 16, height: 16, padding: '0 4px',
+              borderRadius: 999,
+              background: '#ef4444', color: '#fff',
+              fontSize: 10, fontWeight: 700, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{notifCount > 9 ? '9+' : notifCount}</span>
+          )}
+        </div>
+        <div style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: '#3C3489', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 700,
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}>{initials}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Layout({ children }) {
-  const { isOwner, isSuperAdmin, user } = useAuth();
+  const { isOwner, isSuperAdmin, user, darkMode } = useAuth();
   const userId = user?._id;
   const [lowStockCount, setLowStockCount]       = useState(0);
   const [lowStockProducts, setLowStockProducts] = useState([]);
@@ -100,7 +174,17 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen dark:bg-slate-900 flex transition-colors duration-200">
       <Sidebar lowStockCount={lowStockCount} />
-      <main className="flex-1 lg:ml-60 min-h-screen min-w-0 max-w-full overflow-x-hidden mobile-pt lg:pt-0">
+      <main
+        className="flex-1 lg:ml-60 min-h-screen min-w-0 max-w-full overflow-x-hidden mobile-pt lg:pt-0"
+        style={isOwner && !darkMode ? { background: '#FAFAFD' } : undefined}
+      >
+        {isOwner && (
+          <div style={{
+            height: 4,
+            background: 'linear-gradient(90deg, #3C3489 0%, #F59E0B 100%)',
+          }} />
+        )}
+        {isOwner && <OwnerTopBar user={user} />}
         <div className="p-4 lg:p-6 max-w-screen-2xl mx-auto mobile-pb lg:pb-6 min-w-0">
           {children}
         </div>

@@ -83,7 +83,6 @@ export default function OwnerPenjualanPage() {
             <ArrowLeft size={16} className="text-slate-500" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-xl font-black text-slate-800">Penjualan</h1>
             <p className="text-sm text-slate-400 mt-0.5">Ranking omset per cabang</p>
           </div>
         </div>

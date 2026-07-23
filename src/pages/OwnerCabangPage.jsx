@@ -75,7 +75,6 @@ export default function OwnerCabangPage() {
             <ArrowLeft size={16} className="text-slate-500" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-xl font-black text-slate-800">Cabang Saya</h1>
             <p className="text-sm text-slate-400 mt-0.5">{data?.totalCabang ?? 0}/{data?.maxCabang ?? 0} slot digunakan</p>
           </div>
         </div>
