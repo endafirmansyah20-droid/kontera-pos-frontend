@@ -2,12 +2,12 @@
 // LaporanPage.jsx — Rekap Laba Rugi Bulanan
 // ============================================================
 import React, { useState, useEffect, useCallback } from 'react';
-import { reportAPI, customerAPI, financeAPI, settingsAPI, authAPI, transactionAPI, serviceAPI, brankasAPI, pointAPI, cabangAPI, backupAPI, rewardAPI, productAPI } from '../services/api';
+import api, { reportAPI, customerAPI, financeAPI, settingsAPI, authAPI, transactionAPI, serviceAPI, brankasAPI, pointAPI, cabangAPI, backupAPI, rewardAPI, productAPI, ownerAPI } from '../services/api';
 import { formatRupiah, formatDate, PAYMENT_LABELS, PAYMENT_COLORS, FINANCE_TYPE_LABELS } from '../utils/helpers';
 import { PageHeader, EmptyState, Loader, Modal, StatCard, SearchInput, ConfirmDialog, RupiahInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Edit2, Eye, TrendingUp, ShoppingCart, DollarSign, ArrowUpCircle, ArrowDownCircle, ChevronRight, RefreshCw, FileSpreadsheet, FileText, Wrench } from 'lucide-react';
+import { Plus, Trash2, Edit2, Eye, EyeOff, TrendingUp, ShoppingCart, DollarSign, ArrowUpCircle, ArrowDownCircle, ChevronRight, RefreshCw, FileSpreadsheet, FileText, Wrench, UserPlus, Users, Key } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, LineChart, Line
@@ -1228,6 +1228,272 @@ export function PelangganPage() {
 // PengaturanPage.jsx
 // ============================================================
 
+// ─── Manajemen Pengguna — Owner (lintas cabang) ───────────────────────
+function OwnerUserManagement() {
+  const [users, setUsers]                 = useState([]);
+  const [activeCabangs, setActiveCabangs] = useState([]);
+  const [showAdd, setShowAdd]             = useState(false);
+  const [showPw, setShowPw]               = useState(false);
+  const [form, setForm]                   = useState({ name: '', username: '', password: '', role: 'karyawan', cabangId: '' });
+  const [saving, setSaving]               = useState(false);
+
+  // Edit user
+  const [editUser, setEditUser]           = useState(null);
+  const [editForm, setEditForm]           = useState({ name: '', role: 'karyawan', cabangId: '' });
+  const [savingEdit, setSavingEdit]       = useState(false);
+
+  // Reset password
+  const [resetTarget, setResetTarget]           = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetting, setResetting]               = useState(false);
+
+  const loadUsers = useCallback(async () => {
+    try { const { data: res } = await api.get('/owner/users'); setUsers(res.data || []); }
+    catch {}
+  }, []);
+
+  const loadCabangs = useCallback(async () => {
+    try {
+      const { data: res } = await api.get('/owner/dashboard');
+      const list = res.data?.subscriptions?.filter(s => ['aktif', 'gratis'].includes(s.status)) || [];
+      setActiveCabangs(list);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+    loadCabangs();
+  }, [loadUsers, loadCabangs]);
+
+  const handleAdd = async () => {
+    if (!form.name || !form.username || !form.password || !form.cabangId)
+      return toast.error('Semua field wajib diisi');
+    setSaving(true);
+    try {
+      await api.post('/owner/users', form);
+      toast.success('User berhasil ditambahkan!');
+      setShowAdd(false);
+      setForm({ name: '', username: '', password: '', role: 'karyawan', cabangId: '' });
+      loadUsers();
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal menambah user'); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (userId) => {
+    try {
+      const { data: res } = await api.patch(`/owner/users/${userId}/toggle`);
+      toast.success(res.message);
+      loadUsers();
+    } catch { toast.error('Gagal mengubah status user'); }
+  };
+
+  const openEdit = (u) => {
+    setEditUser(u);
+    setEditForm({
+      name:     u.name || '',
+      role:     u.role || 'karyawan',
+      cabangId: u.cabang?._id || u.cabang || '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.name) return toast.error('Nama wajib diisi');
+    if (!editForm.cabangId) return toast.error('Cabang wajib dipilih');
+    setSavingEdit(true);
+    try {
+      await ownerAPI.updateUser(editUser._id, editForm);
+      toast.success('User diperbarui');
+      setEditUser(null);
+      loadUsers();
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal memperbarui user'); }
+    finally { setSavingEdit(false); }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordValue || resetPasswordValue.length < 6)
+      return toast.error('Password minimal 6 karakter');
+    setResetting(true);
+    try {
+      await ownerAPI.resetUserPassword(resetTarget._id, resetPasswordValue);
+      toast.success(`Password ${resetTarget.name} berhasil direset!`);
+      setResetTarget(null);
+      setResetPasswordValue('');
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal reset password'); }
+    finally { setResetting(false); }
+  };
+
+  return (
+    <>
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-700">Manajemen Pengguna</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{users.length} terdaftar · lintas cabang</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+            <UserPlus size={16} /> Tambah User
+          </button>
+        </div>
+        {users.length === 0 ? (
+          <div className="p-8 text-center">
+            <Users size={32} className="text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-400 text-sm">Belum ada pengguna</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {users.map(u => (
+              <div key={u._id} className={`flex items-center gap-3 p-3 rounded-xl border ${u.isActive ? 'bg-slate-50 border-slate-100' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
+                <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                  {u.name?.[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-700">{u.name}</p>
+                  <p className="text-xs text-slate-400">
+                    @{u.username} · <span className="capitalize">{u.role}</span>
+                    {u.cabang?.nama && <span className="ml-1 text-primary-500">· {u.cabang.nama}</span>}
+                  </p>
+                </div>
+                <span className={`badge ${u.isActive ? 'badge-green' : 'badge-gray'} text-xs flex-shrink-0`}>
+                  {u.isActive ? 'Aktif' : 'Nonaktif'}
+                </span>
+                <button onClick={() => openEdit(u)}
+                  className="btn btn-outline py-1.5 px-2.5 text-xs flex-shrink-0"
+                  title="Edit user">
+                  <Edit2 size={13} />
+                </button>
+                <button onClick={() => { setResetTarget(u); setResetPasswordValue(''); }}
+                  className="btn btn-outline py-1.5 px-2.5 text-xs flex-shrink-0 text-amber-600 border-amber-300 hover:bg-amber-50"
+                  title="Reset password">
+                  <Key size={13} />
+                </button>
+                <button onClick={() => handleToggle(u._id)}
+                  className={`btn py-1.5 px-2.5 text-xs flex-shrink-0 ${u.isActive ? 'btn-outline text-red-500' : 'btn-outline text-green-600'}`}>
+                  {u.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Tambah Pengguna" size="sm">
+        <div className="space-y-3">
+          <div>
+            <label className="label">Nama Lengkap *</label>
+            <input className="input" placeholder="Nama lengkap..."
+              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Username *</label>
+            <input className="input" placeholder="username..."
+              value={form.username}
+              onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))} />
+          </div>
+          <div>
+            <label className="label">Password *</label>
+            <div className="relative">
+              <input type={showPw ? 'text' : 'password'} className="input pr-10" placeholder="Min. 6 karakter"
+                value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+              <button type="button" onClick={() => setShowPw(!showPw)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="label">Role</label>
+            <select className="input" value={form.role}
+              onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+              <option value="karyawan">Karyawan</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Cabang *</label>
+            <select className="input" value={form.cabangId}
+              onChange={e => setForm(f => ({ ...f, cabangId: e.target.value }))}>
+              <option value="">Pilih Cabang</option>
+              {activeCabangs.map(sub => (
+                <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button className="btn btn-outline flex-1" onClick={() => setShowAdd(false)}>Batal</button>
+            <button className="btn btn-primary flex-1" disabled={saving} onClick={handleAdd}>
+              {saving ? 'Proses...' : 'Tambah User'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Edit User */}
+      <Modal open={!!editUser} onClose={() => setEditUser(null)}
+        title={`Edit: ${editUser?.name || ''}`} size="sm">
+        <div className="space-y-3">
+          <div>
+            <label className="label">Nama Lengkap *</label>
+            <input className="input"
+              value={editForm.name}
+              onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Role</label>
+            <select className="input"
+              value={editForm.role}
+              onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}>
+              <option value="karyawan">Karyawan</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Cabang *</label>
+            <select className="input"
+              value={editForm.cabangId}
+              onChange={e => setEditForm(f => ({ ...f, cabangId: e.target.value }))}>
+              <option value="">Pilih Cabang</option>
+              {activeCabangs.map(sub => (
+                <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-4">
+          <button className="btn btn-outline flex-1" onClick={() => setEditUser(null)}>Batal</button>
+          <button className="btn btn-primary flex-1" onClick={handleSaveEdit} disabled={savingEdit}>
+            {savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Modal Reset Password */}
+      <Modal open={!!resetTarget}
+        onClose={() => { setResetTarget(null); setResetPasswordValue(''); }}
+        title={`Reset Password — ${resetTarget?.name || ''}`} size="sm">
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="text-xs text-amber-700">⚠️ Password lama akan <strong>terhapus permanen</strong>. Pastikan kamu memberitahu password baru ke user.</p>
+          </div>
+          <div>
+            <label className="label">Password Baru *</label>
+            <input className="input" type="password" placeholder="Min. 6 karakter"
+              value={resetPasswordValue}
+              onChange={e => setResetPasswordValue(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-4">
+          <button className="btn btn-outline flex-1"
+            onClick={() => { setResetTarget(null); setResetPasswordValue(''); }}>Batal</button>
+          <button className="btn flex-1 bg-amber-500 hover:bg-amber-400 text-white font-bold"
+            onClick={handleResetPassword} disabled={resetting}>
+            {resetting ? 'Mereset...' : '🔑 Reset Password'}
+          </button>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 export function PengaturanPage() {
   const { user: currentUser, isAdmin, isSuperAdmin } = useAuth();
   const [settings, setSettings]   = useState(null);
@@ -1371,14 +1637,14 @@ export function PengaturanPage() {
 
   useEffect(() => {
     settingsAPI.get().then(r => setSettings(r.data.data)).catch(() => {});
-    loadUsers();
+    if (isAdmin) loadUsers();
     loadBackupInfo();
     loadRewards();
     // Load cabang untuk superadmin
     if (isSuperAdmin) {
       cabangAPI.getAll().then(r => setCabangs(r.data.data || [])).catch(() => {});
     }
-  }, [isSuperAdmin, loadRewards]);
+  }, [isAdmin, isSuperAdmin, loadRewards]);
 
   const handleSaveSettings = async () => {
     setSaving(true);
@@ -1645,7 +1911,7 @@ export function PengaturanPage() {
       )}
 
       {/* Info Toko */}
-      {!isSuperAdmin && (
+      {isAdmin && !isSuperAdmin && (
       <div className="card mb-6">
         <h3 className="font-bold text-slate-700 mb-4">Informasi Toko</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1888,6 +2154,9 @@ export function PengaturanPage() {
           </button>
         </div>
       </div>
+
+      {/* Manajemen Pengguna — Owner (lintas cabang) */}
+      {currentUser?.role === 'owner' && <OwnerUserManagement />}
 
       {/* Manajemen User */}
       {isAdmin && (

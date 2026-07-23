@@ -36,6 +36,14 @@ export const authAPI = {
   getUsers: () => api.get('/auth/users'),
   updateUser: (id, d) => api.put(`/auth/users/${id}`, d),
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
+  resetPassword:    (id, newPassword)          => api.put(`/auth/users/${id}/reset-password`, { newPassword }),
+  changeMyPassword: (oldPassword, newPassword) => api.put('/auth/change-my-password', { oldPassword, newPassword }),
+};
+
+// ─── Owner (owner-scoped user management) ────────
+export const ownerAPI = {
+  updateUser:        (userId, payload)     => api.put(`/owner/users/${userId}`, payload),
+  resetUserPassword: (userId, newPassword) => api.put(`/owner/users/${userId}/reset-password`, { newPassword }),
 };
 
 // ─── Products ────────────────────────────

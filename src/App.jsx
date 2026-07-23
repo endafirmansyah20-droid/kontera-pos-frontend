@@ -8,6 +8,10 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import OwnerDashboardPage from './pages/OwnerDashboardPage';
+import OwnerCabangPage from './pages/OwnerCabangPage';
+import OwnerKaryawanPage from './pages/OwnerKaryawanPage';
+import OwnerPenjualanPage from './pages/OwnerPenjualanPage';
+import OwnerServicePage from './pages/OwnerServicePage';
 import DashboardPage from './pages/DashboardPage';
 import TransaksiPage from './pages/TransaksiPage';
 import StokPage from './pages/StokPage';
@@ -112,6 +116,10 @@ function AppRoutes() {
       <Route path="/daftar"        element={<PublicRoute><RegisterPage /></PublicRoute>} />
       <Route path="/onboarding"    element={<OnboardingPage />} />
       <Route path="/owner"         element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
+      <Route path="/owner/cabang"  element={<OwnerRoute><OwnerCabangPage /></OwnerRoute>} />
+      <Route path="/owner/karyawan" element={<OwnerRoute><OwnerKaryawanPage /></OwnerRoute>} />
+      <Route path="/owner/penjualan" element={<OwnerRoute><OwnerPenjualanPage /></OwnerRoute>} />
+      <Route path="/owner/service"   element={<OwnerRoute><OwnerServicePage /></OwnerRoute>} />
       <Route path="/pengaturan"    element={<AnyAuthRoute><PengaturanPage /></AnyAuthRoute>} />
       <Route path="/dashboard"     element={<AdminRoute><DashboardPage /></AdminRoute>} />
       <Route path="/transaksi"     element={<ProtectedRoute><TransaksiPage /></ProtectedRoute>} />

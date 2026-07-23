@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, ShoppingCart, Package, Wallet, Wallet2,
-  BarChart3, Users, Settings, LogOut, Smartphone, Menu, X,
+  BarChart2, BarChart3, Users, Settings, LogOut, Smartphone, Menu, X,
   Calculator, Wrench, Building2, ChevronRight, Store, CreditCard,
   Moon, Sun, Lock
 } from 'lucide-react';
@@ -21,9 +21,13 @@ const SUPER_NAV = [
 
 // Nav untuk owner
 const OWNER_NAV = [
-  { to: '/owner',      icon: LayoutDashboard, label: 'Dashboard'  },
-  { to: '/keuangan',   icon: Wallet2,         label: 'Keuangan'   },
-  { to: '/pengaturan', icon: Settings,        label: 'Pengaturan' },
+  { to: '/owner',           icon: LayoutDashboard, label: 'Dashboard'  },
+  { to: '/owner/cabang',    icon: Building2,       label: 'Cabang'     },
+  { to: '/owner/karyawan',  icon: BarChart2,       label: 'Karyawan'   },
+  { to: '/owner/penjualan', icon: BarChart3,       label: 'Penjualan'  },
+  { to: '/owner/service',   icon: Wrench,          label: 'Service HP' },
+  { to: '/keuangan',        icon: Wallet2,         label: 'Keuangan'   },
+  { to: '/pengaturan',      icon: Settings,        label: 'Pengaturan' },
 ];
 
 // Nav untuk admin & karyawan
@@ -117,10 +121,14 @@ export default function Sidebar({ lowStockCount = 0 }) {
   const mainItems = isSuperAdmin
     ? SUPER_NAV.slice(0, 4)
     : isOwner
-      ? OWNER_NAV
+      ? OWNER_NAV.slice(0, 4)
       : activeNav.filter(item => BOTTOM_NAV_KEYS.includes(item.to));
 
-  const moreItems = (isSuperAdmin || isOwner) ? [] : activeNav.filter(item => !BOTTOM_NAV_KEYS.includes(item.to));
+  const moreItems = isSuperAdmin
+    ? []
+    : isOwner
+      ? OWNER_NAV.slice(4)
+      : activeNav.filter(item => !BOTTOM_NAV_KEYS.includes(item.to));
   const isMoreActive = moreItems.some(item => location.pathname === item.to);
 
   const roleLabel = isSuperAdmin
@@ -157,7 +165,7 @@ export default function Sidebar({ lowStockCount = 0 }) {
             {activeNav.map(({ to, icon: Icon, label, badge }) => {
               const count = badge ? getBadgeCount(badge) : 0;
               return (
-                <NavLink key={to} to={to}
+                <NavLink key={to} to={to} end
                   className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
                   <Icon size={18} />
                   <span className="flex-1">{label}</span>
@@ -233,7 +241,7 @@ export default function Sidebar({ lowStockCount = 0 }) {
             const isActive = location.pathname === to;
             const count = badge ? getBadgeCount(badge) : 0;
             return (
-              <NavLink key={to} to={to} className={`bottom-nav-item ${isActive ? 'active' : ''}`}>
+              <NavLink key={to} to={to} end className={`bottom-nav-item ${isActive ? 'active' : ''}`}>
                 <div className="relative">
                   <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
                   {count > 0 && (

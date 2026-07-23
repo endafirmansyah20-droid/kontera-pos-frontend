@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-  Building2, Plus, CreditCard, Copy, Wrench, Users, CheckCircle,
-  UserPlus, Eye, EyeOff, ToggleLeft, ToggleRight, RefreshCw,
-  LayoutDashboard, BarChart2, DollarSign, TrendingUp, ShoppingCart,
-  Store, BarChart3, AlertTriangle, Package, ChevronRight, ArrowUpRight,
-  Activity, Globe, Settings, Zap
+  Building2, Users, CheckCircle, RefreshCw,
+  DollarSign, TrendingUp, ShoppingCart,
+  BarChart3, Package, Globe
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -14,24 +12,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts';
-
-const REKENING = [
-  { bank: 'BCA',     no: '1093049059',    nama: 'Enda Firmansyah' },
-  { bank: 'Mandiri', no: '1250013988837', nama: 'Enda Firmansyah' },
-  { bank: 'BRI',     no: '372701030137531', nama: 'Enda Firmansyah' },
-];
-
-// Tab operasional & manajemen dipisah
-const TABS_OPERASIONAL = [
-  { id: 'dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-  { id: 'penjualan', label: 'Penjualan',  icon: BarChart3        },
-  { id: 'karyawan',  label: 'Karyawan',   icon: BarChart2        },
-  { id: 'service',   label: 'Service HP', icon: Wrench           },
-];
-const TABS_MANAJEMEN = [
-  { id: 'cabang',   label: 'Cabang',   icon: Building2 },
-  { id: 'pengguna', label: 'Pengguna', icon: Users     },
-];
 
 const fmtRp   = v => formatRupiah(v || 0);
 const PALETTE = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316'];
@@ -207,237 +187,14 @@ function DashToko({ cabangList, period }) {
   );
 }
 
-// ── Penjualan Tab ─────────────────────────────────────────────────
-function DashPenjualan({ cabangList, period }) {
-  const rows = cabangList.map(c => ({
-    nama:c.nama, kode:c.kode,
-    tx:c[period]?.count||0, omset:c[period]?.omset||0, laba:c[period]?.laba||0,
-    margin:c[period]?.omset?Math.round((c[period]?.laba/c[period]?.omset)*100):0,
-  })).sort((a,b)=>b.omset-a.omset);
-  const maxOmset = Math.max(...rows.map(r=>r.omset),1);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          {label:'Total Omset', value:fmtRp(rows.reduce((t,r)=>t+r.omset,0)), gradient:'from-blue-400 to-blue-600', icon:DollarSign},
-          {label:'Total Laba',  value:fmtRp(rows.reduce((t,r)=>t+r.laba,0)),  gradient:'from-emerald-400 to-emerald-600', icon:TrendingUp},
-          {label:'Total Tx',    value:`${rows.reduce((t,r)=>t+r.tx,0)} tx`,   gradient:'from-violet-400 to-violet-600', icon:ShoppingCart},
-          {label:'Rata Margin', value:`${rows.length?Math.round(rows.reduce((t,r)=>t+r.margin,0)/rows.length):0}%`, gradient:'from-amber-400 to-orange-500', icon:Activity},
-        ].map(s=>(
-          <MetricCard key={s.label} label={s.label} value={s.value}
-            icon={s.icon} gradient={`bg-gradient-to-br ${s.gradient}`} />
-        ))}
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-50">
-          <h4 className="font-bold text-slate-700 text-sm">Ranking Penjualan</h4>
-          <p className="text-xs text-slate-400">Diurutkan omset tertinggi</p>
-        </div>
-        <div className="p-5 space-y-5">
-          {rows.map((r,i)=>(
-            <div key={r.kode}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0"
-                    style={{background:PALETTE[i%PALETTE.length]}}>{i+1}</div>
-                  <div>
-                    <span className="font-semibold text-slate-700 text-sm">{r.nama}</span>
-                    <span className="text-xs text-slate-400 ml-2">{r.tx} tx</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-slate-700 text-sm">{fmtRp(r.omset)}</p>
-                  <p className="text-xs text-slate-400">Laba {fmtRp(r.laba)}</p>
-                </div>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{width:`${(r.omset/maxOmset)*100}%`,background:PALETTE[i%PALETTE.length]}} />
-              </div>
-              <div className="flex justify-end mt-1">
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-md"
-                  style={{color:PALETTE[i%PALETTE.length],background:PALETTE[i%PALETTE.length]+'15'}}>
-                  Margin {r.margin}%
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Karyawan Tab ──────────────────────────────────────────────────
-function TabKaryawan({ activeCabangs }) {
-  const [stats, setStats]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [cabangId, setCabangId] = useState('');
-  const MEDAL = ['🥇','🥈','🥉'];
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await api.get('/owner/employee-stats', { params: cabangId ? { cabang: cabangId } : {} });
-      setStats(r.data.data || []);
-    } catch { toast.error('Gagal memuat data karyawan'); }
-    finally { setLoading(false); }
-  }, [cabangId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  return (
-    <div>
-      <div className="flex items-center justify-between p-5 border-b border-slate-100">
-        <div>
-          <h2 className="font-bold text-slate-800 text-sm">Performa Karyawan</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Bulan ini</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white text-slate-600"
-            value={cabangId} onChange={e => setCabangId(e.target.value)}>
-            <option value="">Semua Cabang</option>
-            {activeCabangs.map(sub => (
-              <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
-            ))}
-          </select>
-          <button onClick={load} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
-            <RefreshCw size={13} className="text-slate-500" />
-          </button>
-        </div>
-      </div>
-      {loading ? (
-        <div className="p-12 flex justify-center"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"/></div>
-      ) : stats.length === 0 ? (
-        <div className="p-12 text-center"><Users size={32} className="text-slate-200 mx-auto mb-3"/><p className="text-slate-400 text-sm">Belum ada data bulan ini</p></div>
-      ) : (
-        <div className="divide-y divide-slate-50">
-          {stats.map((emp,i) => (
-            <div key={emp._id||i} className="flex items-center justify-between px-5 py-4 hover:bg-slate-50/60 transition">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black ${i<3?'text-xl':'text-white text-sm'}`}
-                  style={i>=3?{background:PALETTE[i%PALETTE.length]}:{}}>
-                  {i<3?MEDAL[i]:(emp._id?.[0]?.toUpperCase()||'?')}
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-700 text-sm">{emp._id||'Tidak diketahui'}</p>
-                  <p className="text-xs text-slate-400">{emp.totalTx} tx · {emp.totalItems} item</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-emerald-600 text-sm">{fmtRp(emp.totalOmset)}</p>
-                <p className="text-xs text-slate-400">Laba: {fmtRp(emp.totalLaba)}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Service Tab ───────────────────────────────────────────────────
-function TabService({ activeCabangs }) {
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [cabangId, setCabangId] = useState('');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await api.get('/service/summary', { params: cabangId ? { cabang: cabangId } : {} });
-      const d = r.data.data || null;
-      if (d) {
-        setSummary({
-          totalUnit: d.jumlahTx||0,
-          omsetBulanIni: d.omsetMurni||d.omset||0,
-          labaBulanIni: d.labaBersih||0,
-          antrian: (d.statusCount?.antrian||0)+(d.statusCount?.proses||0),
-          byStatus: d.statusCount ? Object.entries(d.statusCount).map(([k,v])=>({_id:k,count:v})).filter(s=>s.count>0) : [],
-        });
-      } else { setSummary(null); }
-    } catch { toast.error('Gagal memuat data service'); }
-    finally { setLoading(false); }
-  }, [cabangId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const STATUS_COLOR = { antrian:'bg-amber-100 text-amber-700', proses:'bg-blue-100 text-blue-700', selesai:'bg-emerald-100 text-emerald-700', batal:'bg-red-100 text-red-700', diambil:'bg-violet-100 text-violet-700' };
-  const STATUS_LABEL = { antrian:'Antrian', proses:'Dikerjakan', selesai:'Selesai', batal:'Batal', diambil:'Diambil' };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between p-5 border-b border-slate-100">
-        <div>
-          <h2 className="font-bold text-slate-800 text-sm">Dashboard Service HP</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Rekap service masuk</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <select className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white text-slate-600"
-            value={cabangId} onChange={e => setCabangId(e.target.value)}>
-            <option value="">Semua Cabang</option>
-            {activeCabangs.map(sub=>(
-              <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
-            ))}
-          </select>
-          <button onClick={load} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
-            <RefreshCw size={13} className="text-slate-500" />
-          </button>
-        </div>
-      </div>
-      {loading ? (
-        <div className="p-12 flex justify-center"><div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"/></div>
-      ) : !summary ? (
-        <div className="p-12 text-center"><Wrench size={32} className="text-slate-200 mx-auto mb-3"/><p className="text-slate-400 text-sm">Belum ada data service</p></div>
-      ) : (
-        <div className="p-5 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              {label:'Total Unit',  val:summary.totalUnit,     gradient:'from-blue-400 to-blue-600',     icon:Package,       fmt:'num'},
-              {label:'Omset',       val:summary.omsetBulanIni, gradient:'from-emerald-400 to-emerald-600', icon:DollarSign,   fmt:'rp'},
-              {label:'Laba',        val:summary.labaBulanIni,  gradient:'from-violet-400 to-violet-600', icon:TrendingUp,    fmt:'rp'},
-              {label:'Belum Selesai',val:summary.antrian,      gradient:'from-amber-400 to-orange-500',  icon:AlertTriangle, fmt:'num'},
-            ].map(s=>(
-              <MetricCard key={s.label} label={s.label}
-                value={s.fmt==='rp'?fmtRp(s.val):s.val}
-                icon={s.icon} gradient={`bg-gradient-to-br ${s.gradient}`} />
-            ))}
-          </div>
-          {summary.byStatus?.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {summary.byStatus.map(s=>(
-                <div key={s._id} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl p-3">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${STATUS_COLOR[s._id]||'bg-slate-100 text-slate-600'}`}>
-                    {STATUS_LABEL[s._id]||s._id}
-                  </span>
-                  <span className="font-black text-slate-700 text-lg">{s.count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main ──────────────────────────────────────────────────────────
 export default function OwnerDashboardPage() {
   const { user } = useAuth();
-  const [tab, setTab]               = useState('dashboard');
   const [data, setData]             = useState(null);
   const [cabangList, setCabangList] = useState([]);
   const [users, setUsers]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [period, setPeriod]         = useState('harian');
-  const [showAdd, setShowAdd]       = useState(false);
-  const [showPay, setShowPay]       = useState(null);
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [showPw, setShowPw]         = useState(false);
-  const [form, setForm]             = useState({ namaCabang:'', alamat:'', telepon:'' });
-  const [userForm, setUserForm]     = useState({ name:'', username:'', password:'', role:'karyawan', cabangId:'' });
-  const [saving, setSaving]         = useState(false);
 
   const load = async () => {
     try { const { data: res } = await api.get('/owner/dashboard'); setData(res.data); }
@@ -461,46 +218,7 @@ export default function OwnerDashboardPage() {
     return () => clearTimeout(t);
   }, [user, loadCabangSummary]);
 
-  const handleTambahCabang = async () => {
-    if (!form.namaCabang) return toast.error('Nama cabang wajib diisi');
-    setSaving(true);
-    try {
-      const { data: res } = await api.post('/owner/tambah-cabang', form);
-      toast.success('Cabang dibuat! Transfer untuk mengaktifkan.');
-      setShowAdd(false); setForm({ namaCabang:'', alamat:'', telepon:'' });
-      setShowPay(res.data); load();
-    } catch (err) { toast.error(err.response?.data?.message || 'Gagal'); }
-    finally { setSaving(false); }
-  };
-
-  const handleTambahUser = async () => {
-    if (!userForm.name || !userForm.username || !userForm.password || !userForm.cabangId)
-      return toast.error('Semua field wajib diisi');
-    setSaving(true);
-    try {
-      await api.post('/owner/users', userForm);
-      toast.success('User berhasil ditambahkan!');
-      setShowAddUser(false); setUserForm({ name:'', username:'', password:'', role:'karyawan', cabangId:'' });
-      loadUsers();
-    } catch (err) { toast.error(err.response?.data?.message || 'Gagal'); }
-    finally { setSaving(false); }
-  };
-
-  const handleToggleUser = async (userId) => {
-    try { const { data: res } = await api.patch('/owner/users/'+userId+'/toggle'); toast.success(res.message); loadUsers(); }
-    catch { toast.error('Gagal'); }
-  };
-
-  const copyNo = (no) => { navigator.clipboard.writeText(no); toast.success('Disalin!'); };
-
-  const statusBadge = (s) => {
-    if (s==='gratis') return <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold">GRATIS</span>;
-    if (s==='aktif')  return <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-bold">AKTIF</span>;
-    return <span className="px-2.5 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-bold">NONAKTIF</span>;
-  };
-
   const activeCabangs = data?.subscriptions?.filter(s=>['aktif','gratis'].includes(s.status)) || [];
-  const inputCls = "w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition";
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -535,253 +253,20 @@ export default function OwnerDashboardPage() {
         <MiniStat icon={Users}    label="Total User"   value={users.length}             color="violet" />
       </div>
 
-      {/* ── Tab Navigation — 2 grup ── */}
-      <div className="flex items-center gap-1.5 mb-5 overflow-x-auto pb-1">
-        {/* Grup Operasional */}
-        {TABS_OPERASIONAL.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-              tab===id ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-200 hover:text-blue-600'
-            }`}>
-            <Icon size={13} />{label}
-          </button>
-        ))}
-
-        {/* Divider visual */}
-        <div className="w-px h-6 bg-slate-200 mx-1 shrink-0" />
-
-        {/* Grup Manajemen */}
-        {TABS_MANAJEMEN.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-              tab===id ? 'bg-slate-700 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-400 hover:text-slate-700'
-            }`}>
-            <Icon size={13} />{label}
-          </button>
-        ))}
+      {/* ── Dashboard Content ── */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <p className="text-xs font-semibold text-slate-500">Data berdasarkan periode:</p>
+        <PeriodSel value={period} onChange={setPeriod} />
       </div>
-
-      {/* ── Tab Dashboard ── */}
-      {tab==='dashboard' && (
-        <div>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <p className="text-xs font-semibold text-slate-500">Data berdasarkan periode:</p>
-            <div className="flex items-center gap-2">
-              <PeriodSel value={period} onChange={setPeriod} />
-            </div>
-          </div>
-          {cabangList.length===0
-            ? <div className="bg-white rounded-2xl border border-slate-100 text-center py-16">
-                <Building2 size={36} className="text-slate-200 mx-auto mb-3"/>
-                <p className="text-slate-400">Belum ada data cabang</p>
-              </div>
-            : <DashToko cabangList={cabangList} period={period} />
-          }
+      {cabangList.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 text-center py-16">
+          <Building2 size={36} className="text-slate-200 mx-auto mb-3" />
+          <p className="text-slate-400">Belum ada data cabang</p>
         </div>
+      ) : (
+        <DashToko cabangList={cabangList} period={period} />
       )}
 
-      {/* ── Tab Penjualan ── */}
-      {tab==='penjualan' && (
-        <div>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <p className="text-xs font-semibold text-slate-500">Data berdasarkan periode:</p>
-            <PeriodSel value={period} onChange={setPeriod} />
-          </div>
-          <DashPenjualan cabangList={cabangList} period={period} />
-        </div>
-      )}
-
-      {/* ── Tab Karyawan ── */}
-      {tab==='karyawan' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <TabKaryawan activeCabangs={activeCabangs} />
-        </div>
-      )}
-
-      {/* ── Tab Service HP ── */}
-      {tab==='service' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <TabService activeCabangs={activeCabangs} />
-        </div>
-      )}
-
-      {/* ── Tab Cabang ── */}
-      {tab==='cabang' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <div>
-              <h2 className="font-bold text-slate-800 text-sm">Cabang Saya</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{data?.totalCabang}/{data?.maxCabang} slot digunakan</p>
-            </div>
-            {data?.sisaSlot>0 && (
-              <button onClick={()=>setShowAdd(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition">
-                <Plus size={13} /> Tambah Cabang
-              </button>
-            )}
-          </div>
-          <div className="divide-y divide-slate-50">
-            {data?.subscriptions?.map(sub=>(
-              <div key={sub._id} className="flex items-center justify-between px-5 py-4 hover:bg-slate-50/50 transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <Building2 size={18} className="text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-700 text-sm">{sub.cabang?.nama}</p>
-                    <p className="text-xs text-slate-400">Kode: {sub.cabang?.kode}</p>
-                    {sub.expiredAt && <p className="text-xs text-slate-300">s/d: {new Date(sub.expiredAt).toLocaleDateString('id-ID')}</p>}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1.5">
-                  {statusBadge(sub.status)}
-                  {sub.status==='nonaktif' && (
-                    <button onClick={()=>setShowPay({cabang:sub.cabang})} className="text-xs text-blue-600 font-bold hover:underline">Bayar</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-5 py-3 bg-blue-50/60 border-t border-blue-100">
-            <p className="text-xs text-blue-600 font-medium">✨ Cabang pertama GRATIS · Cabang ke-2 dst Rp 30.000/bulan</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tab Pengguna ── */}
-      {tab==='pengguna' && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <div>
-              <h2 className="font-bold text-slate-800 text-sm">Pengguna</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{users.length} terdaftar</p>
-            </div>
-            <button onClick={()=>setShowAddUser(true)} className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition">
-              <UserPlus size={13} /> Tambah User
-            </button>
-          </div>
-          {users.length===0
-            ? <div className="p-12 text-center"><Users size={32} className="text-slate-200 mx-auto mb-3"/><p className="text-slate-400 text-sm">Belum ada pengguna</p></div>
-            : <div className="divide-y divide-slate-50">
-                {users.map(u=>(
-                  <div key={u._id} className="flex items-center justify-between px-5 py-4 hover:bg-slate-50/50 transition">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center font-black text-white text-sm">
-                        {u.name?.[0]?.toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-slate-700 text-sm">{u.name}</p>
-                        <p className="text-xs text-slate-400">@{u.username} · {u.cabang?.nama}</p>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md mt-0.5 inline-block ${u.role==='admin'?'bg-blue-100 text-blue-700':'bg-slate-100 text-slate-600'}`}>{u.role}</span>
-                      </div>
-                    </div>
-                    <button onClick={()=>handleToggleUser(u._id)}
-                      className={`p-2 rounded-xl transition ${u.isActive?'bg-emerald-100 text-emerald-600 hover:bg-emerald-200':'bg-red-100 text-red-500 hover:bg-red-200'}`}>
-                      {u.isActive?<ToggleRight size={20}/>:<ToggleLeft size={20}/>}
-                    </button>
-                  </div>
-                ))}
-              </div>
-          }
-        </div>
-      )}
-
-      {/* ── Modal Tambah Cabang ── */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 className="font-bold text-slate-800 mb-1">Tambah Cabang Baru</h3>
-            <p className="text-xs text-slate-400 mb-4">Isi detail cabang yang akan ditambahkan</p>
-            <div className="space-y-3">
-              <input className={inputCls} placeholder="Nama Cabang *" value={form.namaCabang} onChange={e=>setForm(f=>({...f,namaCabang:e.target.value}))} />
-              <input className={inputCls} placeholder="Alamat (opsional)" value={form.alamat} onChange={e=>setForm(f=>({...f,alamat:e.target.value}))} />
-              <input className={inputCls} placeholder="Telepon (opsional)" value={form.telepon} onChange={e=>setForm(f=>({...f,telepon:e.target.value}))} />
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-                <p className="text-amber-700 text-xs font-semibold">⚡ Biaya Rp 30.000/bulan — aktif setelah konfirmasi pembayaran</p>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={()=>setShowAdd(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-                <button onClick={handleTambahCabang} disabled={saving} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-70">
-                  {saving?'Proses...':'Buat Cabang'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal Tambah User ── */}
-      {showAddUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 className="font-bold text-slate-800 mb-1">Tambah Pengguna</h3>
-            <p className="text-xs text-slate-400 mb-4">Buat akun baru untuk karyawan atau admin</p>
-            <div className="space-y-3">
-              <input className={inputCls} placeholder="Nama Lengkap *" value={userForm.name} onChange={e=>setUserForm(f=>({...f,name:e.target.value}))} />
-              <input className={inputCls} placeholder="Username *" value={userForm.username} onChange={e=>setUserForm(f=>({...f,username:e.target.value.toLowerCase().replace(/\s/g,'')}))} />
-              <div className="relative">
-                <input type={showPw?'text':'password'} className={inputCls+' pr-10'} placeholder="Password *"
-                  value={userForm.password} onChange={e=>setUserForm(f=>({...f,password:e.target.value}))} />
-                <button type="button" onClick={()=>setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  {showPw?<EyeOff size={16}/>:<Eye size={16}/>}
-                </button>
-              </div>
-              <select className={inputCls+' bg-white'} value={userForm.role} onChange={e=>setUserForm(f=>({...f,role:e.target.value}))}>
-                <option value="karyawan">Karyawan</option>
-                <option value="admin">Admin</option>
-              </select>
-              <select className={inputCls+' bg-white'} value={userForm.cabangId} onChange={e=>setUserForm(f=>({...f,cabangId:e.target.value}))}>
-                <option value="">Pilih Cabang *</option>
-                {activeCabangs.map(sub=>(
-                  <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
-                ))}
-              </select>
-              <div className="flex gap-2 pt-1">
-                <button onClick={()=>setShowAddUser(false)} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-                <button onClick={handleTambahUser} disabled={saving} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-70">
-                  {saving?'Proses...':'Tambah User'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal Pembayaran ── */}
-      {showPay && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end lg:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="text-center mb-5">
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <CreditCard size={28} className="text-blue-600" />
-              </div>
-              <h3 className="font-bold text-slate-800">Instruksi Pembayaran</h3>
-              {showPay?.cabang?.nama && <p className="text-xs text-slate-400 mt-1">Untuk cabang: <strong>{showPay.cabang.nama}</strong></p>}
-            </div>
-            <div className="bg-gradient-to-r from-blue-500 to-blue-700 rounded-2xl p-4 text-center text-white mb-4">
-              <p className="text-3xl font-black">Rp 30.000</p>
-              <p className="text-blue-200 text-xs mt-0.5">untuk 1 bulan aktif</p>
-            </div>
-            <div className="space-y-2.5 mb-4">
-              {REKENING.map(r=>(
-                <div key={r.bank} className="flex items-center justify-between border border-slate-200 rounded-xl p-3.5">
-                  <div>
-                    <p className="font-bold text-slate-700 text-sm">{r.bank}</p>
-                    <p className="text-lg font-mono font-black text-blue-600 tracking-wide">{r.no}</p>
-                    <p className="text-xs text-slate-400">a.n. {r.nama}</p>
-                  </div>
-                  <button onClick={()=>copyNo(r.no)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
-                    <Copy size={15} className="text-slate-500" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-slate-400 text-center mb-4">Konfirmasi via WhatsApp. Aktif dalam 1x24 jam.</p>
-            <button onClick={()=>setShowPay(null)} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition">
-              Mengerti
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
