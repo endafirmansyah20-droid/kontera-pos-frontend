@@ -18,10 +18,13 @@ export const AuthProvider = ({ children }) => {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
 
-  const toggleDarkMode = () => setDarkMode(v => !v);
+  const toggleDarkMode = () => setDarkMode(v => {
+    const next = !v;
+    localStorage.setItem('darkMode', String(next));
+    return next;
+  });
 
   const fetchMe = useCallback(async () => {
     try {
@@ -34,6 +37,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
+
+  // Owner default: dark mode kalau belum ada preference tersimpan
+  useEffect(() => {
+    if (user?.role === 'owner' && localStorage.getItem('darkMode') === null) {
+      localStorage.setItem('darkMode', 'true');
+      setDarkMode(true);
+    }
+  }, [user]);
 
   const login = async (username, password) => {
     const { data } = await authAPI.login({ username, password });

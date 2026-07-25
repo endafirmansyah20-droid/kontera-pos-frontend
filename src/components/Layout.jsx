@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { productAPI } from '../services/api';
-import { AlertTriangle, X, Package, Bell } from 'lucide-react';
+import { AlertTriangle, X, Package, Bell, RefreshCw, Calendar } from 'lucide-react';
 import { formatRupiah } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 
@@ -79,32 +79,52 @@ function OwnerTopBar({ user }) {
   const location = useLocation();
   const title = OWNER_TITLE_MAP[location.pathname] || 'Dashboard';
   const dateStr = new Intl.DateTimeFormat('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   }).format(new Date());
   const notifCount = 0; // static — siap dihubungkan ke source notif nanti
   const initials = getInitials(user?.name);
 
+  // Jam real-time HH:MM:SS. Init sinkron biar tidak flash string kosong.
+  const [waktu, setWaktu] = useState(() =>
+    new Date().toLocaleTimeString('id-ID', { hour12: false }));
+  useEffect(() => {
+    const id = setInterval(() => {
+      setWaktu(new Date().toLocaleTimeString('id-ID', { hour12: false }));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="hidden lg:flex items-center justify-between" style={{
-      background: '#fff',
-      borderBottom: '1px solid #f1f5f9',
+      background: 'rgba(38,33,92,0.95)',
+      borderBottom: '1px solid rgba(255,255,255,0.1)',
       padding: '12px 24px',
       minHeight: 56,
     }}>
-      {/* Kiri: judul halaman dinamis */}
-      <div style={{ fontSize: 16, fontWeight: 500, color: '#1e293b' }}>
-        {title}
+      {/* Kiri: judul halaman + subtitle sambutan (hanya di /owner) */}
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>
+          {title}
+        </div>
+        {location.pathname === '/owner' && (
+          <p className="text-sm" style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)' }}>
+            Selamat datang kembali, {user?.name || '—'} <span aria-hidden="true">👋</span>
+          </p>
+        )}
       </div>
 
-      {/* Tengah: tanggal */}
-      <div style={{ fontSize: 13, color: '#64748b' }}>
-        {dateStr}
+      {/* Tengah: tanggal + jam realtime */}
+      <div className="flex items-center gap-2" style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+        <Calendar size={14} style={{ color: 'rgba(255,255,255,0.6)' }} />
+        <span>{dateStr}</span>
+        <span style={{ color: 'rgba(255,255,255,0.5)' }}>|</span>
+        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{waktu}</span>
       </div>
 
       {/* Kanan: notifikasi + avatar */}
       <div className="flex items-center gap-3">
         <div style={{ position: 'relative', display: 'flex' }}>
-          <Bell size={18} strokeWidth={1.8} style={{ color: '#64748b' }} />
+          <Bell size={18} strokeWidth={1.8} style={{ color: '#fff' }} />
           {notifCount > 0 && (
             <span style={{
               position: 'absolute', top: -6, right: -8,
@@ -116,6 +136,12 @@ function OwnerTopBar({ user }) {
             }}>{notifCount > 9 ? '9+' : notifCount}</span>
           )}
         </div>
+        <button type="button" onClick={() => window.location.reload()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
+          style={{ background: '#3C3489', border: 'none', cursor: 'pointer' }}>
+          <RefreshCw size={14} />
+          <span>Refresh</span>
+        </button>
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
           background: '#3C3489', color: '#fff',

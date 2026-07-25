@@ -5,7 +5,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Wallet, Wallet2,
   BarChart2, BarChart3, Users, Settings, LogOut, Smartphone, Menu, X,
   Calculator, Wrench, Building2, ChevronRight, Store, CreditCard,
-  Moon, Sun, Lock
+  Moon, Sun, Lock, Bell, HelpCircle
 } from 'lucide-react';
 import api from '../services/api';
 import { authAPI } from '../services/api';
@@ -27,7 +27,10 @@ const OWNER_NAV = [
   { to: '/owner/penjualan', icon: BarChart3,       label: 'Penjualan'  },
   { to: '/owner/service',   icon: Wrench,          label: 'Service HP' },
   { to: '/keuangan',        icon: Wallet2,         label: 'Keuangan'   },
+  { to: '/owner/laporan',   icon: BarChart3,       label: 'Laporan'    },
   { to: '/pengaturan',      icon: Settings,        label: 'Pengaturan' },
+  { to: '/owner/notifikasi',icon: Bell,            label: 'Notifikasi' },
+  { to: '/owner/bantuan',   icon: HelpCircle,      label: 'Bantuan'    },
 ];
 
 // Nav untuk admin & karyawan
@@ -181,8 +184,8 @@ export default function Sidebar({ lowStockCount = 0 }) {
               const count = badge ? getBadgeCount(badge) : 0;
               return (
                 <React.Fragment key={to}>
-                  {/* Section label "LAINNYA" muncul sebelum /keuangan hanya untuk Owner */}
-                  {isOwner && to === '/keuangan' && (
+                  {/* Section label "LAINNYA" muncul sebelum /pengaturan hanya untuk Owner */}
+                  {isOwner && to === '/pengaturan' && (
                     <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/40 px-4 mt-4 mb-1.5">LAINNYA</p>
                   )}
                   <NavLink to={to} end
