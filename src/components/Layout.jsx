@@ -156,7 +156,7 @@ function OwnerTopBar({ user }) {
 }
 
 export default function Layout({ children }) {
-  const { isOwner, isSuperAdmin, user, darkMode } = useAuth();
+  const { isOwner, isSuperAdmin, user } = useAuth();
   const userId = user?._id;
   const [lowStockCount, setLowStockCount]       = useState(0);
   const [lowStockProducts, setLowStockProducts] = useState([]);
@@ -202,7 +202,12 @@ export default function Layout({ children }) {
       <Sidebar lowStockCount={lowStockCount} />
       <main
         className="flex-1 lg:ml-60 min-h-screen min-w-0 max-w-full overflow-x-hidden mobile-pt lg:pt-0"
-        style={isOwner && !darkMode ? { background: '#FAFAFD' } : undefined}
+        // Owner UI (Fase-2 redesign) dark-only: HERO_GRADIENT panels + white
+        // text + glass controls (rgba white). Dulu light mode override ke
+        // #FAFAFD bikin control putih tidak kebaca di light bg. Sekarang
+        // Owner main selalu #0f172a — darkMode toggle jadi no-op untuk main
+        // Owner (tetap berlaku untuk modal & komponen shared via html.dark).
+        style={isOwner ? { background: '#0f172a' } : undefined}
       >
         {isOwner && (
           <div style={{

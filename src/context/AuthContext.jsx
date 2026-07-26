@@ -38,13 +38,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => { fetchMe(); }, [fetchMe]);
 
-  // Owner default: dark mode kalau belum ada preference tersimpan
+  // Owner UI dark-only (Layout memaksa main #0f172a & toggle disembunyikan
+  // di Sidebar). Force darkMode=true tanpa syarat supaya .card & komponen
+  // shared dengan varian dark: ikut render sebagai dark. Menormalisasi
+  // stale localStorage=false dari owner yg toggle sebelum toggle ditutup.
   useEffect(() => {
-    if (user?.role === 'owner' && localStorage.getItem('darkMode') === null) {
+    if (user?.role === 'owner' && !darkMode) {
       localStorage.setItem('darkMode', 'true');
       setDarkMode(true);
     }
-  }, [user]);
+  }, [user, darkMode]);
 
   const login = async (username, password) => {
     const { data } = await authAPI.login({ username, password });

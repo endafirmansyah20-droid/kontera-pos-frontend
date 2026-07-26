@@ -178,7 +178,9 @@ function KeuanganSuperAdmin() {
 }
 
 // ── Brankas Section (untuk admin/owner cabang) ─────────────────────────────
-function BrankasSection({ isAdmin, cabangId }) {
+// `variant` = 'light' (default, admin) atau 'dark' (glassmorphism, dipakai
+// KeuanganOwner supaya konsisten dengan halaman Owner lain).
+function BrankasSection({ isAdmin, cabangId, variant = 'light' }) {
   const [brankas, setBrankas]           = useState(0);
   const [loading, setLoading]           = useState(true);
   const [showEdit, setShowEdit]         = useState(false);
@@ -232,48 +234,118 @@ function BrankasSection({ isAdmin, cabangId }) {
 
   if (loading) return null;
 
+  const isDark = variant === 'dark';
+
   return (
     <>
       {/* Brankas Card */}
-      <div className="card mb-6 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 min-w-0">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center flex-shrink-0">
-              <Lock size={22} className="text-white" />
+      {isDark ? (
+        <div className="mb-6 min-w-0" style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '0.5px solid rgba(255,255,255,0.10)',
+          borderRadius: 12,
+          padding: 16,
+        }}>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(239,159,39,0.25)', color: '#FAC775' }}>
+                <Lock size={22} />
+              </div>
+              <div className="min-w-0">
+                <p style={{
+                  fontSize: 11, fontWeight: 600, letterSpacing: '0.05em',
+                  color: '#FAC775', margin: 0, textTransform: 'uppercase',
+                }}>Uang Brankas</p>
+                <p className="text-2xl sm:text-3xl font-black whitespace-nowrap" style={{ color: '#fff', margin: '2px 0 0' }}>
+                  {formatRupiah(brankas)}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Disimpan terpisah dari kas harian
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Uang Brankas</p>
-              <p className="text-2xl sm:text-3xl font-black text-amber-800 whitespace-nowrap">{formatRupiah(brankas)}</p>
-              <p className="text-xs text-amber-500 mt-0.5">Disimpan terpisah dari kas harian</p>
-            </div>
+            {isAdmin && (
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => { setEditVal(brankas.toString()); setShowEdit(true); }}
+                  style={{
+                    padding: '8px 12px', borderRadius: 10,
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '0.5px solid rgba(255,255,255,0.15)',
+                    color: '#FAC775', fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: 6, width: '100%',
+                  }}>
+                  <Edit2 size={13} /> Edit Saldo
+                </button>
+                <button
+                  onClick={() => setShowTransfer(true)}
+                  disabled={brankas <= 0}
+                  style={{
+                    padding: '8px 12px', borderRadius: 10,
+                    background: '#F59E0B', border: 'none',
+                    color: '#fff', fontSize: 12, fontWeight: 700,
+                    cursor: brankas <= 0 ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', gap: 6, width: '100%',
+                    opacity: brankas <= 0 ? 0.5 : 1,
+                  }}>
+                  <ArrowRightLeft size={13} /> Ke Kas Tunai
+                </button>
+              </div>
+            )}
           </div>
-          {isAdmin && (
-            <div className="flex flex-col gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => { setEditVal(brankas.toString()); setShowEdit(true); }}
-                className="btn btn-outline py-2 px-3 text-xs border-amber-300 text-amber-700 hover:bg-amber-100 w-full justify-center"
-              >
-                <Edit2 size={13} /> Edit Saldo
-              </button>
-              <button
-                onClick={() => { setShowTransfer(true); }}
-                className="btn py-2 px-3 text-xs bg-amber-500 text-white hover:bg-amber-600 w-full justify-center"
-                disabled={brankas <= 0}
-              >
-                <ArrowRightLeft size={13} /> Ke Kas Tunai
-              </button>
+
+          {brankas > 0 && (
+            <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                💡 Gunakan tombol "Ke Kas Tunai" untuk memindahkan uang brankas ke kas operasional
+              </p>
             </div>
           )}
         </div>
-
-        {brankas > 0 && (
-          <div className="mt-3 pt-3 border-t border-amber-200">
-            <p className="text-xs text-amber-600">
-              💡 Gunakan tombol "Ke Kas Tunai" untuk memindahkan uang brankas ke kas operasional
-            </p>
+      ) : (
+        <div className="card mb-6 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500 flex items-center justify-center flex-shrink-0">
+                <Lock size={22} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide">Uang Brankas</p>
+                <p className="text-2xl sm:text-3xl font-black text-amber-800 whitespace-nowrap">{formatRupiah(brankas)}</p>
+                <p className="text-xs text-amber-500 mt-0.5">Disimpan terpisah dari kas harian</p>
+              </div>
+            </div>
+            {isAdmin && (
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => { setEditVal(brankas.toString()); setShowEdit(true); }}
+                  className="btn btn-outline py-2 px-3 text-xs border-amber-300 text-amber-700 hover:bg-amber-100 w-full justify-center"
+                >
+                  <Edit2 size={13} /> Edit Saldo
+                </button>
+                <button
+                  onClick={() => { setShowTransfer(true); }}
+                  className="btn py-2 px-3 text-xs bg-amber-500 text-white hover:bg-amber-600 w-full justify-center"
+                  disabled={brankas <= 0}
+                >
+                  <ArrowRightLeft size={13} /> Ke Kas Tunai
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {brankas > 0 && (
+            <div className="mt-3 pt-3 border-t border-amber-200">
+              <p className="text-xs text-amber-600">
+                💡 Gunakan tombol "Ke Kas Tunai" untuk memindahkan uang brankas ke kas operasional
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal Edit Brankas */}
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Saldo Brankas" size="sm">
@@ -354,6 +426,15 @@ const CATEGORIES = {
 
 const TYPE_COLORS = {
   pemasukan: 'badge-green', pengeluaran: 'badge-red', hutang: 'badge-yellow', piutang: 'badge-blue'
+};
+
+// Sel tabel dark reusable — dipakai untuk KeuanganOwner supaya row/td
+// konsisten (padding + baseline color) tanpa harus menyalin object literal.
+const cellStyleDark = {
+  padding: '12px 16px',
+  verticalAlign: 'middle',
+  color: '#fff',
+  whiteSpace: 'nowrap',
 };
 
 const defaultForm = { type: 'pengeluaran', category: '', description: '', amount: '', date: new Date().toISOString().slice(0,10), relatedParty: '', dueDate: '', isPaid: false, sumberDana: '', sumberDanaName: '' };
@@ -481,23 +562,41 @@ function KeuanganOwner() {
 
   return (
     <div className="animate-fade-in-up pb-24 lg:pb-0 min-w-0">
-      <PageHeader title="Keuangan Cabang" subtitle="Pembukuan per cabang"
-        actions={
-          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-            <select
-              className="border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-slate-200 font-semibold flex-1 sm:flex-none min-w-0"
-              value={selectedCabang || ''}
-              onChange={e => { setSelectedCabang(e.target.value); setTypeFilter(''); }}
-            >
-              {cabangs.map(c => <option key={c._id} value={c._id}>{c.nama}</option>)}
-            </select>
-            <button className="btn btn-primary flex-shrink-0" onClick={openAdd}><Plus size={16} /> Catat</button>
-          </div>
-        }
-      />
+      {/* ── Header dark (title dari OwnerTopBar; di sini cuma actions) ── */}
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
+          Pembukuan per cabang
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            value={selectedCabang || ''}
+            onChange={e => { setSelectedCabang(e.target.value); setTypeFilter(''); }}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '0.5px solid rgba(255,255,255,0.15)',
+              color: '#fff', borderRadius: 10,
+              padding: '7px 10px', fontSize: 12,
+              cursor: 'pointer', outline: 'none',
+            }}>
+            {cabangs.map(c => (
+              <option key={c._id} value={c._id} style={{ color: '#1e293b' }}>{c.nama}</option>
+            ))}
+          </select>
+          <button type="button" onClick={openAdd}
+            style={{
+              padding: '7px 12px', borderRadius: 10,
+              background: '#7F77DD',
+              border: '0.5px solid rgba(255,255,255,0.15)',
+              color: '#fff', display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}>
+            <Plus size={14} /> Catat
+          </button>
+        </div>
+      </div>
 
-      {/* Brankas per cabang */}
-      {selectedCabang && <BrankasSection isAdmin={true} cabangId={selectedCabang} />}
+      {/* Brankas per cabang — dark variant */}
+      {selectedCabang && <BrankasSection isAdmin={true} cabangId={selectedCabang} variant="dark" />}
 
       {/* Summary */}
       {summary && (
@@ -509,49 +608,97 @@ function KeuanganOwner() {
         </div>
       )}
 
-      {/* Filter */}
+      {/* Filter — pill tabs dark */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap min-w-0 max-w-full">
-        {['', ...FINANCE_TYPES].map(t => (
-          <button key={t} onClick={() => setTypeFilter(t)}
-            className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>
-            {t ? FINANCE_TYPE_LABELS[t] : 'Semua'}
-          </button>
-        ))}
+        {['', ...FINANCE_TYPES].map(t => {
+          const active = typeFilter === t;
+          return (
+            <button key={t} onClick={() => setTypeFilter(t)}
+              style={{
+                padding: '7px 14px', borderRadius: 999,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: active ? '#7F77DD' : 'rgba(255,255,255,0.06)',
+                border: active ? '0.5px solid #7F77DD' : '0.5px solid rgba(255,255,255,0.15)',
+                color: active ? '#fff' : 'rgba(255,255,255,0.7)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'background 0.15s',
+              }}>
+              {t ? FINANCE_TYPE_LABELS[t] : 'Semua'}
+            </button>
+          );
+        })}
       </div>
 
       {loadingRec ? <Loader /> : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead><tr>
-              <th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Deskripsi</th>
-              <th>Pihak Terkait</th><th>Nominal</th><th>Status</th><th>Aksi</th>
-            </tr></thead>
-            <tbody className="bg-white dark:bg-slate-800">
-              {records.length === 0
-                ? <tr><td colSpan={8}><EmptyState message="Belum ada catatan keuangan" /></td></tr>
-                : records.map(r => (
-                  <tr key={r._id}>
-                    <td className="text-xs">
-                      <div>{formatDate(r.date)}</div>
+        <div style={{
+          background: 'rgba(255,255,255,0.04)',
+          border: '0.5px solid rgba(255,255,255,0.10)',
+          borderRadius: 12,
+          overflow: 'hidden',
+        }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+                  {['Tanggal','Tipe','Kategori','Deskripsi','Pihak Terkait','Nominal','Status','Aksi'].map(h => (
+                    <th key={h} style={{
+                      padding: '12px 16px', textAlign: 'left',
+                      fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      color: 'rgba(255,255,255,0.55)',
+                      whiteSpace: 'nowrap',
+                      borderBottom: '1px solid rgba(255,255,255,0.10)',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: 32 }}>
+                      <div className="flex flex-col items-center justify-center gap-2 py-6">
+                        <DollarSign size={28} style={{ color: 'rgba(255,255,255,0.25)' }} />
+                        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                          Belum ada catatan keuangan
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : records.map(r => (
+                  <tr key={r._id} style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <td style={cellStyleDark} className="text-xs">
+                      <div style={{ color: 'rgba(255,255,255,0.85)' }}>{formatDate(r.date)}</div>
                       {r.createdAt && (
-                        <div className="text-xs text-slate-400">
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>
                           {new Date(r.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false })}
                         </div>
                       )}
                     </td>
-                    <td><span className={`badge ${TYPE_COLORS[r.type]}`}>{FINANCE_TYPE_LABELS[r.type]}</span></td>
-                    <td className="text-slate-500 text-xs">{r.category}</td>
-                    <td className="font-medium text-slate-700 dark:text-slate-300">{r.description}</td>
-                    <td className="text-slate-500 text-xs">{r.relatedParty || '-'}</td>
-                    <td className={`font-bold ${r.type==='pemasukan'?'text-green-600':r.type==='pengeluaran'?'text-red-500':'text-slate-700'}`}>
+                    <td style={cellStyleDark}><span className={`badge ${TYPE_COLORS[r.type]}`}>{FINANCE_TYPE_LABELS[r.type]}</span></td>
+                    <td style={{ ...cellStyleDark, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{r.category}</td>
+                    <td style={{ ...cellStyleDark, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{r.description}</td>
+                    <td style={{ ...cellStyleDark, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{r.relatedParty || '-'}</td>
+                    <td style={{
+                      ...cellStyleDark,
+                      fontWeight: 700,
+                      color: r.type === 'pemasukan' ? '#6EE7B7'
+                           : r.type === 'pengeluaran' ? '#F87171'
+                           : '#fff',
+                    }}>
                       {r.type==='pemasukan'?'+':r.type==='pengeluaran'?'-':''}{formatRupiah(r.amount)}
                     </td>
-                    <td>
+                    <td style={cellStyleDark}>
                       {(r.type==='hutang'||r.type==='piutang')
                         ? <span className={`badge ${r.isPaid?'badge-green':'badge-red'}`}>{r.isPaid?'Lunas':'Belum Lunas'}</span>
-                        : <span className="badge badge-gray">-</span>}
+                        : <span style={{
+                            fontSize: 11, color: 'rgba(255,255,255,0.4)',
+                          }}>-</span>}
                     </td>
-                    <td>
+                    <td style={cellStyleDark}>
                       <div className="flex gap-1.5 flex-wrap">
                         {(r.type === 'hutang' || r.type === 'piutang') && !r.isPaid && (
                           <button onClick={() => openLunasiFin(r)} className="btn btn-success py-1.5 px-2.5 text-xs" title="Lunasi">
@@ -563,10 +710,10 @@ function KeuanganOwner() {
                       </div>
                     </td>
                   </tr>
-                ))
-              }
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -777,10 +924,19 @@ export default function KeuanganPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Filter summary bulan ini
-      const now = new Date();
-      const startBulan = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-      const endBulan   = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10);
+      // Filter summary "bulan ini" (kalender lokal — tanggal 1 s/d akhir bulan).
+      // Sengaja tidak pakai .toISOString().slice(0,10) karena itu convert ke UTC
+      // dulu, dan di TZ +7 (Jakarta) start-of-month lokal jadi mundur 1 hari →
+      // range akhirnya shift 1 hari & terlihat seperti "rolling 30 hari".
+      // Format YYYY-MM-DD dari komponen lokal biar konsisten dengan Owner /
+      // Laporan Bulanan.
+      const now  = new Date();
+      const y    = now.getFullYear();
+      const m0   = now.getMonth();                            // 0-indexed
+      const mm   = String(m0 + 1).padStart(2, '0');
+      const last = new Date(y, m0 + 1, 0).getDate();          // hari terakhir bulan ini
+      const startBulan = `${y}-${mm}-01`;
+      const endBulan   = `${y}-${mm}-${String(last).padStart(2, '0')}`;
 
       const [r, s, sl] = await Promise.all([
         financeAPI.getAll(typeFilter ? { type: typeFilter } : {}),

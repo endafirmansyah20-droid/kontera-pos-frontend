@@ -10,6 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import OwnerDashboardPage from './pages/OwnerDashboardPage';
 import OwnerCabangPage from './pages/OwnerCabangPage';
 import OwnerKaryawanPage from './pages/OwnerKaryawanPage';
+import OwnerKaryawanDetailPage from './pages/OwnerKaryawanDetailPage';
 import OwnerPenjualanPage from './pages/OwnerPenjualanPage';
 import OwnerServicePage from './pages/OwnerServicePage';
 import DashboardPage from './pages/DashboardPage';
@@ -118,6 +119,7 @@ function AppRoutes() {
       <Route path="/owner"         element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
       <Route path="/owner/cabang"  element={<OwnerRoute><OwnerCabangPage /></OwnerRoute>} />
       <Route path="/owner/karyawan" element={<OwnerRoute><OwnerKaryawanPage /></OwnerRoute>} />
+      <Route path="/owner/karyawan/:cashierId" element={<OwnerRoute><OwnerKaryawanDetailPage /></OwnerRoute>} />
       <Route path="/owner/penjualan" element={<OwnerRoute><OwnerPenjualanPage /></OwnerRoute>} />
       <Route path="/owner/service"   element={<OwnerRoute><OwnerServicePage /></OwnerRoute>} />
       <Route path="/pengaturan"    element={<AnyAuthRoute><PengaturanPage /></AnyAuthRoute>} />

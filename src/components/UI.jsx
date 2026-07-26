@@ -77,9 +77,9 @@ export function StatCard({ title, value, subtitle, icon: Icon, color = 'blue', t
     <div className="card hover:shadow-card-hover transition-shadow duration-200 !p-3 sm:!p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1 leading-tight">{title}</p>
-          <p className="text-base sm:text-2xl font-bold text-slate-800 leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{value}</p>
-          {subtitle && <p className="text-[10px] sm:text-xs text-slate-400 mt-1 truncate">{subtitle}</p>}
+          <p className="text-[10px] sm:text-xs font-semibold text-slate-400 dark:text-white/90 uppercase tracking-wide mb-1 leading-tight">{title}</p>
+          <p className="text-base sm:text-2xl font-bold text-slate-800 dark:text-white leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{value}</p>
+          {subtitle && <p className="text-[10px] sm:text-xs text-slate-400 dark:text-white/60 mt-1 truncate">{subtitle}</p>}
           {trend !== undefined && (
             <p className={`text-xs font-semibold mt-2 ${trend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
               {trend >= 0 ? '↑' : '↓'} {Math.abs(trend).toFixed(1)}% vs kemarin

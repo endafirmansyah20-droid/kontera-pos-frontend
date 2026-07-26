@@ -147,10 +147,13 @@
 .dark ::-webkit-scrollbar-track { background: #1e293b; }
 .dark ::-webkit-scrollbar-thumb { background: #475569; }
 
-/* ─── Print ─────────────────────────────────────────────────── */
+/* ─── Print: STRUK KASIR (58mm thermal) ───────────────────────
+   Semua rule di sini disaring pakai :not(.printing-report) supaya
+   tidak fire saat halaman Laporan Owner memicu window.print(). */
 @media print {
   .no-print { display: none !important; }
-  html, body {
+
+  html:not(.printing-report), body:not(.printing-report) {
     width: 58mm !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -163,7 +166,7 @@
      display:none pada top-level non-struk (#root + toast root, dsb)
      menghapus kontribusinya ke document height. Aman: Modal render via
      createPortal ke document.body, di luar #root. */
-  body > *:not(:has(.print-container)):not(.print-container) {
+  body:not(.printing-report) > *:not(:has(.print-container)):not(.print-container) {
     display: none !important;
   }
 
@@ -171,7 +174,7 @@
      fixed, modal card, body modal, dan wrapper off-screen left:-9999px di
      modal riwayat) supaya tidak jadi containing block yang bikin
      .print-container ke-render di luar halaman kertas. */
-  body *:has(.print-container) {
+  body:not(.printing-report) *:has(.print-container) {
     position: static !important;
     left: auto !important;
     top: auto !important;
@@ -189,7 +192,7 @@
 
   /* Sembunyikan sibling non-struk dalam rantai ancestor (header modal,
      tombol Cetak/WA/BT) supaya tidak reserve ruang kosong di kertas. */
-  body *:has(.print-container) > *:not(.print-container):not(:has(.print-container)) {
+  body:not(.printing-report) *:has(.print-container) > *:not(.print-container):not(:has(.print-container)) {
     display: none !important;
   }
 
@@ -206,6 +209,160 @@
     color: #000 !important;
     padding: 2mm !important;
     background: white !important;
+  }
+}
+
+/* ─── Print: LAPORAN OWNER (A4) ────────────────────────────────
+   Diaktifkan saat body/html punya class .printing-report (di-set
+   handler tombol Cetak Laporan sebelum window.print, dilepas di
+   afterprint). Pola isolasi persis mirror rule struk supaya
+   sidebar, top bar, dan control interaktif tidak ikut kecetak. */
+.print-only { display: none; }
+
+@media print {
+  html.printing-report, body.printing-report {
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  @page report-page { size: A4 portrait; margin: 12mm 10mm; }
+  body.printing-report { page: report-page; }
+
+  /* Element khusus print (header laporan) */
+  body.printing-report .print-only { display: block !important; }
+
+  /* Hide seluruh top-level non-laporan (toast root, modal portal, dsb) */
+  body.printing-report > *:not(:has(.owner-report-root)):not(.owner-report-root) {
+    display: none !important;
+  }
+
+  /* Reset rantai ancestor supaya #root, Layout flex, main tidak jadi
+     containing block yang membatasi lebar/tinggi laporan. */
+  body.printing-report *:has(.owner-report-root) {
+    position: static !important;
+    left: auto !important; top: auto !important;
+    right: auto !important; bottom: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    width: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+
+  /* Sembunyikan sibling non-laporan di setiap level (Sidebar, top bar,
+     4px gradient decoration bar, LowStockAlert portal, dsb). */
+  body.printing-report *:has(.owner-report-root) > *:not(.owner-report-root):not(:has(.owner-report-root)) {
+    display: none !important;
+  }
+
+  /* Root laporan: alirkan natural di kertas */
+  body.printing-report .owner-report-root {
+    max-width: none !important;
+    width: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  }
+
+  /* Kontrol interaktif: period switcher, dropdown cabang, refresh,
+     tombol Cetak sendiri, InlineTabs (fisik/digital/kategori dst). */
+  body.printing-report .report-hide-print {
+    display: none !important;
+  }
+
+  /* Header laporan */
+  body.printing-report .owner-report-root .print-only {
+    display: block !important;
+    margin: 0 0 16px 0 !important;
+    padding: 0 0 12px 0 !important;
+    border-bottom: 2px solid #000 !important;
+  }
+  body.printing-report .owner-report-root .print-only h1 {
+    font-size: 20pt !important;
+    font-weight: 800 !important;
+    color: #000 !important;
+    margin: 0 0 6px 0 !important;
+  }
+  body.printing-report .owner-report-root .print-only p {
+    font-size: 10pt !important;
+    color: #444 !important;
+    margin: 0 !important;
+  }
+
+  /* Panel: override inline gradient jadi kartu putih; hindari terpotong
+     di antara halaman. */
+  body.printing-report .report-panel {
+    background: #fff !important;
+    background-image: none !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    box-shadow: none !important;
+    margin-bottom: 12px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    color: #000 !important;
+  }
+  body.printing-report .report-card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #000 !important;
+  }
+
+  /* Semua teks jadi hitam untuk kontras (chart pakai fill/stroke pada
+     SVG, tidak terpengaruh property color). */
+  body.printing-report .owner-report-root,
+  body.printing-report .owner-report-root h1,
+  body.printing-report .owner-report-root h2,
+  body.printing-report .owner-report-root h3,
+  body.printing-report .owner-report-root h4,
+  body.printing-report .owner-report-root p,
+  body.printing-report .owner-report-root span,
+  body.printing-report .owner-report-root div,
+  body.printing-report .owner-report-root button {
+    color: #000 !important;
+    text-shadow: none !important;
+  }
+
+  /* Grid 3-kolom widget → 1-kolom di kertas biar rapi & mudah baca. */
+  body.printing-report .report-grid-3 {
+    display: block !important;
+  }
+  body.printing-report .report-grid-3 > * {
+    margin-bottom: 12px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Chart (recharts): tick sumbu jadi hitam, grid line jadi abu-terang
+     supaya kelihatan di kertas putih. */
+  body.printing-report .owner-report-root svg text,
+  body.printing-report .owner-report-root .recharts-text {
+    fill: #000 !important;
+  }
+  body.printing-report .owner-report-root .recharts-cartesian-grid line,
+  body.printing-report .owner-report-root .recharts-cartesian-grid path {
+    stroke: #cbd5e1 !important;
+  }
+  body.printing-report .owner-report-root .recharts-legend-item-text {
+    color: #000 !important;
+  }
+
+  /* Force print browsers to render backgrounds/borders faithfully. */
+  body.printing-report,
+  body.printing-report * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 

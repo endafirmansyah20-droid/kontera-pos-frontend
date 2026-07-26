@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { serviceAPI, customerAPI } from '../services/api';
+import { serviceAPI, customerAPI, authAPI } from '../services/api';
 import { formatRupiah, formatDate, formatDateTime } from '../utils/helpers';
 import { PageHeader, Modal, Loader, EmptyState, ConfirmDialog, RupiahInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
@@ -37,7 +37,7 @@ const defaultForm = {
   complaint: '', diagnosis: '', workDone: '',
   partsCost: 0, serviceFee: 0,
   status: 'antrian', isPaid: false, notes: '',
-  estimatedDone: '',
+  estimatedDone: '', technician: '',
 };
 
 const defaultFinForm = { type: 'pengeluaran', amount: 0, description: '', category: 'umum', date: new Date().toISOString().slice(0, 10) };
@@ -53,6 +53,7 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchingMember, setSearchingMember] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [technicianList, setTechnicianList] = useState([]);
 
   useEffect(() => {
     if (open) {
@@ -71,9 +72,27 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         isPaid:        editData.isPaid        || false,
         notes:         editData.notes         || '',
         estimatedDone: editData.estimatedDone ? editData.estimatedDone.slice(0, 10) : '',
+        // technician bisa populated {_id,name} atau ObjectId string
+        technician:    editData.technician?._id || editData.technician || '',
       } : defaultForm);
     }
   }, [open, editData]);
+
+  // Fetch daftar teknisi saat modal dibuka. /auth/users sudah di-scope
+  // ke cabang user yang login di backend. Gagal → dropdown kosong (field
+  // opsional, tidak memblokir simpan).
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    authAPI.getUsers()
+      .then(r => {
+        if (cancelled) return;
+        const users = (r.data?.data || []).filter(u => ['admin','karyawan'].includes(u.role));
+        setTechnicianList(users);
+      })
+      .catch(() => { if (!cancelled) setTechnicianList([]); });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -106,11 +125,13 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
     if (!form.complaint.trim())    return toast.error('Keluhan wajib diisi');
     setSaving(true);
     try {
+      // Kirim null (bukan '') untuk optional ObjectId supaya backend tidak CastError.
+      const payload = { ...form, technician: form.technician || null };
       if (editData) {
-        await serviceAPI.update(editData._id, form);
+        await serviceAPI.update(editData._id, payload);
         toast.success('Transaksi diperbarui');
       } else {
-        await serviceAPI.create(form);
+        await serviceAPI.create(payload);
         toast.success('Transaksi servis dibuat');
       }
       onSaved();
@@ -203,6 +224,19 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
             <label className="label">Pekerjaan Dilakukan</label>
             <textarea className="input resize-none" rows={2} placeholder="Ganti LCD, solder ic, dll..." value={form.workDone} onChange={e => set('workDone', e.target.value)} />
           </div>
+        </div>
+
+        {/* Teknisi (opsional) */}
+        <div>
+          <label className="label">Teknisi (opsional)</label>
+          <select className="input" value={form.technician} onChange={e => set('technician', e.target.value)}>
+            <option value="">— Belum ditentukan —</option>
+            {technicianList.map(u => (
+              <option key={u._id} value={u._id}>
+                {u.name}{u.role === 'admin' ? ' (Admin)' : ''}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Biaya */}

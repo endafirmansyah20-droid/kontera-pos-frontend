@@ -227,10 +227,13 @@ export default function Sidebar({ lowStockCount = 0 }) {
                 <p className="text-[9px] text-white/30 mt-1.5">© 2026 KonterA · v2.0.0</p>
               </div>
             )}
-            <button onClick={toggleDarkMode} className="sidebar-link w-full mb-1">
-              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-              <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-            </button>
+            {/* Owner permanent dark (Layout.jsx) — sembunyikan toggle biar tidak menyesatkan */}
+            {!isOwner && (
+              <button onClick={toggleDarkMode} className="sidebar-link w-full mb-1">
+                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+                <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
+            )}
             {!isAdmin && !isOwner && !isSuperAdmin && (
               <button onClick={() => setShowChangePw(true)} className="sidebar-link w-full mb-1">
                 <Lock size={18} /><span>Ganti Password</span>
@@ -351,11 +354,13 @@ export default function Sidebar({ lowStockCount = 0 }) {
               })}
             </div>
             <div className="px-3 pb-2 pt-1 border-t border-slate-100 mx-3 mt-1">
-              <button onClick={toggleDarkMode}
-                className="flex items-center gap-4 w-full px-4 py-3.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
-                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                <span className="text-sm font-semibold">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-              </button>
+              {!isOwner && (
+                <button onClick={toggleDarkMode}
+                  className="flex items-center gap-4 w-full px-4 py-3.5 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all">
+                  {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                  <span className="text-sm font-semibold">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+              )}
               {!isAdmin && !isOwner && !isSuperAdmin && (
                 <button onClick={() => { setShowChangePw(true); setDrawerOpen(false); }}
                   className="flex items-center gap-4 w-full px-4 py-3.5 rounded-xl text-slate-600 hover:bg-amber-50 hover:text-amber-600 transition-all">
