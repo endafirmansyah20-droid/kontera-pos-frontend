@@ -40,10 +40,16 @@ export const authAPI = {
   changeMyPassword: (oldPassword, newPassword) => api.put('/auth/change-my-password', { oldPassword, newPassword }),
 };
 
-// ─── Owner (owner-scoped user management) ────────
+// ─── Owner (owner-scoped user management + laporan) ────────
 export const ownerAPI = {
   updateUser:        (userId, payload)     => api.put(`/owner/users/${userId}`, payload),
   resetUserPassword: (userId, newPassword) => api.put(`/owner/users/${userId}/reset-password`, { newPassword }),
+  // Laporan
+  getClosingRiwayat:   (p)  => api.get('/owner/closing-riwayat', { params: p }),
+  getClosingDetail:    (id) => api.get(`/owner/closing/${id}`),
+  getPembelianRiwayat: (p)  => api.get('/owner/pembelian-riwayat', { params: p }),
+  getPembelianDetail:  (id) => api.get(`/owner/pembelian/${id}`),
+  getMonthlyReport:    (p)  => api.get('/owner/reports/monthly', { params: p }),
 };
 
 // ─── Products ────────────────────────────

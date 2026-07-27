@@ -13,6 +13,7 @@ import OwnerKaryawanPage from './pages/OwnerKaryawanPage';
 import OwnerKaryawanDetailPage from './pages/OwnerKaryawanDetailPage';
 import OwnerPenjualanPage from './pages/OwnerPenjualanPage';
 import OwnerServicePage from './pages/OwnerServicePage';
+import OwnerLaporanPage from './pages/OwnerLaporanPage';
 import DashboardPage from './pages/DashboardPage';
 import TransaksiPage from './pages/TransaksiPage';
 import StokPage from './pages/StokPage';
@@ -122,6 +123,7 @@ function AppRoutes() {
       <Route path="/owner/karyawan/:cashierId" element={<OwnerRoute><OwnerKaryawanDetailPage /></OwnerRoute>} />
       <Route path="/owner/penjualan" element={<OwnerRoute><OwnerPenjualanPage /></OwnerRoute>} />
       <Route path="/owner/service"   element={<OwnerRoute><OwnerServicePage /></OwnerRoute>} />
+      <Route path="/owner/laporan"   element={<OwnerRoute><OwnerLaporanPage /></OwnerRoute>} />
       <Route path="/pengaturan"    element={<AnyAuthRoute><PengaturanPage /></AnyAuthRoute>} />
       <Route path="/dashboard"     element={<AdminRoute><DashboardPage /></AdminRoute>} />
       <Route path="/transaksi"     element={<ProtectedRoute><TransaksiPage /></ProtectedRoute>} />

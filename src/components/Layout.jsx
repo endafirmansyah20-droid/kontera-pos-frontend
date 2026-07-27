@@ -64,6 +64,7 @@ const OWNER_TITLE_MAP = {
   '/owner/karyawan':  'Karyawan',
   '/owner/penjualan': 'Penjualan',
   '/owner/service':   'Service HP',
+  '/owner/laporan':   'Laporan',
   '/keuangan':        'Keuangan',
   '/pengaturan':      'Pengaturan',
 };
