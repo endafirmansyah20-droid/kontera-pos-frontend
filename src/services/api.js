@@ -52,6 +52,11 @@ export const ownerAPI = {
   getMonthlyReport:    (p)  => api.get('/owner/reports/monthly', { params: p }),
 };
 
+// ─── Notifications (owner) ───────────────
+export const notificationAPI = {
+  getAll: () => api.get('/owner/notifications'),
+};
+
 // ─── Products ────────────────────────────
 export const productAPI = {
   getAll:          (p)     => api.get('/products', { params: p }),

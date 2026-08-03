@@ -9,11 +9,14 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import OwnerDashboardPage from './pages/OwnerDashboardPage';
 import OwnerCabangPage from './pages/OwnerCabangPage';
+import OwnerCabangDetailPage from './pages/OwnerCabangDetailPage';
 import OwnerKaryawanPage from './pages/OwnerKaryawanPage';
 import OwnerKaryawanDetailPage from './pages/OwnerKaryawanDetailPage';
 import OwnerPenjualanPage from './pages/OwnerPenjualanPage';
 import OwnerServicePage from './pages/OwnerServicePage';
 import OwnerLaporanPage from './pages/OwnerLaporanPage';
+import OwnerNotifikasiPage from './pages/OwnerNotifikasiPage';
+import OwnerBantuanPage from './pages/OwnerBantuanPage';
 import DashboardPage from './pages/DashboardPage';
 import TransaksiPage from './pages/TransaksiPage';
 import StokPage from './pages/StokPage';
@@ -119,11 +122,14 @@ function AppRoutes() {
       <Route path="/onboarding"    element={<OnboardingPage />} />
       <Route path="/owner"         element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
       <Route path="/owner/cabang"  element={<OwnerRoute><OwnerCabangPage /></OwnerRoute>} />
+      <Route path="/owner/cabang/:id" element={<OwnerRoute><OwnerCabangDetailPage /></OwnerRoute>} />
       <Route path="/owner/karyawan" element={<OwnerRoute><OwnerKaryawanPage /></OwnerRoute>} />
       <Route path="/owner/karyawan/:cashierId" element={<OwnerRoute><OwnerKaryawanDetailPage /></OwnerRoute>} />
       <Route path="/owner/penjualan" element={<OwnerRoute><OwnerPenjualanPage /></OwnerRoute>} />
       <Route path="/owner/service"   element={<OwnerRoute><OwnerServicePage /></OwnerRoute>} />
       <Route path="/owner/laporan"   element={<OwnerRoute><OwnerLaporanPage /></OwnerRoute>} />
+      <Route path="/owner/notifikasi" element={<OwnerRoute><OwnerNotifikasiPage /></OwnerRoute>} />
+      <Route path="/owner/bantuan"    element={<OwnerRoute><OwnerBantuanPage /></OwnerRoute>} />
       <Route path="/pengaturan"    element={<AnyAuthRoute><PengaturanPage /></AnyAuthRoute>} />
       <Route path="/dashboard"     element={<AdminRoute><DashboardPage /></AdminRoute>} />
       <Route path="/transaksi"     element={<ProtectedRoute><TransaksiPage /></ProtectedRoute>} />

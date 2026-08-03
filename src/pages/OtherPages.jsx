@@ -2,12 +2,13 @@
 // LaporanPage.jsx — Rekap Laba Rugi Bulanan
 // ============================================================
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import api, { reportAPI, customerAPI, financeAPI, settingsAPI, authAPI, transactionAPI, serviceAPI, brankasAPI, pointAPI, cabangAPI, backupAPI, rewardAPI, productAPI, ownerAPI } from '../services/api';
 import { formatRupiah, formatDate, PAYMENT_LABELS, PAYMENT_COLORS, FINANCE_TYPE_LABELS } from '../utils/helpers';
 import { PageHeader, EmptyState, Loader, Modal, StatCard, SearchInput, ConfirmDialog, RupiahInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Edit2, Eye, EyeOff, TrendingUp, ShoppingCart, DollarSign, ArrowUpCircle, ArrowDownCircle, ChevronRight, RefreshCw, FileSpreadsheet, FileText, Wrench, UserPlus, Users, Key } from 'lucide-react';
+import { Plus, Trash2, Edit2, Eye, EyeOff, TrendingUp, ShoppingCart, DollarSign, ArrowUpCircle, ArrowDownCircle, ChevronRight, RefreshCw, FileSpreadsheet, FileText, Wrench, UserPlus, Users, Key, X, Settings as SettingsIcon, Gift } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, LineChart, Line
@@ -1228,6 +1229,130 @@ export function PelangganPage() {
 // PengaturanPage.jsx
 // ============================================================
 
+// ─── Owner theme constants (dark glassmorphism) ───────────────────────
+const OWNER_HERO_GRADIENT = 'linear-gradient(120deg, #26215C 0%, #3C3489 50%, #7F77DD 100%)';
+
+const OWNER_AVATAR_COLORS = [
+  { bg: 'rgba(127,119,221,0.25)', color: '#AFA9EC' }, // ungu
+  { bg: 'rgba(251,146,60,0.22)',  color: '#FDBA74' }, // oranye
+  { bg: 'rgba(59,130,246,0.22)',  color: '#93C5FD' }, // biru
+  { bg: 'rgba(16,185,129,0.22)',  color: '#6EE7B7' }, // hijau
+  { bg: 'rgba(236,72,153,0.22)',  color: '#F9A8D4' }, // pink
+  { bg: 'rgba(234,179,8,0.22)',   color: '#FDE68A' }, // amber
+];
+
+// Hash sederhana → index warna avatar (stabil per user)
+const ownerHashIdx = (s = '', len = 1) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % len;
+};
+
+// Style baseline untuk input di modal dark
+const OWNER_DARK_INPUT_STYLE = {
+  width: '100%',
+  background: 'rgba(255,255,255,0.06)',
+  border: '0.5px solid rgba(255,255,255,0.15)',
+  borderRadius: 10,
+  padding: '10px 12px',
+  color: '#fff',
+  fontSize: 13,
+  outline: 'none',
+};
+const OWNER_DARK_LABEL_STYLE = {
+  display: 'block',
+  color: 'rgba(255,255,255,0.75)',
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: 0.4,
+  marginBottom: 6,
+};
+
+// ─── Modal versi dark (khusus tampilan Owner) ─────────────────────────
+function OwnerDarkModal({ open, onClose, title, children, size = 'sm' }) {
+  if (!open) return null;
+  const maxW = { sm: '440px', md: '520px', lg: '680px', xl: '1100px' }[size] || '440px';
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 99999,
+      background: 'rgba(15,15,40,0.72)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'linear-gradient(180deg, #2A2569 0%, #241F55 100%)',
+        border: '0.5px solid rgba(255,255,255,0.12)',
+        borderRadius: 16,
+        width: '100%', maxWidth: maxW, maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px',
+          borderBottom: '0.5px solid rgba(255,255,255,0.10)',
+          flexShrink: 0,
+        }}>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#fff' }}>{title}</h3>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+            border: '0.5px solid rgba(255,255,255,0.10)',
+            color: 'rgba(255,255,255,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>{children}</div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// Tombol primer & sekunder untuk tema Owner (dark)
+function OwnerPrimaryBtn({ children, style = {}, disabled = false, ...rest }) {
+  return (
+    <button {...rest} disabled={disabled} style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      padding: '9px 16px', borderRadius: 10,
+      background: disabled ? 'rgba(127,119,221,0.35)' : '#7F77DD',
+      color: '#fff',
+      border: '1px solid rgba(255,255,255,0.15)',
+      fontSize: 12, fontWeight: 700,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      boxShadow: disabled ? 'none' : '0 4px 12px -2px rgba(127,119,221,0.4)',
+      transition: 'background 0.15s',
+      ...style,
+    }}>{children}</button>
+  );
+}
+function OwnerGhostBtn({ children, style = {}, tone = 'default', disabled = false, ...rest }) {
+  const toneColor = {
+    default: '#fff',
+    danger:  '#FCA5A5',
+    success: '#86EFAC',
+    warning: '#FDE68A',
+  }[tone] || '#fff';
+  return (
+    <button {...rest} disabled={disabled} style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      padding: '8px 12px', borderRadius: 10,
+      background: 'rgba(255,255,255,0.06)',
+      color: toneColor,
+      border: '0.5px solid rgba(255,255,255,0.15)',
+      fontSize: 12, fontWeight: 600,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.55 : 1,
+      transition: 'background 0.15s',
+      ...style,
+    }}>{children}</button>
+  );
+}
+
 // ─── Manajemen Pengguna — Owner (lintas cabang) ───────────────────────
 function OwnerUserManagement() {
   const [users, setUsers]                 = useState([]);
@@ -1324,172 +1449,231 @@ function OwnerUserManagement() {
 
   return (
     <>
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
+      <div style={{
+        background: OWNER_HERO_GRADIENT, borderRadius: 12, padding: 16,
+        boxShadow: '0 10px 28px -8px rgba(38,33,92,0.35), inset 0 1px 0 rgba(255,255,255,0.10)',
+      }}>
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <div>
-            <h3 className="font-bold text-slate-700">Manajemen Pengguna</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{users.length} terdaftar · lintas cabang</p>
+            <h3 style={{ margin: 0, color: '#fff', fontSize: 15, fontWeight: 700 }}>Manajemen Pengguna</h3>
+            <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+              {users.length} terdaftar · lintas cabang
+            </p>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-            <UserPlus size={16} /> Tambah User
-          </button>
+          <OwnerPrimaryBtn onClick={() => setShowAdd(true)}>
+            <UserPlus size={14} /> Tambah User
+          </OwnerPrimaryBtn>
         </div>
         {users.length === 0 ? (
-          <div className="p-8 text-center">
-            <Users size={32} className="text-slate-200 mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">Belum ada pengguna</p>
+          <div style={{ padding: 32, textAlign: 'center' }}>
+            <Users size={32} style={{ color: 'rgba(255,255,255,0.25)', margin: '0 auto 12px', display: 'block' }} />
+            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, margin: 0 }}>Belum ada pengguna</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {users.map(u => (
-              <div key={u._id} className={`flex items-center gap-3 p-3 rounded-xl border ${u.isActive ? 'bg-slate-50 border-slate-100' : 'bg-slate-100 border-slate-200 opacity-60'}`}>
-                <div className="w-9 h-9 rounded-full bg-primary-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {u.name?.[0]?.toUpperCase()}
+          <div>
+            {users.map((u, idx) => {
+              const av = OWNER_AVATAR_COLORS[ownerHashIdx(u._id || u.username || u.name || '', OWNER_AVATAR_COLORS.length)];
+              const isLast = idx === users.length - 1;
+              return (
+                <div key={u._id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 4px',
+                    borderBottom: isLast ? 'none' : '0.5px solid rgba(255,255,255,0.08)',
+                    opacity: u.isActive ? 1 : 0.55,
+                    flexWrap: 'wrap',
+                  }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%',
+                    background: av.bg, color: av.color,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: 14, flexShrink: 0,
+                    border: '0.5px solid rgba(255,255,255,0.1)',
+                  }}>
+                    {u.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {u.name}
+                    </p>
+                    <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>
+                      @{u.username} · <span style={{ textTransform: 'capitalize' }}>{u.role}</span>
+                      {u.cabang?.nama && <span style={{ color: '#AFA9EC', marginLeft: 4 }}>· {u.cabang.nama}</span>}
+                    </p>
+                  </div>
+                  <span style={{
+                    padding: '3px 8px', borderRadius: 6,
+                    background: u.isActive ? 'rgba(16,185,129,0.20)' : 'rgba(148,163,184,0.20)',
+                    color: u.isActive ? '#6EE7B7' : 'rgba(255,255,255,0.65)',
+                    border: `0.5px solid ${u.isActive ? 'rgba(16,185,129,0.35)' : 'rgba(148,163,184,0.30)'}`,
+                    fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
+                  }}>
+                    {u.isActive ? 'Aktif' : 'Nonaktif'}
+                  </span>
+                  <OwnerGhostBtn onClick={() => openEdit(u)} title="Edit user"
+                    style={{ padding: '6px 8px' }}>
+                    <Edit2 size={13} />
+                  </OwnerGhostBtn>
+                  <OwnerGhostBtn tone="warning"
+                    onClick={() => { setResetTarget(u); setResetPasswordValue(''); }}
+                    title="Reset password"
+                    style={{ padding: '6px 8px' }}>
+                    <Key size={13} />
+                  </OwnerGhostBtn>
+                  <OwnerGhostBtn tone={u.isActive ? 'danger' : 'success'}
+                    onClick={() => handleToggle(u._id)}
+                    style={{ padding: '6px 10px' }}>
+                    {u.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                  </OwnerGhostBtn>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-700">{u.name}</p>
-                  <p className="text-xs text-slate-400">
-                    @{u.username} · <span className="capitalize">{u.role}</span>
-                    {u.cabang?.nama && <span className="ml-1 text-primary-500">· {u.cabang.nama}</span>}
-                  </p>
-                </div>
-                <span className={`badge ${u.isActive ? 'badge-green' : 'badge-gray'} text-xs flex-shrink-0`}>
-                  {u.isActive ? 'Aktif' : 'Nonaktif'}
-                </span>
-                <button onClick={() => openEdit(u)}
-                  className="btn btn-outline py-1.5 px-2.5 text-xs flex-shrink-0"
-                  title="Edit user">
-                  <Edit2 size={13} />
-                </button>
-                <button onClick={() => { setResetTarget(u); setResetPasswordValue(''); }}
-                  className="btn btn-outline py-1.5 px-2.5 text-xs flex-shrink-0 text-amber-600 border-amber-300 hover:bg-amber-50"
-                  title="Reset password">
-                  <Key size={13} />
-                </button>
-                <button onClick={() => handleToggle(u._id)}
-                  className={`btn py-1.5 px-2.5 text-xs flex-shrink-0 ${u.isActive ? 'btn-outline text-red-500' : 'btn-outline text-green-600'}`}>
-                  {u.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Tambah Pengguna" size="sm">
-        <div className="space-y-3">
+      {/* Modal Tambah User — dark */}
+      <OwnerDarkModal open={showAdd} onClose={() => setShowAdd(false)} title="Tambah Pengguna" size="sm">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="label">Nama Lengkap *</label>
-            <input className="input" placeholder="Nama lengkap..."
+            <label style={OWNER_DARK_LABEL_STYLE}>Nama Lengkap *</label>
+            <input style={OWNER_DARK_INPUT_STYLE} placeholder="Nama lengkap..."
               value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
           <div>
-            <label className="label">Username *</label>
-            <input className="input" placeholder="username..."
+            <label style={OWNER_DARK_LABEL_STYLE}>Username *</label>
+            <input style={OWNER_DARK_INPUT_STYLE} placeholder="username..."
               value={form.username}
               onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))} />
           </div>
           <div>
-            <label className="label">Password *</label>
-            <div className="relative">
-              <input type={showPw ? 'text' : 'password'} className="input pr-10" placeholder="Min. 6 karakter"
+            <label style={OWNER_DARK_LABEL_STYLE}>Password *</label>
+            <div style={{ position: 'relative' }}>
+              <input type={showPw ? 'text' : 'password'}
+                style={{ ...OWNER_DARK_INPUT_STYLE, paddingRight: 40 }}
+                placeholder="Min. 6 karakter"
                 value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
               <button type="button" onClick={() => setShowPw(!showPw)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                style={{
+                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                  background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.6)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center',
+                }}>
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
           <div>
-            <label className="label">Role</label>
-            <select className="input" value={form.role}
+            <label style={OWNER_DARK_LABEL_STYLE}>Role</label>
+            <select style={OWNER_DARK_INPUT_STYLE} value={form.role}
               onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-              <option value="karyawan">Karyawan</option>
-              <option value="admin">Admin</option>
+              <option value="karyawan" style={{ color: '#1e293b' }}>Karyawan</option>
+              <option value="admin" style={{ color: '#1e293b' }}>Admin</option>
             </select>
           </div>
           <div>
-            <label className="label">Cabang *</label>
-            <select className="input" value={form.cabangId}
+            <label style={OWNER_DARK_LABEL_STYLE}>Cabang *</label>
+            <select style={OWNER_DARK_INPUT_STYLE} value={form.cabangId}
               onChange={e => setForm(f => ({ ...f, cabangId: e.target.value }))}>
-              <option value="">Pilih Cabang</option>
+              <option value="" style={{ color: '#1e293b' }}>Pilih Cabang</option>
               {activeCabangs.map(sub => (
-                <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
+                <option key={sub.cabang?._id} value={sub.cabang?._id} style={{ color: '#1e293b' }}>
+                  {sub.cabang?.nama}
+                </option>
               ))}
             </select>
           </div>
-          <div className="flex gap-2 pt-2">
-            <button className="btn btn-outline flex-1" onClick={() => setShowAdd(false)}>Batal</button>
-            <button className="btn btn-primary flex-1" disabled={saving} onClick={handleAdd}>
+          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+            <OwnerGhostBtn onClick={() => setShowAdd(false)} style={{ flex: 1, padding: '10px 16px' }}>Batal</OwnerGhostBtn>
+            <OwnerPrimaryBtn disabled={saving} onClick={handleAdd} style={{ flex: 1, padding: '10px 16px' }}>
               {saving ? 'Proses...' : 'Tambah User'}
-            </button>
+            </OwnerPrimaryBtn>
           </div>
         </div>
-      </Modal>
+      </OwnerDarkModal>
 
-      {/* Modal Edit User */}
-      <Modal open={!!editUser} onClose={() => setEditUser(null)}
+      {/* Modal Edit User — dark */}
+      <OwnerDarkModal open={!!editUser} onClose={() => setEditUser(null)}
         title={`Edit: ${editUser?.name || ''}`} size="sm">
-        <div className="space-y-3">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="label">Nama Lengkap *</label>
-            <input className="input"
+            <label style={OWNER_DARK_LABEL_STYLE}>Nama Lengkap *</label>
+            <input style={OWNER_DARK_INPUT_STYLE}
               value={editForm.name}
               onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
           </div>
           <div>
-            <label className="label">Role</label>
-            <select className="input"
+            <label style={OWNER_DARK_LABEL_STYLE}>Role</label>
+            <select style={OWNER_DARK_INPUT_STYLE}
               value={editForm.role}
               onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}>
-              <option value="karyawan">Karyawan</option>
-              <option value="admin">Admin</option>
+              <option value="karyawan" style={{ color: '#1e293b' }}>Karyawan</option>
+              <option value="admin" style={{ color: '#1e293b' }}>Admin</option>
             </select>
           </div>
           <div>
-            <label className="label">Cabang *</label>
-            <select className="input"
+            <label style={OWNER_DARK_LABEL_STYLE}>Cabang *</label>
+            <select style={OWNER_DARK_INPUT_STYLE}
               value={editForm.cabangId}
               onChange={e => setEditForm(f => ({ ...f, cabangId: e.target.value }))}>
-              <option value="">Pilih Cabang</option>
+              <option value="" style={{ color: '#1e293b' }}>Pilih Cabang</option>
               {activeCabangs.map(sub => (
-                <option key={sub.cabang?._id} value={sub.cabang?._id}>{sub.cabang?.nama}</option>
+                <option key={sub.cabang?._id} value={sub.cabang?._id} style={{ color: '#1e293b' }}>
+                  {sub.cabang?.nama}
+                </option>
               ))}
             </select>
           </div>
+          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+            <OwnerGhostBtn onClick={() => setEditUser(null)} style={{ flex: 1, padding: '10px 16px' }}>Batal</OwnerGhostBtn>
+            <OwnerPrimaryBtn onClick={handleSaveEdit} disabled={savingEdit} style={{ flex: 1, padding: '10px 16px' }}>
+              {savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </OwnerPrimaryBtn>
+          </div>
         </div>
-        <div className="flex gap-3 mt-4">
-          <button className="btn btn-outline flex-1" onClick={() => setEditUser(null)}>Batal</button>
-          <button className="btn btn-primary flex-1" onClick={handleSaveEdit} disabled={savingEdit}>
-            {savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
-          </button>
-        </div>
-      </Modal>
+      </OwnerDarkModal>
 
-      {/* Modal Reset Password */}
-      <Modal open={!!resetTarget}
+      {/* Modal Reset Password — dark */}
+      <OwnerDarkModal open={!!resetTarget}
         onClose={() => { setResetTarget(null); setResetPasswordValue(''); }}
         title={`Reset Password — ${resetTarget?.name || ''}`} size="sm">
-        <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <p className="text-xs text-amber-700">⚠️ Password lama akan <strong>terhapus permanen</strong>. Pastikan kamu memberitahu password baru ke user.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{
+            background: 'rgba(251,191,36,0.12)',
+            border: '0.5px solid rgba(251,191,36,0.35)',
+            borderRadius: 10, padding: 12,
+          }}>
+            <p style={{ margin: 0, color: '#FDE68A', fontSize: 11, lineHeight: 1.5 }}>
+              ⚠️ Password lama akan <strong>terhapus permanen</strong>. Pastikan kamu memberitahu password baru ke user.
+            </p>
           </div>
           <div>
-            <label className="label">Password Baru *</label>
-            <input className="input" type="password" placeholder="Min. 6 karakter"
+            <label style={OWNER_DARK_LABEL_STYLE}>Password Baru *</label>
+            <input style={OWNER_DARK_INPUT_STYLE} type="password" placeholder="Min. 6 karakter"
               value={resetPasswordValue}
               onChange={e => setResetPasswordValue(e.target.value)} />
           </div>
+          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+            <OwnerGhostBtn
+              onClick={() => { setResetTarget(null); setResetPasswordValue(''); }}
+              style={{ flex: 1, padding: '10px 16px' }}>Batal</OwnerGhostBtn>
+            <button
+              onClick={handleResetPassword} disabled={resetting}
+              style={{
+                flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '10px 16px', borderRadius: 10,
+                background: resetting ? 'rgba(245,158,11,0.5)' : '#F59E0B',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.15)',
+                fontSize: 12, fontWeight: 700,
+                cursor: resetting ? 'not-allowed' : 'pointer',
+                boxShadow: resetting ? 'none' : '0 4px 12px -2px rgba(245,158,11,0.4)',
+              }}>
+              {resetting ? 'Mereset...' : '🔑 Reset Password'}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-3 mt-4">
-          <button className="btn btn-outline flex-1"
-            onClick={() => { setResetTarget(null); setResetPasswordValue(''); }}>Batal</button>
-          <button className="btn flex-1 bg-amber-500 hover:bg-amber-400 text-white font-bold"
-            onClick={handleResetPassword} disabled={resetting}>
-            {resetting ? 'Mereset...' : '🔑 Reset Password'}
-          </button>
-        </div>
-      </Modal>
+      </OwnerDarkModal>
     </>
   );
 }
@@ -1736,6 +1920,279 @@ export function PengaturanPage() {
     }
     return '—';
   };
+
+  // ── Owner: tampilan khusus dark glassmorphism (konsisten dg halaman Owner lain) ──
+  // Jangan tunggu `settings` yang memang tidak dipakai di tampilan Owner —
+  // menghindari loader tanpa akhir kalau endpoint settings tak diizinkan utk owner.
+  if (currentUser?.role === 'owner') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+        className="animate-fade-in-up max-w-3xl pb-24 lg:pb-0">
+
+        {/* Header dark */}
+        <div style={{
+          background: OWNER_HERO_GRADIENT, borderRadius: 12, padding: 16,
+          boxShadow: '0 10px 28px -8px rgba(38,33,92,0.35), inset 0 1px 0 rgba(255,255,255,0.10)',
+        }}>
+          <div className="flex items-start gap-3 flex-wrap">
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'rgba(255,255,255,0.10)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <SettingsIcon size={18} style={{ color: '#fff' }} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h1 style={{ margin: 0, color: '#fff', fontSize: 18, fontWeight: 700 }}>Pengaturan</h1>
+              <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.65)', fontSize: 12 }}>
+                Akun & manajemen pengguna lintas cabang
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Password Akun */}
+        <div style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+          borderRadius: 12,
+          padding: 16,
+          backdropFilter: 'blur(6px)',
+        }}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: 14, fontWeight: 700 }}>Password Akun</h3>
+              <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                Ganti password login kamu sendiri
+              </p>
+            </div>
+            <OwnerGhostBtn onClick={() => setShowChangePw(true)}>
+              <Key size={13} /> Ganti Password
+            </OwnerGhostBtn>
+          </div>
+        </div>
+
+        {/* Katalog Hadiah (Reward) */}
+        <div style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+          borderRadius: 12,
+          padding: 16,
+          backdropFilter: 'blur(6px)',
+        }}>
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <div>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Gift size={14} style={{ color: '#FDE68A' }} />
+                Katalog Hadiah (Reward)
+              </h3>
+              <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                Daftar hadiah yang bisa ditukar pelanggan dengan poin
+              </p>
+            </div>
+            <OwnerPrimaryBtn onClick={() => {
+              setEditReward(null);
+              setRewardForm({ name: '', description: '', pointsRequired: '', stock: '', image: '' });
+              setShowRewardModal(true);
+            }}>
+              <Plus size={14} /> Tambah Hadiah
+            </OwnerPrimaryBtn>
+          </div>
+          {rewards.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center' }}>
+              <Gift size={32} style={{ color: 'rgba(255,255,255,0.25)', margin: '0 auto 12px', display: 'block' }} />
+              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, margin: 0 }}>
+                Belum ada hadiah. Tambahkan hadiah untuk pelanggan!
+              </p>
+            </div>
+          ) : (
+            <div>
+              {rewards.map((r, idx) => {
+                const isLast = idx === rewards.length - 1;
+                return (
+                  <div key={r._id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 4px', gap: 10,
+                    borderBottom: isLast ? 'none' : '0.5px solid rgba(255,255,255,0.08)',
+                    opacity: r.isActive ? 1 : 0.55,
+                    flexWrap: 'wrap',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 10,
+                        background: 'rgba(234,179,8,0.20)',
+                        border: '0.5px solid rgba(234,179,8,0.35)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 18, flexShrink: 0,
+                      }}>
+                        {r.image
+                          ? <img src={r.image} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} />
+                          : <span>🎁</span>}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ margin: 0, color: '#fff', fontSize: 13, fontWeight: 700 }}>{r.name}</p>
+                        {r.description && (
+                          <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>{r.description}</p>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+                          <span style={{ color: '#FDE68A', fontSize: 11, fontWeight: 700 }}>
+                            ⭐ {r.pointsRequired?.toLocaleString('id-ID')} poin
+                          </span>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Stok: {r.stock}</span>
+                          {!r.isActive && (
+                            <span style={{
+                              padding: '2px 6px', borderRadius: 5,
+                              background: 'rgba(148,163,184,0.20)',
+                              color: 'rgba(255,255,255,0.65)',
+                              fontSize: 10, fontWeight: 600,
+                            }}>Nonaktif</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <OwnerGhostBtn
+                        onClick={() => {
+                          setEditReward(r);
+                          setRewardForm({
+                            name: r.name,
+                            description: r.description || '',
+                            pointsRequired: String(r.pointsRequired),
+                            stock: String(r.stock),
+                            image: r.image || '',
+                          });
+                          setShowRewardModal(true);
+                        }}
+                        style={{ padding: '6px 10px' }}>
+                        Edit
+                      </OwnerGhostBtn>
+                      <OwnerGhostBtn tone="danger"
+                        onClick={async () => {
+                          if (window.confirm('Hapus hadiah ini?')) {
+                            await rewardAPI.delete(r._id);
+                            loadRewards();
+                            toast.success('Hadiah dihapus!');
+                          }
+                        }}
+                        style={{ padding: '6px 10px' }}>
+                        Hapus
+                      </OwnerGhostBtn>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Manajemen Pengguna (dark) */}
+        <OwnerUserManagement />
+
+        {/* Modal Ganti Password Sendiri — dark */}
+        <OwnerDarkModal open={showChangePw}
+          onClose={() => { setShowChangePw(false); setChangePwForm({ oldPassword: '', newPassword: '', confirmPassword: '' }); }}
+          title="Ganti Password Saya" size="sm">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={OWNER_DARK_LABEL_STYLE}>Password Lama *</label>
+              <input style={OWNER_DARK_INPUT_STYLE} type="password" placeholder="Password yang sekarang"
+                value={changePwForm.oldPassword}
+                onChange={e => setChangePwForm(f => ({ ...f, oldPassword: e.target.value }))} />
+            </div>
+            <div>
+              <label style={OWNER_DARK_LABEL_STYLE}>Password Baru *</label>
+              <input style={OWNER_DARK_INPUT_STYLE} type="password" placeholder="Min. 6 karakter"
+                value={changePwForm.newPassword}
+                onChange={e => setChangePwForm(f => ({ ...f, newPassword: e.target.value }))} />
+            </div>
+            <div>
+              <label style={OWNER_DARK_LABEL_STYLE}>Konfirmasi Password Baru *</label>
+              <input style={OWNER_DARK_INPUT_STYLE} type="password" placeholder="Ulangi password baru"
+                value={changePwForm.confirmPassword}
+                onChange={e => setChangePwForm(f => ({ ...f, confirmPassword: e.target.value }))} />
+            </div>
+            {changePwForm.newPassword && changePwForm.confirmPassword && changePwForm.newPassword !== changePwForm.confirmPassword && (
+              <p style={{ margin: 0, color: '#FCA5A5', fontSize: 11 }}>⚠️ Password tidak cocok</p>
+            )}
+            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+              <OwnerGhostBtn onClick={() => setShowChangePw(false)} style={{ flex: 1, padding: '10px 16px' }}>Batal</OwnerGhostBtn>
+              <OwnerPrimaryBtn onClick={handleChangeMyPassword} disabled={changingPw} style={{ flex: 1, padding: '10px 16px' }}>
+                {changingPw ? 'Menyimpan...' : 'Simpan Password'}
+              </OwnerPrimaryBtn>
+            </div>
+          </div>
+        </OwnerDarkModal>
+
+        {/* Modal Tambah/Edit Reward — dark */}
+        <OwnerDarkModal open={showRewardModal} onClose={() => setShowRewardModal(false)}
+          title={editReward ? 'Edit Hadiah' : 'Tambah Hadiah'} size="sm">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={OWNER_DARK_LABEL_STYLE}>Nama Hadiah *</label>
+              <input style={OWNER_DARK_INPUT_STYLE} placeholder="Contoh: Jam Dinding"
+                value={rewardForm.name}
+                onChange={e => setRewardForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div>
+              <label style={OWNER_DARK_LABEL_STYLE}>Deskripsi</label>
+              <input style={OWNER_DARK_INPUT_STYLE} placeholder="Deskripsi singkat hadiah"
+                value={rewardForm.description}
+                onChange={e => setRewardForm(f => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={OWNER_DARK_LABEL_STYLE}>Poin Dibutuhkan *</label>
+                <input style={OWNER_DARK_INPUT_STYLE} type="number" min="1" placeholder="1000"
+                  value={rewardForm.pointsRequired}
+                  onChange={e => setRewardForm(f => ({ ...f, pointsRequired: e.target.value }))} />
+              </div>
+              <div>
+                <label style={OWNER_DARK_LABEL_STYLE}>Stok</label>
+                <input style={OWNER_DARK_INPUT_STYLE} type="number" min="0" placeholder="10"
+                  value={rewardForm.stock}
+                  onChange={e => setRewardForm(f => ({ ...f, stock: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label style={OWNER_DARK_LABEL_STYLE}>URL Gambar (opsional)</label>
+              <input style={OWNER_DARK_INPUT_STYLE} placeholder="https://..."
+                value={rewardForm.image}
+                onChange={e => setRewardForm(f => ({ ...f, image: e.target.value }))} />
+            </div>
+            {editReward && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.75)', fontSize: 12, cursor: 'pointer' }}>
+                <input type="checkbox"
+                  checked={rewardForm.isActive !== false}
+                  onChange={e => setRewardForm(f => ({ ...f, isActive: e.target.checked }))} />
+                Aktif (tampil di daftar hadiah)
+              </label>
+            )}
+            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+              <OwnerGhostBtn onClick={() => setShowRewardModal(false)} style={{ flex: 1, padding: '10px 16px' }}>Batal</OwnerGhostBtn>
+              <OwnerPrimaryBtn disabled={savingReward}
+                onClick={async () => {
+                  if (!rewardForm.name || !rewardForm.pointsRequired) return toast.error('Nama dan poin wajib diisi!');
+                  setSavingReward(true);
+                  try {
+                    const payload = { ...rewardForm, pointsRequired: Number(rewardForm.pointsRequired), stock: Number(rewardForm.stock) || 0 };
+                    if (editReward) await rewardAPI.update(editReward._id, payload);
+                    else await rewardAPI.create(payload);
+                    toast.success(editReward ? 'Hadiah diupdate!' : 'Hadiah ditambahkan!');
+                    setShowRewardModal(false); loadRewards();
+                  } catch (err) { toast.error(err.response?.data?.message || 'Gagal menyimpan'); }
+                  finally { setSavingReward(false); }
+                }}
+                style={{ flex: 1, padding: '10px 16px' }}>
+                {savingReward ? 'Menyimpan...' : (editReward ? 'Update' : 'Tambah')}
+              </OwnerPrimaryBtn>
+            </div>
+          </div>
+        </OwnerDarkModal>
+      </div>
+    );
+  }
 
   if (!settings) return <Loader />;
 

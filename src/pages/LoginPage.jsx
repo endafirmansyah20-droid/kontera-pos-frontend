@@ -5,16 +5,24 @@ import { Eye, EyeOff, Loader2, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { GoogleLogin } from '@react-oauth/google';
 import { useInstallPrompt } from '../context/PwaInstallContext';
-import { isMobileDevice } from '../utils/device';
+import { isAndroid, isIOS } from '../utils/device';
+import IosInstallInstructionsModal from '../components/IosInstallInstructionsModal';
 
 export default function LoginPage() {
   const [form, setForm]       = useState({ username:'', password:'' });
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
+  const [iosModalOpen, setIosModalOpen] = useState(false);
   const { login, loginWithGoogle }  = useAuth();
   const { canInstall, promptInstall } = useInstallPrompt();
   const navigate   = useNavigate();
   const inputRef   = useRef();
+
+  const ios = isIOS();
+  const android = isAndroid();
+  // Tombol muncul di: iOS (buka modal instruksi manual) ATAU desktop yang browser-nya fire beforeinstallprompt.
+  // Android disembunyikan karena punya APK sendiri.
+  const showInstallBtn = !android && (ios || canInstall);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 400); }, []);
 
@@ -214,14 +222,21 @@ export default function LoginPage() {
             Belum punya akun?{' '}
             <a href="/daftar" style={{color:'#fbbf24',fontWeight:700,textDecoration:'none'}}>Daftar gratis</a>
           </p>
-          {canInstall && !isMobileDevice() && (
-            <button type="button" onClick={promptInstall} className="btn-install" style={{marginTop:16}}>
+          {showInstallBtn && (
+            <button
+              type="button"
+              onClick={ios ? () => setIosModalOpen(true) : promptInstall}
+              className="btn-install"
+              style={{marginTop:16}}
+            >
               <Download size={15}/> Install Aplikasi
             </button>
           )}
           <p style={{textAlign:'center',color:'rgba(255,255,255,0.1)',fontSize:11,margin:'18px 0 0'}}>© 2025 KonterA · All rights reserved</p>
         </div>
       </div>
+
+      <IosInstallInstructionsModal open={iosModalOpen} onClose={() => setIosModalOpen(false)} />
     </div>
   );
 }
