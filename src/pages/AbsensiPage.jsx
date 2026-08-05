@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { absensiAPI } from '../services/api';
 import { formatDate } from '../utils/helpers';
+import { isIOS, isStandalonePWA } from '../utils/device';
 import { PageHeader, Modal, Loader, EmptyState } from '../components/UI';
 import {
   Clock, MapPin, Camera, LogIn, LogOut, FileText, CalendarDays,
@@ -57,21 +58,48 @@ function compressImage(file, maxWidth = 1280, quality = 0.7) {
   });
 }
 
-// Bungkus getCurrentPosition jadi promise dengan timeout 15s
+// Bungkus getCurrentPosition jadi promise dengan hard timeout 20s.
+// Why: di iOS PWA standalone (Home Screen), WebKit punya bug di mana permission
+// dialog gagal muncul dan callback tidak pernah dipanggil — opsi `timeout` di
+// options ikut diabaikan → promise hang selamanya, UI stuck di "Memproses".
+// Guard manual pakai setTimeout memastikan flow selalu resolve/reject.
 function getGPS() {
+  const iosPwa = isIOS() && isStandalonePWA();
+  const iosDeniedMsg =
+    'Izin lokasi ditolak. Buka Settings iPhone → Privacy & Security → Location Services, aktifkan untuk aplikasi ini.';
+  const iosTimeoutMsg =
+    'Timeout mengambil lokasi. Buka Settings iPhone → Privacy & Security → Location Services, pastikan aktif untuk aplikasi ini, lalu coba lagi.';
+
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Browser tidak mendukung GPS'));
+
+    let settled = false;
+    const HARD_TIMEOUT_MS = 20000;
+    const hardTimer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(iosPwa ? iosTimeoutMsg : 'Timeout mengambil lokasi. Coba lagi atau cek izin lokasi.'));
+    }, HARD_TIMEOUT_MS);
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        akurasi: pos.coords.accuracy,
-      }),
+      (pos) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardTimer);
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          akurasi: pos.coords.accuracy,
+        });
+      },
       (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardTimer);
         const map = {
-          1: 'Izin lokasi ditolak. Aktifkan di pengaturan browser.',
+          1: iosPwa ? iosDeniedMsg : 'Izin lokasi ditolak. Aktifkan di pengaturan browser.',
           2: 'Lokasi tidak tersedia. Cek koneksi GPS.',
-          3: 'Timeout mengambil lokasi. Coba lagi.',
+          3: iosPwa ? iosTimeoutMsg : 'Timeout mengambil lokasi. Coba lagi.',
         };
         reject(new Error(map[err.code] || 'Gagal mengambil lokasi'));
       },
@@ -355,6 +383,11 @@ export default function AbsensiPage() {
   // Alur: klik tombol → minta GPS → buka kamera → onChange file → kompres → upload.
   const pendingGpsRef = useRef(null); // { lat, lng, akurasi }
 
+  // Deteksi platform sekali per-render; dipakai untuk atur behavior file input
+  // (drop `capture` di iOS) dan menampilkan hint permission khusus iOS-PWA.
+  const iosDevice = isIOS();
+  const iosPwaMode = iosDevice && isStandalonePWA();
+
   useEffect(() => {
     loadStatus();
   }, []);
@@ -397,12 +430,25 @@ export default function AbsensiPage() {
     try {
       const gps = await getGPS();
       pendingGpsRef.current = gps;
-      // Buka kamera lewat file input (accept image/* + capture)
       const ref = mode === 'checkin' ? checkinFileRef : checkoutFileRef;
+
+      // Deteksi user cancel picker: `<input type=file>` TIDAK fire `onChange`
+      // kalau user tap Cancel di action sheet iOS/Android, jadi processing
+      // bisa stuck. Window regain focus ketika picker close (baik pilih file
+      // maupun cancel). Kalau setelah 500ms handleFileChange belum reset
+      // pendingGpsRef → anggap cancel dan reset manual.
+      const onFocus = () => {
+        window.removeEventListener('focus', onFocus);
+        setTimeout(() => {
+          if (pendingGpsRef.current) {
+            pendingGpsRef.current = null;
+            setProcessing(null);
+          }
+        }, 500);
+      };
+      window.addEventListener('focus', onFocus);
+
       ref.current?.click();
-      // NB: processing di-reset di finally-nya handleFileChange atau
-      // user cancel (onCancel di window.focus). Setelah ini flow lanjut
-      // di handleFileChange.
     } catch (err) {
       toast.error(err.message || 'Gagal mengambil lokasi');
       setProcessing(null);
@@ -511,12 +557,16 @@ export default function AbsensiPage() {
               </button>
             </div>
 
-            {/* Hidden file inputs — accept camera on mobile */}
+            {/* Hidden file inputs — accept camera on mobile.
+                iOS PWA standalone punya bug WebKit: attribute `capture` kadang
+                bikin native picker tidak muncul / onChange tidak fire setelah
+                shutter. Untuk iOS drop `capture` → biarkan iOS action sheet
+                muncul dengan pilihan "Take Photo / Photo Library". */}
             <input
               ref={checkinFileRef}
               type="file"
               accept="image/*"
-              capture="user"
+              capture={iosDevice ? undefined : 'user'}
               className="hidden"
               onChange={(e) => handleFileChange('checkin', e)}
             />
@@ -524,7 +574,7 @@ export default function AbsensiPage() {
               ref={checkoutFileRef}
               type="file"
               accept="image/*"
-              capture="user"
+              capture={iosDevice ? undefined : 'user'}
               className="hidden"
               onChange={(e) => handleFileChange('checkout', e)}
             />
@@ -536,6 +586,15 @@ export default function AbsensiPage() {
                 Pastikan izin lokasi & kamera aktif di browser.
               </p>
             </div>
+            {iosPwaMode && (
+              <div className="mt-2 flex items-start gap-2 text-xs text-blue-600 dark:text-blue-300">
+                <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
+                <p>
+                  Di iPhone: pastikan izin Lokasi & Kamera aktif di
+                  {' '}<span className="font-semibold">Settings → nama app</span>.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Riwayat bulan ini */}

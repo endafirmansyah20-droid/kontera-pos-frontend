@@ -31,3 +31,13 @@ export function isSafari() {
   const ua = navigator.userAgent || '';
   return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua) && !/Chrome/.test(ua);
 }
+
+// App sedang berjalan sebagai PWA standalone (di-install ke Home Screen /
+// desktop), bukan dari tab browser biasa.
+// iOS pakai `navigator.standalone` non-standard; platform lain pakai
+// media query display-mode.
+export function isStandalonePWA() {
+  if (typeof window === 'undefined') return false;
+  if (window.navigator && window.navigator.standalone === true) return true;
+  return !!window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+}
