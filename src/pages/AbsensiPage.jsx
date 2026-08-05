@@ -385,6 +385,12 @@ export default function AbsensiPage() {
   // masih false, artinya picker ditutup tanpa pilih file → reset processing.
   const photoStartedRef = useRef(false);
 
+  // Timer id safety-net (20s) untuk skenario di iOS PWA di mana focus /
+  // visibilitychange TIDAK fire sama sekali saat picker capture=user close
+  // (karena picker jadi in-app modal → WebKit tidak lose focus / hide page).
+  // Di-clear waktu handleFileChange mulai jalan.
+  const safetyNetTimerRef = useRef(null);
+
   // Deteksi platform sekali per-render; dipakai untuk atur behavior file input
   // (drop `capture` di iOS) dan menampilkan hint permission khusus iOS-PWA.
   const iosDevice = isIOS();
@@ -462,12 +468,32 @@ export default function AbsensiPage() {
     window.addEventListener('focus', onFire);
     document.addEventListener('visibilitychange', onVisibility);
 
+    // Safety-net: kalau dalam 20 detik handleFileChange belum jalan (event
+    // fast-path gagal fire, misal di iOS PWA capture=user), paksa reset.
+    // 20s pilih sebagai kompromi: cukup pendek supaya stuck-user tidak
+    // sampai reload, cukup panjang supaya tidak interrupt normal camera
+    // flow (framing → snap → confirm biasanya <15s). Non-fatal kalau
+    // fire di tengah alur normal: handleFileChange tetap complete.
+    safetyNetTimerRef.current = setTimeout(() => {
+      safetyNetTimerRef.current = null;
+      if (!photoStartedRef.current) {
+        armed = false;
+        window.removeEventListener('focus', onFire);
+        document.removeEventListener('visibilitychange', onVisibility);
+        setProcessing(null);
+      }
+    }, 20000);
+
     ref.current?.click();
   };
 
   // Tahap 2: user pilih/ambil foto → ambil GPS → kompres → submit
   const handleFileChange = async (mode, e) => {
     photoStartedRef.current = true; // signal ke cancel-detector: jangan reset
+    if (safetyNetTimerRef.current) {
+      clearTimeout(safetyNetTimerRef.current);
+      safetyNetTimerRef.current = null;
+    }
     const file = e.target.files?.[0];
     // Reset value biar bisa pilih file sama lagi nanti
     e.target.value = '';
@@ -516,7 +542,12 @@ export default function AbsensiPage() {
   const bisaCheckout  = !!status?.checkIn?.waktu && !status?.checkOut?.waktu && !isIzinHariIni;
 
   return (
-    <div>
+    // Pakai .mobile-pb (index.css @layer components) di root AbsensiPage —
+    // di Layout wrapper class ini kalah cascade sama `p-4` utility di
+    // className yang sama, jadi tidak efektif untuk halaman lain. Di sini
+    // tidak ada utility padding yang bersaing, jadi .mobile-pb apply penuh
+    // (5rem + safe-bottom). `lg:pb-0` (utility) override di desktop.
+    <div className="mobile-pb lg:pb-0">
       <PageHeader
         title="Absensi"
         subtitle="Check-in, check-out, dan pengajuan izin"
