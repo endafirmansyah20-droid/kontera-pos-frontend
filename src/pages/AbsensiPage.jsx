@@ -379,9 +379,11 @@ export default function AbsensiPage() {
   const checkinFileRef  = useRef(null);
   const checkoutFileRef = useRef(null);
 
-  // Foto sementara + koordinat sementara antar step (pilih foto → submit).
-  // Alur: klik tombol → minta GPS → buka kamera → onChange file → kompres → upload.
-  const pendingGpsRef = useRef(null); // { lat, lng, akurasi }
+  // Flag apakah handleFileChange sudah mulai jalan (user pilih foto).
+  // Dipakai oleh window.focus listener di startCapture untuk mendeteksi
+  // user cancel action sheet — kalau focus kembali ke window tapi flag ini
+  // masih false, artinya picker ditutup tanpa pilih file → reset processing.
+  const photoStartedRef = useRef(false);
 
   // Deteksi platform sekali per-render; dipakai untuk atur behavior file input
   // (drop `capture` di iOS) dan menampilkan hint permission khusus iOS-PWA.
@@ -424,55 +426,46 @@ export default function AbsensiPage() {
     }
   };
 
-  // Tahap 1: klik tombol check-in/out → ambil GPS → buka kamera
-  const startCapture = async (mode) => {
+  // Tahap 1: klik tombol check-in/out → langsung buka kamera (SYNCHRONOUS).
+  // PENTING: .click() pada <input type=file> HARUS dipanggil synchronous di
+  // dalam user gesture asli. Kalau ada `await` sebelum .click() (mis. await
+  // getGPS()), Safari/WebKit — terutama di PWA standalone — akan silently
+  // reject membuka picker/kamera: tidak error, tidak popup, stuck selamanya.
+  // Chrome/Android lebih longgar tapi kita samakan flow buat konsistensi.
+  // GPS dipindah ke handleFileChange (setelah user selesai motret).
+  const startCapture = (mode) => {
     setProcessing(mode);
-    try {
-      const gps = await getGPS();
-      pendingGpsRef.current = gps;
-      const ref = mode === 'checkin' ? checkinFileRef : checkoutFileRef;
+    photoStartedRef.current = false;
+    const ref = mode === 'checkin' ? checkinFileRef : checkoutFileRef;
 
-      // Deteksi user cancel picker: `<input type=file>` TIDAK fire `onChange`
-      // kalau user tap Cancel di action sheet iOS/Android, jadi processing
-      // bisa stuck. Window regain focus ketika picker close (baik pilih file
-      // maupun cancel). Kalau setelah 500ms handleFileChange belum reset
-      // pendingGpsRef → anggap cancel dan reset manual.
-      const onFocus = () => {
-        window.removeEventListener('focus', onFocus);
-        setTimeout(() => {
-          if (pendingGpsRef.current) {
-            pendingGpsRef.current = null;
-            setProcessing(null);
-          }
-        }, 500);
-      };
-      window.addEventListener('focus', onFocus);
+    // Deteksi user cancel picker: `<input type=file>` TIDAK fire `onChange`
+    // kalau user tap Cancel di action sheet. Window regain focus ketika
+    // picker close (baik pilih file maupun cancel). Kalau setelah 500ms
+    // handleFileChange belum sempat men-set photoStartedRef → anggap cancel.
+    const onFocus = () => {
+      window.removeEventListener('focus', onFocus);
+      setTimeout(() => {
+        if (!photoStartedRef.current) setProcessing(null);
+      }, 500);
+    };
+    window.addEventListener('focus', onFocus);
 
-      ref.current?.click();
-    } catch (err) {
-      toast.error(err.message || 'Gagal mengambil lokasi');
-      setProcessing(null);
-    }
+    ref.current?.click();
   };
 
-  // Tahap 2: user pilih/ambil foto → kompres → submit
+  // Tahap 2: user pilih/ambil foto → ambil GPS → kompres → submit
   const handleFileChange = async (mode, e) => {
+    photoStartedRef.current = true; // signal ke cancel-detector: jangan reset
     const file = e.target.files?.[0];
     // Reset value biar bisa pilih file sama lagi nanti
     e.target.value = '';
     if (!file) {
       setProcessing(null);
-      pendingGpsRef.current = null;
-      return;
-    }
-    const gps = pendingGpsRef.current;
-    if (!gps) {
-      toast.error('Data lokasi hilang, coba lagi');
-      setProcessing(null);
       return;
     }
 
     try {
+      const gps = await getGPS();
       const blob = await compressImage(file);
       const fd = new FormData();
       fd.append('foto', blob, 'absensi.jpg');
@@ -486,16 +479,20 @@ export default function AbsensiPage() {
       await loadStatus();
       await loadRiwayat();
     } catch (err) {
-      const meta = err.response?.data?.meta;
-      const msg  = err.response?.data?.message || 'Gagal memproses absensi';
-      if (err.response?.status === 400 && meta?.jarak != null) {
-        toast.error(`${msg} (jarak ${Math.round(meta.jarak)}m dari lokasi cabang)`, { duration: 6000 });
+      // Bedakan error GPS/kompresi (Error murni) vs error API (punya err.response)
+      if (err.response) {
+        const meta = err.response.data?.meta;
+        const msg  = err.response.data?.message || 'Gagal memproses absensi';
+        if (err.response.status === 400 && meta?.jarak != null) {
+          toast.error(`${msg} (jarak ${Math.round(meta.jarak)}m dari lokasi cabang)`, { duration: 6000 });
+        } else {
+          toast.error(msg);
+        }
       } else {
-        toast.error(msg);
+        toast.error(err.message || 'Gagal memproses absensi');
       }
     } finally {
       setProcessing(null);
-      pendingGpsRef.current = null;
     }
   };
 
