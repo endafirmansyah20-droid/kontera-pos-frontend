@@ -439,16 +439,28 @@ export default function AbsensiPage() {
     const ref = mode === 'checkin' ? checkinFileRef : checkoutFileRef;
 
     // Deteksi user cancel picker: `<input type=file>` TIDAK fire `onChange`
-    // kalau user tap Cancel di action sheet. Window regain focus ketika
-    // picker close (baik pilih file maupun cancel). Kalau setelah 500ms
-    // handleFileChange belum sempat men-set photoStartedRef → anggap cancel.
-    const onFocus = () => {
-      window.removeEventListener('focus', onFocus);
+    // kalau user tap Cancel. Register 2 event, yang duluan fire menang:
+    //   • `focus` — reliable di desktop/Android
+    //   • `visibilitychange` — di iOS PWA sering fire lebih dulu dari focus
+    //     saat kamera app close & PWA jadi visible lagi
+    // Setelah trigger, tunggu 250ms untuk kasih handleFileChange kesempatan
+    // set photoStartedRef (normalnya fire dalam beberapa ms setelah user
+    // pilih file). Kalau flag masih false → user cancel, reset processing.
+    let armed = true;
+    const onFire = () => {
+      if (!armed) return;
+      armed = false;
+      window.removeEventListener('focus', onFire);
+      document.removeEventListener('visibilitychange', onVisibility);
       setTimeout(() => {
         if (!photoStartedRef.current) setProcessing(null);
-      }, 500);
+      }, 250);
     };
-    window.addEventListener('focus', onFocus);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') onFire();
+    };
+    window.addEventListener('focus', onFire);
+    document.addEventListener('visibilitychange', onVisibility);
 
     ref.current?.click();
   };
@@ -554,16 +566,15 @@ export default function AbsensiPage() {
               </button>
             </div>
 
-            {/* Hidden file inputs — accept camera on mobile.
-                iOS PWA standalone punya bug WebKit: attribute `capture` kadang
-                bikin native picker tidak muncul / onChange tidak fire setelah
-                shutter. Untuk iOS drop `capture` → biarkan iOS action sheet
-                muncul dengan pilihan "Take Photo / Photo Library". */}
+            {/* Hidden file inputs — `capture="user"` skip action sheet dan
+                langsung buka kamera depan (selfie) di mobile. Aman dipakai di
+                iOS PWA sekarang karena root cause bug lama (await sebelum
+                .click() → picker tidak pernah buka) sudah difix. */}
             <input
               ref={checkinFileRef}
               type="file"
               accept="image/*"
-              capture={iosDevice ? undefined : 'user'}
+              capture="user"
               className="hidden"
               onChange={(e) => handleFileChange('checkin', e)}
             />
@@ -571,7 +582,7 @@ export default function AbsensiPage() {
               ref={checkoutFileRef}
               type="file"
               accept="image/*"
-              capture={iosDevice ? undefined : 'user'}
+              capture="user"
               className="hidden"
               onChange={(e) => handleFileChange('checkout', e)}
             />
