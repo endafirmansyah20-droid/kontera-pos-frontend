@@ -5,7 +5,7 @@ import {
   CalendarDays, ExternalLink, Users, LogIn, LogOut,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api, { ownerAPI } from '../services/api';
+import api, { ownerAPI, mediaUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from '../components/UI';
 import { formatDate, formatDateTime } from '../utils/helpers';
@@ -194,12 +194,15 @@ function DetailModal({ open, onClose, data }) {
   const approval       = data.approvalStatus;
   const jamCheckin     = data.checkIn?.waktu;
   const jamCheckout    = data.checkOut?.waktu;
-  const fotoCheckin    = data.checkIn?.fotoUrl;
-  const fotoCheckout   = data.checkOut?.fotoUrl;
+  // Foto/lampiran di-serve dari backend (path relatif /uploads/...) — di APK
+  // Capacitor native, path relatif resolve ke capacitor://localhost dan gagal.
+  // mediaUrl() prefix ke domain backend kalau native, biarkan relative di web.
+  const fotoCheckin    = mediaUrl(data.checkIn?.fotoUrl);
+  const fotoCheckout   = mediaUrl(data.checkOut?.fotoUrl);
   const lokasiCheckin  = data.checkIn?.lokasi;
   const lokasiCheckout = data.checkOut?.lokasi;
   const keterangan     = data.keterangan;
-  const lampiran       = data.lampiranUrl;
+  const lampiran       = mediaUrl(data.lampiranUrl);
   const alasanTolak    = data.alasanTolak;
   const approvedByNama = data.approvedBy?.name;
   const approvedAt     = data.approvedAt;

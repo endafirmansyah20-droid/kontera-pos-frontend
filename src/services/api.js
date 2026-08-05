@@ -27,6 +27,17 @@ api.interceptors.response.use(
 
 export default api;
 
+// Build URL absolut untuk media (foto/lampiran) yang di-serve backend.
+// Backend biasanya balikin path relatif (mis. /uploads/absensi/xxx.jpg).
+// Di web same-origin (nginx proxy) path relatif kebetulan work; di APK
+// Android/iOS (Capacitor native) webview served dari capacitor://localhost
+// → path relatif gagal load, butuh prefix ke domain backend production.
+export function mediaUrl(path) {
+  if (!path) return null;
+  if (/^(https?:|data:|blob:)/i.test(path)) return path;
+  return `${API_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 // ─── Auth ────────────────────────────────
 export const authAPI = {
   login: (d) => api.post('/auth/login', d),
