@@ -1351,7 +1351,10 @@ export default function TransaksiPage() {
       {/* ══ KASIR ══ */}
       {activeMainTab === 'kasir' && (
         <>
-        <div className="flex flex-col lg:flex-row lg:items-start gap-3 pb-32 lg:pb-0">
+        {/* Bottom padding = tinggi floating cart bar (bottom-16 = 64px + tinggi bar ~64px)
+            + safe-area iOS. Tanpa var(--safe-bottom), pb-32 (128px) pas untuk Android
+            tapi kurang 34px di iPhone sehingga baris produk terakhir ketutup cart bar. */}
+        <div className="flex flex-col lg:flex-row lg:items-start gap-3 lg:pb-0 pb-[calc(9rem+var(--safe-bottom))]">
 
           {/* Kiri — height menyesuaikan konten di mobile; desktop dibatasi viewport agar produk scroll internal */}
           <div className="flex-1 min-w-0 flex flex-col card p-0 lg:max-h-[calc(100vh-2rem)] lg:overflow-hidden">

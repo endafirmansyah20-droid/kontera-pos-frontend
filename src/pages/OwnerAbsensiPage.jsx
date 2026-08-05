@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Fingerprint, RefreshCw, Filter, CheckCircle2, XCircle, Clock,
   MapPin, FileText, Image as ImageIcon, AlertCircle, Loader2,
@@ -15,12 +15,10 @@ const HERO_GRADIENT = 'linear-gradient(120deg, #26215C 0%, #3C3489 50%, #7F77DD 
 const PAGE_SIZE = 20;
 
 const STATUS_META = {
-  hadir:     { label: 'Hadir',     bg: 'rgba(110,231,183,0.15)', color: '#6EE7B7', ring: 'rgba(110,231,183,0.35)' },
-  terlambat: { label: 'Terlambat', bg: 'rgba(253,186,116,0.15)', color: '#FDBA74', ring: 'rgba(253,186,116,0.35)' },
-  izin:      { label: 'Izin',      bg: 'rgba(147,197,253,0.15)', color: '#93C5FD', ring: 'rgba(147,197,253,0.35)' },
-  sakit:     { label: 'Sakit',     bg: 'rgba(216,180,254,0.15)', color: '#D8B4FE', ring: 'rgba(216,180,254,0.35)' },
-  cuti:      { label: 'Cuti',      bg: 'rgba(175,169,236,0.15)', color: '#AFA9EC', ring: 'rgba(175,169,236,0.35)' },
-  alpa:      { label: 'Alpa',      bg: 'rgba(248,113,113,0.15)', color: '#F87171', ring: 'rgba(248,113,113,0.35)' },
+  hadir: { label: 'Hadir', bg: 'rgba(110,231,183,0.15)', color: '#6EE7B7', ring: 'rgba(110,231,183,0.35)' },
+  izin:  { label: 'Izin',  bg: 'rgba(147,197,253,0.15)', color: '#93C5FD', ring: 'rgba(147,197,253,0.35)' },
+  sakit: { label: 'Sakit', bg: 'rgba(216,180,254,0.15)', color: '#D8B4FE', ring: 'rgba(216,180,254,0.35)' },
+  cuti:  { label: 'Cuti',  bg: 'rgba(175,169,236,0.15)', color: '#AFA9EC', ring: 'rgba(175,169,236,0.35)' },
 };
 
 const APPROVAL_META = {
@@ -185,17 +183,26 @@ function TolakModal({ open, onClose, onConfirm, loading }) {
 }
 
 // ── Modal Detail ─────────────────────────────────────────────────
+// `data` = raw Absensi doc dengan populated user/cabang/approvedBy.
 function DetailModal({ open, onClose, data }) {
   if (!data) return null;
 
-  const {
-    userNama, cabangNama, tanggal, status, approval,
-    jamCheckin, jamCheckout,
-    fotoCheckin, fotoCheckout,
-    lokasiCheckin, lokasiCheckout,
-    keterangan, lampiran, alasanTolak,
-    approvedByNama, approvedAt,
-  } = data;
+  const userNama       = data.user?.name;
+  const cabangNama     = data.cabang?.nama;
+  const tanggal        = data.tanggal;
+  const status         = data.status;
+  const approval       = data.approvalStatus;
+  const jamCheckin     = data.checkIn?.waktu;
+  const jamCheckout    = data.checkOut?.waktu;
+  const fotoCheckin    = data.checkIn?.fotoUrl;
+  const fotoCheckout   = data.checkOut?.fotoUrl;
+  const lokasiCheckin  = data.checkIn?.lokasi;
+  const lokasiCheckout = data.checkOut?.lokasi;
+  const keterangan     = data.keterangan;
+  const lampiran       = data.lampiranUrl;
+  const alasanTolak    = data.alasanTolak;
+  const approvedByNama = data.approvedBy?.name;
+  const approvedAt     = data.approvedAt;
 
   const gmapsUrl = (loc) => {
     if (!loc?.lat || !loc?.lng) return null;
@@ -359,7 +366,9 @@ export default function OwnerAbsensiPage() {
   const [statusFilter, setStatusFilter]     = useState('');
   const [approvalFilter, setApprovalFilter] = useState('');
 
-  const [summary, setSummary] = useState(null);
+  // Aggregate totals dari backend summary array per cabang (default 0 semua)
+  const [totals, setTotals] = useState({ hadir: 0, izin: 0, sakit: 0, cuti: 0 });
+  const [pendingCount, setPendingCount] = useState(0);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const [items, setItems]     = useState([]);
@@ -390,9 +399,20 @@ export default function OwnerAbsensiPage() {
       const params = { bulan };
       if (cabangId) params.cabang = cabangId;
       const r = await ownerAPI.getAbsensiSummary(params);
-      setSummary(r.data?.data ?? r.data ?? null);
+      // Backend: { success, startDate, endDate, summary: [...perCabang], pendingCount }
+      // Setiap item: { cabangId, cabangNama, hadir, izin, sakit, cuti, total }
+      const perCabang = Array.isArray(r.data?.summary) ? r.data.summary : [];
+      const agg = perCabang.reduce((acc, s) => ({
+        hadir: acc.hadir + (s.hadir || 0),
+        izin:  acc.izin  + (s.izin  || 0),
+        sakit: acc.sakit + (s.sakit || 0),
+        cuti:  acc.cuti  + (s.cuti  || 0),
+      }), { hadir: 0, izin: 0, sakit: 0, cuti: 0 });
+      setTotals(agg);
+      setPendingCount(r.data?.pendingCount || 0);
     } catch {
-      setSummary(null);
+      setTotals({ hadir: 0, izin: 0, sakit: 0, cuti: 0 });
+      setPendingCount(0);
     } finally { setSummaryLoading(false); }
   }, [bulan, cabangId]);
 
@@ -486,9 +506,9 @@ export default function OwnerAbsensiPage() {
     }
   };
 
-  const pendingCount = useMemo(() => {
-    return items.filter(x => x.status !== 'hadir' && x.status !== 'terlambat' && x.approval === 'pending').length;
-  }, [items]);
+  // pendingCount datang dari backend summary (global lintas semua absensi
+  // yang ter-scope owner), bukan hasil filter items paginated — supaya angka
+  // badge tetap akurat walau list sedang di-paging/di-filter.
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto pb-24 lg:pb-6">
@@ -589,12 +609,12 @@ export default function OwnerAbsensiPage() {
         </div>
       </GradientPanel>
 
-      {/* Summary cards */}
+      {/* Summary cards — aggregate lintas cabang untuk periode bulan terpilih */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <SummaryCard icon={CheckCircle2} label="Hadir"  value={summaryLoading ? '…' : (summary?.hadir ?? 0)}  color="#6EE7B7" />
-        <SummaryCard icon={FileText}     label="Izin"   value={summaryLoading ? '…' : (summary?.izin  ?? 0)}  color="#93C5FD" />
-        <SummaryCard icon={AlertCircle}  label="Sakit"  value={summaryLoading ? '…' : (summary?.sakit ?? 0)}  color="#D8B4FE" />
-        <SummaryCard icon={CalendarDays} label="Cuti"   value={summaryLoading ? '…' : (summary?.cuti  ?? 0)}  color="#AFA9EC" />
+        <SummaryCard icon={CheckCircle2} label="Hadir"  value={summaryLoading ? '…' : totals.hadir}  color="#6EE7B7" />
+        <SummaryCard icon={FileText}     label="Izin"   value={summaryLoading ? '…' : totals.izin}   color="#93C5FD" />
+        <SummaryCard icon={AlertCircle}  label="Sakit"  value={summaryLoading ? '…' : totals.sakit}  color="#D8B4FE" />
+        <SummaryCard icon={CalendarDays} label="Cuti"   value={summaryLoading ? '…' : totals.cuti}   color="#AFA9EC" />
       </div>
 
       {/* Pending badge */}
@@ -658,9 +678,17 @@ export default function OwnerAbsensiPage() {
         ) : (
           <div className="space-y-2">
             {items.map((r) => {
-              const key      = r._id || r.id;
-              const av       = AVATAR_COLORS[hashIdx(r.userId || r.userNama || '', AVATAR_COLORS.length)];
-              const isPending = r.approval === 'pending' && r.status !== 'hadir' && r.status !== 'terlambat';
+              const key         = r._id || r.id;
+              // Backend populate: user = { _id, name, username, role }, cabang = { _id, nama, kode }
+              const userName    = r.user?.name;
+              const userIdSeed  = r.user?._id || userName || '';
+              const cabangName  = r.cabang?.nama;
+              const approval    = r.approvalStatus;
+              const jamIn       = r.checkIn?.waktu;
+              const jamOut      = r.checkOut?.waktu;
+              const av          = AVATAR_COLORS[hashIdx(String(userIdSeed), AVATAR_COLORS.length)];
+              // Yang perlu approval owner: hanya status non-hadir & masih pending
+              const isPending   = approval === 'pending' && r.status !== 'hadir';
               return (
                 <div
                   key={key}
@@ -681,18 +709,18 @@ export default function OwnerAbsensiPage() {
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
                         style={{ background: av.bg, color: av.color, fontWeight: 700, fontSize: 13 }}>
-                        {initialsOf(r.userNama)}
+                        {initialsOf(userName)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold truncate" style={{ color: '#fff' }}>
-                            {r.userNama || '—'}
+                            {userName || '—'}
                           </p>
                           <StatusBadge status={r.status} />
-                          <ApprovalBadge approval={r.approval} />
+                          <ApprovalBadge approval={approval} />
                         </div>
                         <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                          {r.cabangNama || '—'} · {formatDate(r.tanggal, { weekday: 'short' })}
+                          {cabangName || '—'} · {formatDate(r.tanggal, { weekday: 'short' })}
                         </p>
                         {r.keterangan && (
                           <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.7)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -704,13 +732,13 @@ export default function OwnerAbsensiPage() {
 
                     {/* Kanan: jam / aksi */}
                     <div className="text-right shrink-0" style={{ minWidth: 90 }}>
-                      {(r.jamCheckin || r.jamCheckout) ? (
+                      {(jamIn || jamOut) ? (
                         <>
                           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', fontFamily: 'monospace', margin: 0 }}>
-                            <LogIn size={10} style={{ display: 'inline', color: '#6EE7B7', verticalAlign: 'middle' }} /> {formatJam(r.jamCheckin)}
+                            <LogIn size={10} style={{ display: 'inline', color: '#6EE7B7', verticalAlign: 'middle' }} /> {formatJam(jamIn)}
                           </p>
                           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', fontFamily: 'monospace', margin: '2px 0 0' }}>
-                            <LogOut size={10} style={{ display: 'inline', color: '#FDBA74', verticalAlign: 'middle' }} /> {formatJam(r.jamCheckout)}
+                            <LogOut size={10} style={{ display: 'inline', color: '#FDBA74', verticalAlign: 'middle' }} /> {formatJam(jamOut)}
                           </p>
                         </>
                       ) : (

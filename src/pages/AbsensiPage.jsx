@@ -21,12 +21,10 @@ const APPROVAL_BADGE = {
 };
 
 const STATUS_ABSENSI_BADGE = {
-  hadir:     { label: 'Hadir',      cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-  terlambat: { label: 'Terlambat',  cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
-  izin:      { label: 'Izin',       cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-  sakit:     { label: 'Sakit',      cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
-  cuti:      { label: 'Cuti',       cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
-  alpa:      { label: 'Alpa',       cls: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  hadir: { label: 'Hadir', cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  izin:  { label: 'Izin',  cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+  sakit: { label: 'Sakit', cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+  cuti:  { label: 'Cuti',  cls: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
 };
 
 // Kompres file gambar ke max width 1280px + JPEG quality 0.7 via canvas.
@@ -105,9 +103,12 @@ function labelBulan(ym) {
 }
 
 // ─── Card Status Hari Ini ─────────────────────────────────────────
-function StatusHariIniCard({ status }) {
-  // Fallback saat data belum dimuat
-  if (!status) {
+// Baca langsung dari raw dokumen Absensi (skema Mongoose):
+//   { status, checkIn: { waktu, ... }, checkOut: { waktu, ... },
+//     approvalStatus, keterangan, ... }
+// atau `status === null` kalau belum ada catatan hari ini.
+function StatusHariIniCard({ status, loading }) {
+  if (loading) {
     return (
       <div className="card p-4">
         <Loader size="sm" />
@@ -115,17 +116,15 @@ function StatusHariIniCard({ status }) {
     );
   }
 
-  const {
-    sudahCheckin,
-    sudahCheckout,
-    jamCheckin,
-    jamCheckout,
-    izin, // { status: 'izin|sakit|cuti', approval: 'pending|disetujui|ditolak' } | null
-  } = status;
+  const sudahCheckin  = !!status?.checkIn?.waktu;
+  const sudahCheckout = !!status?.checkOut?.waktu;
+  const jamCheckin    = status?.checkIn?.waktu;
+  const jamCheckout   = status?.checkOut?.waktu;
+  const isIzin        = status && status.status !== 'hadir';
 
   // Prioritas render: izin → sudah checkout → sudah checkin → belum apa-apa
-  if (izin) {
-    const approval = APPROVAL_BADGE[izin.approval] || APPROVAL_BADGE.pending;
+  if (isIzin) {
+    const approval = APPROVAL_BADGE[status.approvalStatus] || APPROVAL_BADGE.pending;
     return (
       <div className="card p-4 border-l-4 border-blue-500">
         <div className="flex items-start gap-3">
@@ -137,7 +136,7 @@ function StatusHariIniCard({ status }) {
               Status Hari Ini
             </p>
             <p className="text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5">
-              Pengajuan {STATUS_IZIN_LABEL[izin.status] || izin.status}
+              Pengajuan {STATUS_IZIN_LABEL[status.status] || status.status}
             </p>
             <span className={`inline-block mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full ${approval.cls}`}>
               {approval.label}
@@ -368,7 +367,10 @@ export default function AbsensiPage() {
     setLoading(true);
     try {
       const { data } = await absensiAPI.getHariIni();
-      setStatus(data.data || data);
+      // Backend: { success, data: <Absensi doc | null>, cabang, maxJarakMeter }
+      // Explicit ?? null — kalau doc null (belum absen), jangan fallback ke
+      // wrapper (yang tidak punya field checkIn/checkOut/status).
+      setStatus(data?.data ?? null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal memuat status absensi');
     } finally {
@@ -451,9 +453,12 @@ export default function AbsensiPage() {
     }
   };
 
-  // Kondisi tombol
-  const belumCheckin  = !status?.sudahCheckin && !status?.izin;
-  const bisaCheckout  =  status?.sudahCheckin && !status?.sudahCheckout && !status?.izin;
+  // Kondisi tombol — derive dari skema Mongoose asli.
+  // Kalau `status` null = belum ada catatan sama sekali → belum check-in.
+  // Kalau `status.status !== 'hadir'` = sudah ajukan izin/sakit/cuti hari ini.
+  const isIzinHariIni = !!status && status.status !== 'hadir';
+  const belumCheckin  = !status?.checkIn?.waktu && !isIzinHariIni;
+  const bisaCheckout  = !!status?.checkIn?.waktu && !status?.checkOut?.waktu && !isIzinHariIni;
 
   return (
     <div>
@@ -462,11 +467,11 @@ export default function AbsensiPage() {
         subtitle="Check-in, check-out, dan pengajuan izin"
       />
 
-      {loading ? (
+      {loading && !status ? (
         <div className="card p-4"><Loader /></div>
       ) : (
         <div className="space-y-4">
-          <StatusHariIniCard status={status} />
+          <StatusHariIniCard status={status} loading={loading} />
 
           {/* Aksi utama */}
           <div className="card p-4">
@@ -558,7 +563,9 @@ export default function AbsensiPage() {
               <div className="divide-y divide-slate-100 dark:divide-slate-700">
                 {riwayat.map((r) => {
                   const sBadge = STATUS_ABSENSI_BADGE[r.status] || { label: r.status, cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300' };
-                  const aBadge = r.approval ? APPROVAL_BADGE[r.approval] : null;
+                  const aBadge = r.approvalStatus ? APPROVAL_BADGE[r.approvalStatus] : null;
+                  const jamIn  = r.checkIn?.waktu;
+                  const jamOut = r.checkOut?.waktu;
                   const key = r._id || r.id || r.tanggal;
                   return (
                     <div key={key} className="py-3 flex items-start justify-between gap-3">
@@ -583,13 +590,13 @@ export default function AbsensiPage() {
                         )}
                       </div>
                       <div className="text-right flex-shrink-0">
-                        {(r.jamCheckin || r.jamCheckout) ? (
+                        {(jamIn || jamOut) ? (
                           <>
                             <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                              <span className="text-green-600 dark:text-green-400">IN</span> {formatJam(r.jamCheckin)}
+                              <span className="text-green-600 dark:text-green-400">IN</span> {formatJam(jamIn)}
                             </p>
                             <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                              <span className="text-orange-600 dark:text-orange-400">OUT</span> {formatJam(r.jamCheckout)}
+                              <span className="text-orange-600 dark:text-orange-400">OUT</span> {formatJam(jamOut)}
                             </p>
                           </>
                         ) : (
