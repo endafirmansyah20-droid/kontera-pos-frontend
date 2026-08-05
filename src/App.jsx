@@ -2,7 +2,12 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { Capacitor } from '@capacitor/core';
 import { AuthProvider, useAuth } from './context/AuthContext';
+
+// Deteksi runtime APK sekali di module load — dipakai LandingRoute untuk
+// skip landing page (landing hanya relevan untuk pengunjung browser/PWA).
+const IS_NATIVE_APP = Capacitor.isNativePlatform();
 import { PwaInstallProvider } from './context/PwaInstallContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
@@ -104,15 +109,24 @@ function PublicRoute({ children }) {
   return children;
 }
 
-// Landing page: tamu → tampilkan marketing page, user login → redirect ke dashboard sesuai role
+// Landing page: tamu → tampilkan marketing page, user login → redirect ke dashboard sesuai role.
+// APK Android/iOS: skip landing total — user native app selalu ke /login (kalau anon) atau
+// dashboard sesuai role (kalau sudah login). Landing hanya relevan untuk browser/PWA.
 function LandingRoute({ children }) {
   const { user, isSuperAdmin, isOwner, loading } = useAuth();
-  if (loading) return children;
+  if (loading) {
+    // APK: jangan flash landing selama auth resolve — render loader.
+    // Browser: tetap render children (avoid empty flash pada landing).
+    return IS_NATIVE_APP
+      ? <div className="min-h-screen flex items-center justify-center"><Loader size="lg" /></div>
+      : children;
+  }
   if (user) {
     if (isSuperAdmin) return <Navigate to="/dashboard" replace />;
     if (isOwner) return <Navigate to="/owner" replace />;
     return <Navigate to="/dashboard" replace />;
   }
+  if (IS_NATIVE_APP) return <Navigate to="/login" replace />;
   return children;
 }
 
