@@ -50,6 +50,10 @@ export const ownerAPI = {
   getPembelianRiwayat: (p)  => api.get('/owner/pembelian-riwayat', { params: p }),
   getPembelianDetail:  (id) => api.get(`/owner/pembelian/${id}`),
   getMonthlyReport:    (p)  => api.get('/owner/reports/monthly', { params: p }),
+  // Absensi (Owner view)
+  getAbsensiList:      (p)  => api.get('/owner/absensi', { params: p }),
+  getAbsensiSummary:   (p)  => api.get('/owner/absensi/summary', { params: p }),
+  approveAbsensi:      (id, d) => api.patch(`/owner/absensi/${id}/approve`, d),
 };
 
 // ─── Notifications (owner) ───────────────
@@ -203,6 +207,15 @@ export const pembelianAPI = {
   updateHargaJual: (d) => api.post('/pembelian/update-harga', d),
   batalkan: (id, d) => api.post(`/pembelian/${id}/batalkan`, d),
   edit: (id, d) => api.put(`/pembelian/${id}`, d),
+};
+
+// ─── Absensi ─────────────────────────────────────
+export const absensiAPI = {
+  getHariIni:  ()      => api.get('/absensi/hari-ini', { params: { _t: Date.now() } }),
+  checkin:     (fd)    => api.post('/absensi/checkin',  fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  checkout:    (fd)    => api.post('/absensi/checkout', fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  izin:        (fd)    => api.post('/absensi/izin',     fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getRiwayat:  (bulan) => api.get('/absensi/riwayat',   { params: { bulan } }),
 };
 
 // ─── Service HP ──────────────────────────────────

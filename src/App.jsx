@@ -12,6 +12,7 @@ import OwnerCabangPage from './pages/OwnerCabangPage';
 import OwnerCabangDetailPage from './pages/OwnerCabangDetailPage';
 import OwnerKaryawanPage from './pages/OwnerKaryawanPage';
 import OwnerKaryawanDetailPage from './pages/OwnerKaryawanDetailPage';
+import OwnerAbsensiPage from './pages/OwnerAbsensiPage';
 import OwnerPenjualanPage from './pages/OwnerPenjualanPage';
 import OwnerServicePage from './pages/OwnerServicePage';
 import OwnerLaporanPage from './pages/OwnerLaporanPage';
@@ -27,6 +28,7 @@ import CabangPage from './pages/CabangPage';
 import { Loader } from './components/UI';
 import SaldoPage from './pages/SaldoPage';
 import ClosingKasPage from './pages/ClosingKasPage';
+import AbsensiPage from './pages/AbsensiPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import OnboardingPage from './pages/OnboardingPage';
 import LandingPage from './pages/LandingPage';
@@ -125,6 +127,7 @@ function AppRoutes() {
       <Route path="/owner/cabang/:id" element={<OwnerRoute><OwnerCabangDetailPage /></OwnerRoute>} />
       <Route path="/owner/karyawan" element={<OwnerRoute><OwnerKaryawanPage /></OwnerRoute>} />
       <Route path="/owner/karyawan/:cashierId" element={<OwnerRoute><OwnerKaryawanDetailPage /></OwnerRoute>} />
+      <Route path="/owner/absensi"   element={<OwnerRoute><OwnerAbsensiPage /></OwnerRoute>} />
       <Route path="/owner/penjualan" element={<OwnerRoute><OwnerPenjualanPage /></OwnerRoute>} />
       <Route path="/owner/service"   element={<OwnerRoute><OwnerServicePage /></OwnerRoute>} />
       <Route path="/owner/laporan"   element={<OwnerRoute><OwnerLaporanPage /></OwnerRoute>} />
@@ -141,6 +144,7 @@ function AppRoutes() {
       <Route path="/pelanggan"     element={<ProtectedRoute><PelangganPage /></ProtectedRoute>} />
       <Route path="/client"        element={<SuperAdminRoute><CabangPage /></SuperAdminRoute>} />
       <Route path="/closing-kas"   element={<ProtectedRoute><ClosingKasPage /></ProtectedRoute>} />
+      <Route path="/absensi"       element={<ProtectedRoute><AbsensiPage /></ProtectedRoute>} />
       {/* ── BARU: Panel Langganan / Konfirmasi Pembayaran (superadmin) ── */}
       <Route path="/subscriptions" element={<SuperAdminRoute><SubscriptionPage /></SuperAdminRoute>} />
       <Route path="/"  element={<LandingRoute><LandingPage /></LandingRoute>} />

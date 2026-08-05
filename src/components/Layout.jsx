@@ -65,6 +65,7 @@ const OWNER_TITLE_MAP = {
   '/owner':           'Dashboard Owner',
   '/owner/cabang':    'Cabang',
   '/owner/karyawan':  'Karyawan',
+  '/owner/absensi':   'Absensi Karyawan',
   '/owner/penjualan': 'Penjualan',
   '/owner/service':   'Service HP',
   '/owner/laporan':   'Laporan',

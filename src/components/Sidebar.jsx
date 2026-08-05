@@ -5,7 +5,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Wallet, Wallet2,
   BarChart2, BarChart3, Users, Settings, LogOut, Smartphone, Menu, X,
   Calculator, Wrench, Building2, ChevronRight, Store, CreditCard,
-  Moon, Sun, Lock, Bell, HelpCircle
+  Moon, Sun, Lock, Bell, HelpCircle, Fingerprint
 } from 'lucide-react';
 import api from '../services/api';
 import { authAPI } from '../services/api';
@@ -24,6 +24,7 @@ const OWNER_NAV = [
   { to: '/owner',           icon: LayoutDashboard, label: 'Dashboard'  },
   { to: '/owner/cabang',    icon: Building2,       label: 'Cabang'     },
   { to: '/owner/karyawan',  icon: BarChart2,       label: 'Karyawan'   },
+  { to: '/owner/absensi',   icon: Fingerprint,     label: 'Absensi'    },
   { to: '/owner/penjualan', icon: BarChart3,       label: 'Penjualan'  },
   { to: '/owner/service',   icon: Wrench,          label: 'Service HP' },
   { to: '/keuangan',        icon: Wallet2,         label: 'Keuangan'   },
@@ -42,12 +43,13 @@ const navItems = [
   { to: '/saldo',       icon: Wallet,          label: 'Saldo'     },
   { to: '/closing-kas', icon: Calculator,      label: 'Closing'   },
   { to: '/keuangan',    icon: Wallet2,         label: 'Keuangan'  },
+  { to: '/absensi',     icon: Fingerprint,     label: 'Absensi'   },
   { to: '/laporan',     icon: BarChart3,       label: 'Laporan',   adminOnly: true },
   { to: '/pelanggan',   icon: Users,           label: 'Pelanggan' },
   { to: '/pengaturan',  icon: Settings,        label: 'Pengaturan', adminOnly: true },
 ];
 
-const BOTTOM_NAV_KEYS = ['/dashboard', '/transaksi', '/stok', '/saldo', '/owner'];
+const BOTTOM_NAV_KEYS = ['/dashboard', '/transaksi', '/stok', '/saldo', '/absensi', '/owner'];
 
 export default function Sidebar({ lowStockCount = 0 }) {
   const { user, logout, isAdmin, isSuperAdmin, isOwner, cabang, darkMode, toggleDarkMode } = useAuth();
