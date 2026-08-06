@@ -82,6 +82,38 @@ const formatJam = (iso) => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// Accept "HH:MM" atau ISO datetime — backend embed lembur[] bisa balikin
+// dua-duanya tergantung skema. Robust parser biar UI tidak pecah.
+const formatJamFlex = (v) => {
+  if (!v) return '-';
+  if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) return v;
+  return formatJam(v);
+};
+
+const hitungDurasiMenit = (jamMulai, jamSelesai) => {
+  if (!jamMulai || !jamSelesai) return 0;
+  const parse = (v) => {
+    if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) {
+      const [h, m] = v.split(':').map(Number);
+      return h * 60 + m;
+    }
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return null;
+    return d.getHours() * 60 + d.getMinutes();
+  };
+  const s = parse(jamMulai);
+  const e = parse(jamSelesai);
+  if (s == null || e == null) return 0;
+  return e - s;
+};
+
+const formatDurasiKompak = (menit) => {
+  const m = Number(menit) || 0;
+  const j = Math.floor(m / 60);
+  const sisa = m % 60;
+  return j > 0 ? `${j}j ${sisa}m` : `${sisa}m`;
+};
+
 // ── UI primitives ────────────────────────────────────────────────
 function GradientPanel({ children, style = {}, className = '' }) {
   return (
@@ -194,6 +226,7 @@ function DetailModal({ open, onClose, data }) {
   const approval       = data.approvalStatus;
   const jamCheckin     = data.checkIn?.waktu;
   const jamCheckout    = data.checkOut?.waktu;
+  const lemburArr      = Array.isArray(data.lembur) ? data.lembur : [];
   // Foto/lampiran di-serve dari backend (path relatif /uploads/...) — di APK
   // Capacitor native, path relatif resolve ke capacitor://localhost dan gagal.
   // mediaUrl() prefix ke domain backend kalau native, biarkan relative di web.
@@ -318,6 +351,51 @@ function DetailModal({ open, onClose, data }) {
           </div>
         )}
 
+        {/* Riwayat Lembur (read-only — aksi ada di row list) */}
+        {lemburArr.length > 0 && (
+          <div>
+            <p style={{ color: 'rgba(100,116,139,0.9)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
+              Riwayat Lembur ({lemburArr.length})
+            </p>
+            <div className="space-y-2">
+              {lemburArr.map((l) => {
+                const lId       = l._id || l.id || `${l.jamMulai}-${l.jamSelesai}`;
+                const lApproval = l.approvalStatus || 'pending';
+                const durasi    = l.durasi != null
+                  ? Number(l.durasi)
+                  : hitungDurasiMenit(l.jamMulai, l.jamSelesai);
+                return (
+                  <div key={lId} style={{
+                    background: '#f8fafc', border: '1px solid #e2e8f0',
+                    borderRadius: 8, padding: 10,
+                  }}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Clock size={12} style={{ color: '#d97706' }} />
+                      <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600, color: '#1e293b' }}>
+                        {formatJamFlex(l.jamMulai)} – {formatJamFlex(l.jamSelesai)}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#d97706', fontWeight: 700 }}>
+                        {formatDurasiKompak(durasi)}
+                      </span>
+                      <ApprovalBadge approval={lApproval} />
+                    </div>
+                    {l.alasan && (
+                      <p style={{ fontSize: 12, color: '#334155', margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>
+                        {l.alasan}
+                      </p>
+                    )}
+                    {l.alasanTolak && (
+                      <p style={{ fontSize: 12, color: '#b91c1c', margin: '6px 0 0' }}>
+                        Ditolak: {l.alasanTolak}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Foto & lokasi */}
         {(fotoCheckin || fotoCheckout || jamCheckin || jamCheckout) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -386,6 +464,7 @@ export default function OwnerAbsensiPage() {
   const [tolakOpen, setTolakOpen] = useState(false);
   const [tolakTarget, setTolakTarget] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
+  const [approvingLemburId, setApprovingLemburId] = useState(null);
 
   // Load cabang list
   const loadCabangs = useCallback(async () => {
@@ -506,6 +585,34 @@ export default function OwnerAbsensiPage() {
       toast.error(err.response?.data?.message || 'Gagal menolak');
     } finally {
       setApprovingId(null);
+    }
+  };
+
+  // Approve/reject lembur — reject pakai window.prompt (konsisten dgn
+  // OwnerKaryawanDetailPage) supaya tidak menambah TolakModal target-type.
+  const handleApproveLembur = async (lemburId, approve) => {
+    let alasanTolak;
+    if (!approve) {
+      const alasan = window.prompt('Alasan penolakan lembur:');
+      if (alasan == null) return; // user cancel
+      if (!alasan.trim()) {
+        toast.error('Alasan penolakan wajib diisi');
+        return;
+      }
+      alasanTolak = alasan.trim();
+    }
+    setApprovingLemburId(lemburId);
+    try {
+      await ownerAPI.approveLembur(lemburId, {
+        approve,
+        ...(alasanTolak && { alasanTolak }),
+      });
+      toast.success(approve ? 'Lembur disetujui' : 'Lembur ditolak');
+      handleRefresh();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal memproses lembur');
+    } finally {
+      setApprovingLemburId(null);
     }
   };
 
@@ -692,13 +799,17 @@ export default function OwnerAbsensiPage() {
               const av          = AVATAR_COLORS[hashIdx(String(userIdSeed), AVATAR_COLORS.length)];
               // Yang perlu approval owner: hanya status non-hadir & masih pending
               const isPending   = approval === 'pending' && r.status !== 'hadir';
+              // Lembur embed — bisa ada di record apapun (termasuk 'hadir').
+              const lemburArr        = Array.isArray(r.lembur) ? r.lembur : [];
+              const lemburPending    = lemburArr.filter(l => (l.approvalStatus || 'pending') === 'pending');
+              const hasLemburPending = lemburPending.length > 0;
               return (
                 <div
                   key={key}
                   onClick={() => openDetail(r)}
                   style={{
                     background: 'rgba(255,255,255,0.06)',
-                    border: isPending
+                    border: (isPending || hasLemburPending)
                       ? '0.5px solid rgba(252,211,77,0.45)'
                       : '0.5px solid rgba(255,255,255,0.1)',
                     borderRadius: 12, padding: 14,
@@ -788,6 +899,101 @@ export default function OwnerAbsensiPage() {
                           : <CheckCircle2 size={13} />}
                         Setuju
                       </button>
+                    </div>
+                  )}
+
+                  {/* Lembur section — tampil kalau record punya embed lembur.
+                      Tombol aksi hanya untuk item pending. */}
+                  {lemburArr.length > 0 && (
+                    <div className="mt-3 pt-3" style={{ borderTop: '0.5px solid rgba(255,255,255,0.1)' }}>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Clock size={12} style={{ color: '#FCD34D' }} />
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          Lembur ({lemburArr.length})
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {lemburArr.map((l) => {
+                          const lId       = l._id || l.id;
+                          const lApproval = l.approvalStatus || 'pending';
+                          const lPending  = lApproval === 'pending';
+                          const lLoading  = approvingLemburId === lId;
+                          const durasi    = l.durasi != null
+                            ? Number(l.durasi)
+                            : hitungDurasiMenit(l.jamMulai, l.jamSelesai);
+                          return (
+                            <div key={lId || `${l.jamMulai}-${l.jamSelesai}`} style={{
+                              background: 'rgba(0,0,0,0.15)',
+                              border: '0.5px solid rgba(255,255,255,0.08)',
+                              borderRadius: 8, padding: 10,
+                            }}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span style={{ fontSize: 11, color: '#fff', fontFamily: 'monospace', fontWeight: 600 }}>
+                                      {formatJamFlex(l.jamMulai)} – {formatJamFlex(l.jamSelesai)}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: '#FCD34D', fontWeight: 700 }}>
+                                      {formatDurasiKompak(durasi)}
+                                    </span>
+                                    <ApprovalBadge approval={lApproval} />
+                                  </div>
+                                  {l.alasan && (
+                                    <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', margin: '4px 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                      {l.alasan}
+                                    </p>
+                                  )}
+                                  {l.alasanTolak && (
+                                    <p style={{ fontSize: 11, color: '#F87171', margin: '4px 0 0' }}>
+                                      Ditolak: {l.alasanTolak}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {lPending && lId && (
+                                <div className="mt-2 pt-2 flex gap-2 justify-end" style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleApproveLembur(lId, false); }}
+                                    disabled={lLoading}
+                                    style={{
+                                      padding: '5px 12px', borderRadius: 7,
+                                      background: 'rgba(248,113,113,0.15)',
+                                      border: '0.5px solid rgba(248,113,113,0.35)',
+                                      color: '#F87171', fontSize: 11, fontWeight: 600,
+                                      cursor: lLoading ? 'wait' : 'pointer',
+                                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                                      opacity: lLoading ? 0.6 : 1,
+                                    }}
+                                  >
+                                    <XCircle size={12} /> Tolak Lembur
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleApproveLembur(lId, true); }}
+                                    disabled={lLoading}
+                                    style={{
+                                      padding: '5px 12px', borderRadius: 7,
+                                      background: 'rgba(110,231,183,0.15)',
+                                      border: '0.5px solid rgba(110,231,183,0.4)',
+                                      color: '#6EE7B7', fontSize: 11, fontWeight: 600,
+                                      cursor: lLoading ? 'wait' : 'pointer',
+                                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                                      opacity: lLoading ? 0.6 : 1,
+                                    }}
+                                  >
+                                    {lLoading
+                                      ? <Loader2 size={12} className="animate-spin" />
+                                      : <CheckCircle2 size={12} />}
+                                    Setuju Lembur
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

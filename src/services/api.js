@@ -65,6 +65,7 @@ export const ownerAPI = {
   getAbsensiList:      (p)  => api.get('/owner/absensi', { params: p }),
   getAbsensiSummary:   (p)  => api.get('/owner/absensi/summary', { params: p }),
   approveAbsensi:      (id, d) => api.patch(`/owner/absensi/${id}/approve`, d),
+  approveLembur:       (lemburId, d) => api.patch(`/owner/absensi/lembur/${lemburId}/approve`, d),
 };
 
 // ─── Notifications (owner) ───────────────
@@ -227,6 +228,8 @@ export const absensiAPI = {
   checkout:    (fd)    => api.post('/absensi/checkout', fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
   izin:        (fd)    => api.post('/absensi/izin',     fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getRiwayat:  (bulan) => api.get('/absensi/riwayat',   { params: { bulan } }),
+  lembur:            (d)     => api.post('/absensi/lembur', d),
+  getRiwayatLembur:  (bulan) => api.get('/absensi/lembur/riwayat', { params: { bulan } }),
 };
 
 // ─── Service HP ──────────────────────────────────

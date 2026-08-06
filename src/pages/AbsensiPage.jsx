@@ -116,6 +116,67 @@ function formatJam(iso) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// "HH:MM" atau ISO string → "HH:MM"
+function formatJamFlex(v) {
+  if (!v) return '-';
+  if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) return v;
+  return formatJam(v);
+}
+
+// Menit → "Xj Ym" (kompak)
+function formatDurasiMenit(menit) {
+  const m = Number(menit) || 0;
+  const j = Math.floor(m / 60);
+  const sisa = m % 60;
+  if (j === 0) return `${sisa}m`;
+  if (sisa === 0) return `${j}j`;
+  return `${j}j ${sisa}m`;
+}
+
+// Hitung menit antara dua nilai jam. Terima "HH:MM" (input form) maupun
+// ISO datetime (bentuk yang di-return backend untuk riwayat lembur).
+function hitungDurasiMenit(jamMulai, jamSelesai) {
+  if (!jamMulai || !jamSelesai) return 0;
+  const parse = (v) => {
+    if (typeof v === 'string' && /^\d{2}:\d{2}$/.test(v)) {
+      const [h, m] = v.split(':').map(Number);
+      return h * 60 + m;
+    }
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return null;
+    return d.getHours() * 60 + d.getMinutes();
+  };
+  const s = parse(jamMulai);
+  const e = parse(jamSelesai);
+  if (s == null || e == null) return 0;
+  return e - s;
+}
+
+// Rakit ISO datetime lokal dari YYYY-MM-DD + HH + MM.
+// Format "YYYY-MM-DDTHH:MM:00" (tanpa Z) → per ES spec di-parse sebagai
+// LOCAL time, jadi `.toISOString()` menghasilkan UTC yang sesuai. Ini yang
+// diharapkan backend supaya bisa dibaca sebagai Date valid.
+function jamToISO(tanggalYMD, hh, mm) {
+  const h = String(hh).padStart(2, '0');
+  const m = String(mm).padStart(2, '0');
+  return new Date(`${tanggalYMD}T${h}:${m}:00`).toISOString();
+}
+
+// YYYY-MM-DD hari ini (lokal)
+function todayStr() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// YYYY-MM-DD N hari lalu
+function daysAgoStr(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  const pad = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // YYYY-MM string dari Date (default sekarang)
 function bulanIni() {
   const d = new Date();
@@ -366,15 +427,178 @@ function IzinModal({ open, onClose, onSuccess }) {
   );
 }
 
+// Konstanta untuk 2-select 24-jam. Pakai select alih-alih <input type="time">
+// karena iOS Safari mengikut region 12-jam (AM/PM) walau lokal id-ID diset di
+// browser — user request format 24-jam konsisten lintas platform.
+const HOURS   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
+// 2-select JamPicker: state H & M dipegang terpisah oleh parent.
+function JamPicker({ hVal, mVal, onH, onM, disabled }) {
+  return (
+    <div className="flex gap-2">
+      <select
+        aria-label="Jam"
+        className="input flex-1"
+        value={hVal}
+        onChange={(e) => onH(e.target.value)}
+        disabled={disabled}
+      >
+        <option value="">HH</option>
+        {HOURS.map((x) => <option key={x} value={x}>{x}</option>)}
+      </select>
+      <select
+        aria-label="Menit"
+        className="input flex-1"
+        value={mVal}
+        onChange={(e) => onM(e.target.value)}
+        disabled={disabled}
+      >
+        <option value="">MM</option>
+        {MINUTES.map((x) => <option key={x} value={x}>{x}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ─── Modal Ajukan Lembur ──────────────────────────────────────────
+function LemburModal({ open, onClose, onSuccess }) {
+  const MAX_DATE = todayStr();
+  const MIN_DATE = daysAgoStr(30);
+
+  const [tanggal, setTanggal]     = useState(MAX_DATE);
+  const [mulaiH, setMulaiH]       = useState('');
+  const [mulaiM, setMulaiM]       = useState('');
+  const [selesaiH, setSelesaiH]   = useState('');
+  const [selesaiM, setSelesaiM]   = useState('');
+  const [alasan, setAlasan]       = useState('');
+  const [saving, setSaving]       = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setTanggal(todayStr());
+      setMulaiH(''); setMulaiM('');
+      setSelesaiH(''); setSelesaiM('');
+      setAlasan('');
+    }
+  }, [open]);
+
+  // Compose "HH:MM" hanya jika kedua bagian terisi.
+  const jamMulai   = mulaiH   && mulaiM   ? `${mulaiH}:${mulaiM}`     : '';
+  const jamSelesai = selesaiH && selesaiM ? `${selesaiH}:${selesaiM}` : '';
+
+  const durasiPreview = hitungDurasiMenit(jamMulai, jamSelesai);
+
+  const handleSubmit = async () => {
+    if (!tanggal) return toast.error('Tanggal wajib diisi');
+    if (tanggal > MAX_DATE) return toast.error('Tanggal tidak boleh di masa depan');
+    if (tanggal < MIN_DATE) return toast.error('Tanggal max 30 hari ke belakang');
+    if (!jamMulai || !jamSelesai) return toast.error('Jam mulai & selesai wajib diisi');
+    if (durasiPreview <= 0) return toast.error('Jam selesai harus lebih besar dari jam mulai');
+    if (durasiPreview > 12 * 60) return toast.error('Durasi lembur maksimal 12 jam');
+    if (!alasan.trim()) return toast.error('Alasan wajib diisi');
+
+    setSaving(true);
+    try {
+      await absensiAPI.lembur({
+        tanggal,
+        jamMulai:   jamToISO(tanggal, mulaiH, mulaiM),
+        jamSelesai: jamToISO(tanggal, selesaiH, selesaiM),
+        alasan: alasan.trim(),
+      });
+      toast.success('Pengajuan lembur berhasil dikirim');
+      onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal mengirim pengajuan lembur');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Ajukan Lembur" size="md">
+      <div className="space-y-4">
+        <div>
+          <label className="label">Tanggal *</label>
+          <input
+            type="date"
+            className="input"
+            value={tanggal}
+            min={MIN_DATE}
+            max={MAX_DATE}
+            onChange={(e) => setTanggal(e.target.value)}
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Boleh pilih hari ini atau maksimal 30 hari ke belakang
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Jam Mulai *</label>
+            <JamPicker
+              hVal={mulaiH} mVal={mulaiM}
+              onH={setMulaiH} onM={setMulaiM}
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <label className="label">Jam Selesai *</label>
+            <JamPicker
+              hVal={selesaiH} mVal={selesaiM}
+              onH={setSelesaiH} onM={setSelesaiM}
+              disabled={saving}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+          Format 24 jam (00 – 23)
+        </p>
+
+        {jamMulai && jamSelesai && durasiPreview > 0 && (
+          <div className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg px-3 py-2">
+            Durasi: <span className="font-semibold">{formatDurasiMenit(durasiPreview)}</span>
+          </div>
+        )}
+
+        <div>
+          <label className="label">Alasan *</label>
+          <textarea
+            className="input min-h-[100px]"
+            placeholder="Jelaskan alasan lembur..."
+            value={alasan}
+            onChange={(e) => setAlasan(e.target.value)}
+          />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button className="btn btn-outline flex-1" onClick={onClose} disabled={saving}>
+            Batal
+          </button>
+          <button className="btn btn-primary flex-1" onClick={handleSubmit} disabled={saving}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : null}
+            {saving ? 'Mengirim...' : 'Kirim Pengajuan'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── Halaman utama ────────────────────────────────────────────────
 export default function AbsensiPage() {
   const [status, setStatus]         = useState(null);
   const [loading, setLoading]       = useState(true);
   const [processing, setProcessing] = useState(null); // 'checkin' | 'checkout' | null
   const [showIzin, setShowIzin]     = useState(false);
+  const [showLembur, setShowLembur] = useState(false);
   const [riwayat, setRiwayat]       = useState([]);
   const [riwayatLoading, setRiwayatLoading] = useState(false);
   const [bulan, setBulan]           = useState(bulanIni());
+  const [tabRiwayat, setTabRiwayat] = useState('absensi'); // 'absensi' | 'lembur'
+  const [riwayatLembur, setRiwayatLembur] = useState([]);
+  const [riwayatLemburLoading, setRiwayatLemburLoading] = useState(false);
 
   const checkinFileRef  = useRef(null);
   const checkoutFileRef = useRef(null);
@@ -402,6 +626,7 @@ export default function AbsensiPage() {
 
   useEffect(() => {
     loadRiwayat();
+    loadRiwayatLembur();
   }, [bulan]);
 
   const loadStatus = async () => {
@@ -429,6 +654,19 @@ export default function AbsensiPage() {
       toast.error(err.response?.data?.message || 'Gagal memuat riwayat');
     } finally {
       setRiwayatLoading(false);
+    }
+  };
+
+  const loadRiwayatLembur = async () => {
+    setRiwayatLemburLoading(true);
+    try {
+      const { data } = await absensiAPI.getRiwayatLembur(bulan);
+      const list = data.data || data || [];
+      setRiwayatLembur(Array.isArray(list) ? list : []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal memuat riwayat lembur');
+    } finally {
+      setRiwayatLemburLoading(false);
     }
   };
 
@@ -564,7 +802,7 @@ export default function AbsensiPage() {
             <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-3">
               Aksi
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <button
                 onClick={() => startCapture('checkin')}
                 disabled={!belumCheckin || processing !== null}
@@ -594,6 +832,15 @@ export default function AbsensiPage() {
               >
                 <FileText size={18} />
                 <span>Ajukan Izin</span>
+              </button>
+
+              <button
+                onClick={() => setShowLembur(true)}
+                disabled={processing !== null}
+                className="btn bg-purple-600 text-white hover:bg-purple-700 justify-center py-3 disabled:opacity-50"
+              >
+                <Clock size={18} />
+                <span>Ajukan Lembur</span>
               </button>
             </div>
 
@@ -653,58 +900,133 @@ export default function AbsensiPage() {
               />
             </div>
 
-            {riwayatLoading ? (
-              <Loader />
-            ) : riwayat.length === 0 ? (
-              <EmptyState message="Belum ada riwayat absensi bulan ini" icon={CalendarDays} />
+            {/* Tabs */}
+            <div className="flex gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-700 mb-3">
+              <button
+                type="button"
+                onClick={() => setTabRiwayat('absensi')}
+                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition ${
+                  tabRiwayat === 'absensi'
+                    ? 'bg-white text-slate-800 dark:bg-slate-800 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                Riwayat Absensi
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabRiwayat('lembur')}
+                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition ${
+                  tabRiwayat === 'lembur'
+                    ? 'bg-white text-slate-800 dark:bg-slate-800 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                Riwayat Lembur
+              </button>
+            </div>
+
+            {tabRiwayat === 'absensi' ? (
+              riwayatLoading ? (
+                <Loader />
+              ) : riwayat.length === 0 ? (
+                <EmptyState message="Belum ada riwayat absensi bulan ini" icon={CalendarDays} />
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {riwayat.map((r) => {
+                    const sBadge = STATUS_ABSENSI_BADGE[r.status] || { label: r.status, cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300' };
+                    const aBadge = r.approvalStatus ? APPROVAL_BADGE[r.approvalStatus] : null;
+                    const jamIn  = r.checkIn?.waktu;
+                    const jamOut = r.checkOut?.waktu;
+                    const key = r._id || r.id || r.tanggal;
+                    return (
+                      <div key={key} className="py-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            {formatDate(r.tanggal, { weekday: 'short' })}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${sBadge.cls}`}>
+                              {sBadge.label}
+                            </span>
+                            {aBadge && (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${aBadge.cls}`}>
+                                {aBadge.label}
+                              </span>
+                            )}
+                          </div>
+                          {r.keterangan && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                              {r.keterangan}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          {(jamIn || jamOut) ? (
+                            <>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                                <span className="text-green-600 dark:text-green-400">IN</span> {formatJam(jamIn)}
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                                <span className="text-orange-600 dark:text-orange-400">OUT</span> {formatJam(jamOut)}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">—</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                {riwayat.map((r) => {
-                  const sBadge = STATUS_ABSENSI_BADGE[r.status] || { label: r.status, cls: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300' };
-                  const aBadge = r.approvalStatus ? APPROVAL_BADGE[r.approvalStatus] : null;
-                  const jamIn  = r.checkIn?.waktu;
-                  const jamOut = r.checkOut?.waktu;
-                  const key = r._id || r.id || r.tanggal;
-                  return (
-                    <div key={key} className="py-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                          {formatDate(r.tanggal, { weekday: 'short' })}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${sBadge.cls}`}>
-                            {sBadge.label}
-                          </span>
-                          {aBadge && (
+              riwayatLemburLoading ? (
+                <Loader />
+              ) : riwayatLembur.length === 0 ? (
+                <EmptyState message="Belum ada pengajuan lembur bulan ini" icon={Clock} />
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {riwayatLembur.map((l) => {
+                    const aBadge  = l.approvalStatus ? APPROVAL_BADGE[l.approvalStatus] : APPROVAL_BADGE.pending;
+                    const key     = l._id || l.id || `${l.tanggal}-${l.jamMulai}`;
+                    const durasi  = l.durasi != null
+                      ? Number(l.durasi)
+                      : hitungDurasiMenit(l.jamMulai, l.jamSelesai);
+                    return (
+                      <div key={key} className="py-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                            {formatDate(l.tanggal, { weekday: 'short' })}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                            {formatJamFlex(l.jamMulai)} – {formatJamFlex(l.jamSelesai)}
+                            {' · '}
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                              {formatDurasiMenit(durasi)}
+                            </span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${aBadge.cls}`}>
                               {aBadge.label}
                             </span>
+                          </div>
+                          {l.alasan && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                              {l.alasan}
+                            </p>
+                          )}
+                          {l.alasanTolak && (
+                            <p className="text-xs text-red-500 dark:text-red-400 mt-1 line-clamp-2">
+                              Ditolak: {l.alasanTolak}
+                            </p>
                           )}
                         </div>
-                        {r.keterangan && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                            {r.keterangan}
-                          </p>
-                        )}
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        {(jamIn || jamOut) ? (
-                          <>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                              <span className="text-green-600 dark:text-green-400">IN</span> {formatJam(jamIn)}
-                            </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                              <span className="text-orange-600 dark:text-orange-400">OUT</span> {formatJam(jamOut)}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-xs text-slate-400 italic">—</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -714,6 +1036,12 @@ export default function AbsensiPage() {
         open={showIzin}
         onClose={() => setShowIzin(false)}
         onSuccess={() => { loadStatus(); loadRiwayat(); }}
+      />
+
+      <LemburModal
+        open={showLembur}
+        onClose={() => setShowLembur(false)}
+        onSuccess={() => { loadRiwayatLembur(); }}
       />
     </div>
   );
