@@ -157,26 +157,42 @@ function ApprovalBadge({ approval }) {
 
 function SummaryCard({ icon: Icon, label, value, color = '#AFA9EC' }) {
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.06)',
-      border: '0.5px solid rgba(255,255,255,0.1)',
-      borderRadius: 12, padding: 14,
-      backdropFilter: 'blur(8px)',
-    }}>
-      <div className="flex items-center gap-2 mb-2">
-        <div style={{
-          width: 30, height: 30, borderRadius: 8,
-          background: `${color}22`,
-          border: `0.5px solid ${color}55`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Icon size={14} style={{ color }} />
+    <div
+      className="p-2 sm:p-[14px] rounded-lg sm:rounded-xl min-w-0"
+      style={{
+        background: 'rgba(255,255,255,0.06)',
+        border: '0.5px solid rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2 min-w-0">
+        <div
+          className="w-6 h-6 sm:w-[30px] sm:h-[30px] rounded-md sm:rounded-lg shrink-0 flex items-center justify-center"
+          style={{
+            background: `${color}22`,
+            border: `0.5px solid ${color}55`,
+          }}
+        >
+          <Icon size={11} className="sm:hidden" style={{ color }} />
+          <Icon size={14} className="hidden sm:block" style={{ color }} />
         </div>
-        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>
+        <p
+          className="uppercase truncate"
+          style={{
+            color: 'rgba(255,255,255,0.6)', fontWeight: 600,
+            letterSpacing: '0.05em', margin: 0,
+            fontSize: 'clamp(9px, 2.4vw, 11px)',
+          }}
+        >
           {label}
         </p>
       </div>
-      <p style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
+      <p
+        style={{
+          color: '#fff', fontWeight: 700, margin: 0, lineHeight: 1.1,
+          fontSize: 'clamp(16px, 4.8vw, 22px)',
+        }}
+      >
         {value}
       </p>
     </div>
@@ -622,38 +638,42 @@ export default function OwnerAbsensiPage() {
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto pb-24 lg:pb-6">
-      {/* Header filter */}
-      <GradientPanel style={{ marginBottom: 16 }}>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div style={{
-              width: 34, height: 34, borderRadius: 10,
-              background: 'rgba(255,255,255,0.10)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Fingerprint size={16} style={{ color: '#fff' }} />
+      {/* Header filter — padding & font mengecil di mobile */}
+      <GradientPanel style={{ marginBottom: 16 }} className="!p-3 sm:!p-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className="w-7 h-7 sm:w-[34px] sm:h-[34px] shrink-0 rounded-lg sm:rounded-[10px] flex items-center justify-center"
+              style={{
+                background: 'rgba(255,255,255,0.10)',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            >
+              <Fingerprint size={14} className="sm:hidden" style={{ color: '#fff' }} />
+              <Fingerprint size={16} className="hidden sm:block" style={{ color: '#fff' }} />
             </div>
             <div className="min-w-0">
-              <h2 style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+              <h2 className="text-[14px] sm:text-base" style={{ color: '#fff', fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
                 Absensi Karyawan
               </h2>
-              <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, margin: '2px 0 0' }}>
+              <p className="text-[10px] sm:text-xs" style={{ color: 'rgba(255,255,255,0.65)', margin: '2px 0 0' }}>
                 Pantau kehadiran & setujui pengajuan izin
               </p>
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <input
               type="month"
               value={bulan}
               onChange={(e) => setBulan(e.target.value)}
+              className="!py-1 !px-2 sm:!py-[7px] sm:!px-2.5"
               style={{ ...controlBase, cursor: 'pointer', colorScheme: 'dark' }}
             />
             <select
               value={cabangId}
               onChange={(e) => setCabangId(e.target.value)}
+              className="!py-1 !px-2 sm:!py-[7px] sm:!px-2.5 max-w-[140px] sm:max-w-none truncate"
               style={{ ...controlBase, cursor: 'pointer' }}
             >
               <option value="" style={{ color: '#1e293b' }}>Semua Cabang</option>
@@ -666,8 +686,9 @@ export default function OwnerAbsensiPage() {
             <button
               type="button" onClick={handleRefresh} disabled={loading}
               title="Muat ulang"
+              className="p-1.5 sm:p-2 shrink-0"
               style={{
-                padding: 8, borderRadius: 10,
+                borderRadius: 10,
                 background: 'rgba(255,255,255,0.08)',
                 border: '0.5px solid rgba(255,255,255,0.15)',
                 color: '#fff', display: 'flex', alignItems: 'center',
@@ -680,12 +701,21 @@ export default function OwnerAbsensiPage() {
           </div>
         </div>
 
-        {/* Filter status + approval */}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <Filter size={13} style={{ color: 'rgba(255,255,255,0.65)' }} />
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>Status:</span>
-            <div className="flex gap-1 p-1 rounded-lg"
+        {/* Filter status + approval — mobile: masing2 baris sendiri & scroll-x
+            supaya semua chip bisa dijangkau tanpa kepotong. */}
+        <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+          <div
+            className="filter-scroll flex items-center gap-1.5 pr-4"
+            style={{
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            <Filter size={13} className="shrink-0" style={{ color: 'rgba(255,255,255,0.65)' }} />
+            <span className="text-xs shrink-0" style={{ color: 'rgba(255,255,255,0.75)' }}>Status:</span>
+            <div className="flex gap-1 p-1 rounded-lg shrink-0"
               style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.10)' }}>
               {STATUS_FILTERS.map(([k, l]) => (
                 <button key={k || 'all-s'} type="button" onClick={() => setStatusFilter(k)}
@@ -695,14 +725,24 @@ export default function OwnerAbsensiPage() {
                     background: statusFilter === k ? '#7F77DD' : 'transparent',
                     color: statusFilter === k ? '#fff' : 'rgba(255,255,255,0.65)',
                     transition: 'background 0.15s',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}>{l}</button>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>Approval:</span>
-            <div className="flex gap-1 p-1 rounded-lg"
+          <div
+            className="filter-scroll flex items-center gap-1.5 pr-4"
+            style={{
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            <span className="text-xs shrink-0" style={{ color: 'rgba(255,255,255,0.75)' }}>Approval:</span>
+            <div className="flex gap-1 p-1 rounded-lg shrink-0"
               style={{ background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.10)' }}>
               {APPROVAL_FILTERS.map(([k, l]) => (
                 <button key={k || 'all-a'} type="button" onClick={() => setApprovalFilter(k)}
@@ -712,6 +752,8 @@ export default function OwnerAbsensiPage() {
                     background: approvalFilter === k ? '#7F77DD' : 'transparent',
                     color: approvalFilter === k ? '#fff' : 'rgba(255,255,255,0.65)',
                     transition: 'background 0.15s',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                   }}>{l}</button>
               ))}
             </div>
@@ -719,8 +761,9 @@ export default function OwnerAbsensiPage() {
         </div>
       </GradientPanel>
 
-      {/* Summary cards — aggregate lintas cabang untuk periode bulan terpilih */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+      {/* Summary cards — aggregate lintas cabang untuk periode bulan terpilih.
+          Mobile: 4-in-a-row biar tetap 1 baris & compact (icon kecil + angka besar). */}
+      <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-4">
         <SummaryCard icon={CheckCircle2} label="Hadir"  value={summaryLoading ? '…' : totals.hadir}  color="#6EE7B7" />
         <SummaryCard icon={FileText}     label="Izin"   value={summaryLoading ? '…' : totals.izin}   color="#93C5FD" />
         <SummaryCard icon={AlertCircle}  label="Sakit"  value={summaryLoading ? '…' : totals.sakit}  color="#D8B4FE" />

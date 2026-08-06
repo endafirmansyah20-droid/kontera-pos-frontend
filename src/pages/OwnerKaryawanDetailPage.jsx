@@ -5,10 +5,12 @@ import {
   CheckCircle2, XCircle, Clock, Loader2, FileText, AlertCircle,
   CalendarDays, User as UserIcon, Fingerprint, Activity,
   Shield, UserCheck, UserX, Store, AtSign, Calendar,
+  MapPin, ExternalLink, Image as ImageIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import api, { ownerAPI } from '../services/api';
+import api, { ownerAPI, mediaUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { Modal } from '../components/UI';
 import { formatRupiah, formatDate, formatDateTime } from '../utils/helpers';
 
 const HERO_GRADIENT = 'linear-gradient(120deg, #26215C 0%, #3C3489 50%, #7F77DD 100%)';
@@ -264,6 +266,158 @@ function TabBar({ active, onChange }) {
   );
 }
 
+// ── Detail Modal ─────────────────────────────────────────────────
+// Menampilkan foto check-in/check-out (+lokasi) & lampiran izin/sakit.
+// Foto/lampiran wajib dibungkus mediaUrl() supaya jalan di APK Capacitor
+// (path relatif fail di webview capacitor://localhost).
+function AbsensiDetailModal({ open, onClose, data }) {
+  if (!data) return null;
+
+  const jamCheckin     = data.checkIn?.waktu;
+  const jamCheckout    = data.checkOut?.waktu;
+  const fotoCheckin    = mediaUrl(data.checkIn?.fotoUrl);
+  const fotoCheckout   = mediaUrl(data.checkOut?.fotoUrl);
+  const lokasiCheckin  = data.checkIn?.lokasi;
+  const lokasiCheckout = data.checkOut?.lokasi;
+  const keterangan     = data.keterangan;
+  const lampiran       = mediaUrl(data.lampiranUrl);
+  const alasanTolak    = data.alasanTolak;
+  const approvedByNama = data.approvedBy?.name;
+  const approvedAt     = data.approvedAt;
+
+  const gmapsUrl = (loc) => {
+    if (!loc?.lat || !loc?.lng) return null;
+    return `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
+  };
+
+  const FotoCard = ({ title, url, jam, lokasi, badgeColor }) => {
+    if (!url && !jam) return null;
+    return (
+      <div style={{
+        border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, background: '#f8fafc',
+      }}>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span style={{ fontSize: 11, fontWeight: 700, color: badgeColor }}>{title}</span>
+          {jam && (
+            <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
+              {formatJamFlex(jam)}
+            </span>
+          )}
+        </div>
+        {url ? (
+          <img
+            src={url}
+            alt={title}
+            style={{
+              width: '100%', borderRadius: 8, objectFit: 'cover',
+              maxHeight: 240, background: '#e2e8f0',
+            }}
+          />
+        ) : (
+          <div style={{
+            width: '100%', height: 120, borderRadius: 8,
+            background: '#e2e8f0', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            color: '#94a3b8',
+          }}>
+            <ImageIcon size={20} />
+          </div>
+        )}
+        {gmapsUrl(lokasi) && (
+          <a
+            href={gmapsUrl(lokasi)}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              marginTop: 8, fontSize: 11, color: '#3b82f6', fontWeight: 600,
+            }}
+          >
+            <MapPin size={11} />
+            {lokasi.lat.toFixed(5)}, {lokasi.lng.toFixed(5)}
+            <ExternalLink size={10} />
+          </a>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Detail Absensi" size="lg">
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+            {formatDate(data.tanggal, { weekday: 'long' })}
+          </span>
+          <StatusBadge status={data.status} />
+          {data.approvalStatus && <ApprovalBadge approval={data.approvalStatus} />}
+        </div>
+
+        {keterangan && (
+          <div style={{
+            padding: 12, borderRadius: 10,
+            background: '#eff6ff', border: '1px solid #bfdbfe',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', margin: 0 }}>
+              Keterangan
+            </p>
+            <p style={{ fontSize: 13, color: '#1e293b', margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>
+              {keterangan}
+            </p>
+          </div>
+        )}
+
+        {alasanTolak && (
+          <div style={{
+            padding: 12, borderRadius: 10,
+            background: '#fef2f2', border: '1px solid #fecaca',
+          }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#991b1b', textTransform: 'uppercase', margin: 0 }}>
+              Alasan Ditolak {approvedByNama ? `oleh ${approvedByNama}` : ''}
+            </p>
+            <p style={{ fontSize: 13, color: '#1e293b', margin: '4px 0 0' }}>{alasanTolak}</p>
+          </div>
+        )}
+
+        {(fotoCheckin || fotoCheckout || jamCheckin || jamCheckout) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FotoCard title="CHECK-IN"  url={fotoCheckin}  jam={jamCheckin}  lokasi={lokasiCheckin}  badgeColor="#059669" />
+            <FotoCard title="CHECK-OUT" url={fotoCheckout} jam={jamCheckout} lokasi={lokasiCheckout} badgeColor="#ea580c" />
+          </div>
+        )}
+
+        {lampiran && (
+          <div>
+            <p style={{ color: 'rgba(100,116,139,0.9)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', margin: '0 0 6px' }}>
+              Lampiran
+            </p>
+            <a
+              href={lampiran}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 12px', borderRadius: 8,
+                background: '#f1f5f9', border: '1px solid #e2e8f0',
+                color: '#3b82f6', fontSize: 12, fontWeight: 600,
+              }}
+            >
+              <FileText size={13} /> Lihat Lampiran <ExternalLink size={11} />
+            </a>
+          </div>
+        )}
+
+        {data.approvalStatus === 'disetujui' && approvedByNama && (
+          <p className="text-xs text-slate-500">
+            Disetujui oleh <b>{approvedByNama}</b>
+            {approvedAt && <> · {formatDateTime(approvedAt)}</>}
+          </p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ═════════════════════════════════════════════════════════════════
 export default function OwnerKaryawanDetailPage() {
   const { user } = useAuth();
@@ -290,6 +444,8 @@ export default function OwnerKaryawanDetailPage() {
   const [absensiList, setAbsensiList] = useState([]);
   const [absensiLoading, setAbsensiLoading] = useState(false);
   const [approvingLemburId, setApprovingLemburId] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailData, setDetailData] = useState(null);
 
   // ── Performa tab state ──
   const [perfRange, setPerfRange] = useState('30');
@@ -610,13 +766,24 @@ export default function OwnerKaryawanDetailPage() {
                 const hasLemburPending = lemburArr.some(l => (l.approvalStatus || 'pending') === 'pending');
                 const isRowHighlight = (approval === 'pending' && status !== 'hadir') || hasLemburPending;
                 return (
-                  <div key={rKey} style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: isRowHighlight
-                      ? '0.5px solid rgba(252,211,77,0.45)'
-                      : '0.5px solid rgba(255,255,255,0.1)',
-                    borderRadius: 10, padding: 12,
-                  }}>
+                  <div key={rKey}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { setDetailData(r); setDetailOpen(true); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setDetailData(r); setDetailOpen(true);
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: isRowHighlight
+                        ? '0.5px solid rgba(252,211,77,0.45)'
+                        : '0.5px solid rgba(255,255,255,0.1)',
+                      borderRadius: 10, padding: 12,
+                      cursor: 'pointer',
+                    }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -695,7 +862,7 @@ export default function OwnerKaryawanDetailPage() {
                                   <div className="mt-2 pt-2 flex gap-2 justify-end" style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
                                     <button
                                       type="button"
-                                      onClick={() => handleApproveLembur(lId, false)}
+                                      onClick={(e) => { e.stopPropagation(); handleApproveLembur(lId, false); }}
                                       disabled={lLoading}
                                       style={{
                                         padding: '5px 12px', borderRadius: 7,
@@ -711,7 +878,7 @@ export default function OwnerKaryawanDetailPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleApproveLembur(lId, true)}
+                                      onClick={(e) => { e.stopPropagation(); handleApproveLembur(lId, true); }}
                                       disabled={lLoading}
                                       style={{
                                         padding: '5px 12px', borderRadius: 7,
@@ -896,6 +1063,12 @@ export default function OwnerKaryawanDetailPage() {
           )}
         </GradientPanel>
       )}
+
+      <AbsensiDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        data={detailData}
+      />
     </div>
   );
 }
