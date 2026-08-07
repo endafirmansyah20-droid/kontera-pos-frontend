@@ -1033,6 +1033,29 @@ export default function OwnerAbsensiPage() {
                                   </button>
                                 </div>
                               )}
+                              {lApproval === 'disetujui' && lId && (
+                                <div className="mt-2 pt-2 flex justify-end" style={{ borderTop: '0.5px solid rgba(255,255,255,0.08)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleApproveLembur(lId, false); }}
+                                    disabled={lLoading}
+                                    style={{
+                                      padding: '5px 12px', borderRadius: 7,
+                                      background: 'rgba(248,113,113,0.15)',
+                                      border: '0.5px solid rgba(248,113,113,0.35)',
+                                      color: '#F87171', fontSize: 11, fontWeight: 600,
+                                      cursor: lLoading ? 'wait' : 'pointer',
+                                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                                      opacity: lLoading ? 0.6 : 1,
+                                    }}
+                                  >
+                                    {lLoading
+                                      ? <Loader2 size={12} className="animate-spin" />
+                                      : <XCircle size={12} />}
+                                    Batalkan
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
