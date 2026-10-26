@@ -250,3 +250,13 @@ export const serviceAPI = {
   getArsipList:   ()        => api.get('/service/arsip'),
   getArsipDetail: (b, t)    => api.get(`/service/arsip/${b}/${t}`),
 };
+
+// ─── Sparepart (stok service) ────────────────────
+export const sparepartAPI = {
+  getAll:   (p)         => api.get('/sparepart', { params: p }),
+  getOne:   (id)        => api.get(`/sparepart/${id}`),
+  create:   (d)         => api.post('/sparepart', d),
+  update:   (id, d)     => api.put(`/sparepart/${id}`, d),
+  delete:   (id)        => api.delete(`/sparepart/${id}`),
+  addStock: (id, jumlah)=> api.post(`/sparepart/${id}/add-stock`, { jumlah }),
+};

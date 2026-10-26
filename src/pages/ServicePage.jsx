@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { serviceAPI, customerAPI, authAPI } from '../services/api';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { serviceAPI, customerAPI, authAPI, sparepartAPI } from '../services/api';
 import { formatRupiah, formatDate, formatDateTime } from '../utils/helpers';
 import { PageHeader, Modal, Loader, EmptyState, ConfirmDialog, RupiahInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
@@ -9,7 +9,7 @@ import {
   Wrench, Plus, Search, RefreshCw, Edit2, Trash2,
   CheckCircle, Clock, AlertCircle, XCircle, Package,
   TrendingUp, TrendingDown, DollarSign, ChevronRight,
-  Smartphone, User, Phone, FileText, X
+  Smartphone, User, Phone, FileText, X, Boxes, PackagePlus, EyeOff, Eye
 } from 'lucide-react';
 
 // ─── Konstanta ────────────────────────────────────────────────
@@ -35,7 +35,7 @@ const defaultForm = {
   customerName: '', customerPhone: '', customerId: null,
   deviceBrand: '', deviceModel: '', deviceColor: '',
   complaint: '', diagnosis: '', workDone: '',
-  partsCost: 0, serviceFee: 0,
+  sparepartItems: [], serviceFee: 0,
   status: 'antrian', isPaid: false, notes: '',
   estimatedDone: '', technician: '',
 };
@@ -57,6 +57,31 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
 
   useEffect(() => {
     if (open) {
+      // sparepartItems: pakai array dari backend kalau ada; fallback ke
+      // transaksi lama (hanya punya partsCost angka tunggal) sebagai 1
+      // item eksternal supaya nilainya tetap terbaca saat edit.
+      let items = [];
+      if (editData) {
+        if (Array.isArray(editData.sparepartItems) && editData.sparepartItems.length > 0) {
+          items = editData.sparepartItems.map(it => ({
+            source:      it.sparepartId ? 'stok' : 'eksternal',
+            sparepartId: it.sparepartId?._id || it.sparepartId || null,
+            nama:        it.nama || '',
+            qty:         Number(it.qty) || 1,
+            hargaBeli:   Number(it.hargaBeli) || 0,
+            hargaJual:   Number(it.hargaJual) || 0,
+            satuan:      it.satuan || '',
+          }));
+        } else if (Number(editData.partsCost) > 0) {
+          items = [{
+            source: 'eksternal', sparepartId: null,
+            nama: 'Sparepart', qty: 1,
+            hargaBeli: Number(editData.partsCost) || 0,
+            hargaJual: Number(editData.partsCost) || 0,
+            satuan: '',
+          }];
+        }
+      }
       setForm(editData ? {
         customerName:  editData.customerName  || '',
         customerPhone: editData.customerPhone || '',
@@ -66,7 +91,7 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         complaint:     editData.complaint     || '',
         diagnosis:     editData.diagnosis     || '',
         workDone:      editData.workDone      || '',
-        partsCost:     editData.partsCost     || 0,
+        sparepartItems: items,
         serviceFee:    editData.serviceFee    || 0,
         status:        editData.status        || 'antrian',
         isPaid:        editData.isPaid        || false,
@@ -123,10 +148,27 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
   const handleSave = async () => {
     if (!form.customerName.trim()) return toast.error('Nama pelanggan wajib diisi');
     if (!form.complaint.trim())    return toast.error('Keluhan wajib diisi');
+    // Validasi item sparepart (kalau ada)
+    for (const it of (form.sparepartItems || [])) {
+      if (!it.nama?.trim()) return toast.error('Nama item sparepart wajib diisi');
+      if (!it.qty || Number(it.qty) <= 0) return toast.error(`Qty untuk "${it.nama}" harus > 0`);
+    }
     setSaving(true);
     try {
       // Kirim null (bukan '') untuk optional ObjectId supaya backend tidak CastError.
-      const payload = { ...form, technician: form.technician || null };
+      // sparepartItems dikirim apa adanya; partsCost dihitung backend otomatis.
+      const payload = {
+        ...form,
+        technician: form.technician || null,
+        sparepartItems: (form.sparepartItems || []).map(it => ({
+          sparepartId: it.source === 'stok' ? it.sparepartId : null,
+          nama:        it.nama,
+          qty:         Number(it.qty) || 0,
+          hargaBeli:   Number(it.hargaBeli) || 0,
+          hargaJual:   Number(it.hargaJual) || 0,
+          satuan:      it.satuan || '',
+        })),
+      };
       if (editData) {
         await serviceAPI.update(editData._id, payload);
         toast.success('Transaksi diperbarui');
@@ -141,7 +183,11 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
     } finally { setSaving(false); }
   };
 
-  const totalCost = (Number(form.partsCost) || 0) + (Number(form.serviceFee) || 0);
+  const totalModalSparepart = (form.sparepartItems || []).reduce(
+    (s, it) => s + (Number(it.hargaBeli) || 0) * (Number(it.qty) || 0),
+    0
+  );
+  const estProfit = (Number(form.serviceFee) || 0) - totalModalSparepart;
 
   return (
     <Modal open={open} onClose={onClose} title={editData ? 'Edit Servis' : 'Input Servis HP Baru'} size="lg">
@@ -239,35 +285,30 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
           </select>
         </div>
 
-        {/* Biaya */}
+        {/* Sparepart Items */}
+        <SparepartItemsField
+          items={form.sparepartItems}
+          onChange={(items) => set('sparepartItems', items)}
+        />
+
+        {/* Biaya Service + Estimasi Keuntungan (side-by-side) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="label">Biaya Sparepart / Parts (Modal)</label>
-            <RupiahInput value={form.partsCost} onChange={v => set('partsCost', v)} placeholder="0" />
-          </div>
           <div>
             <label className="label">Biaya Service HP (Dibayar Pelanggan)</label>
             <RupiahInput value={form.serviceFee} onChange={v => set('serviceFee', v)} placeholder="0" />
           </div>
-        </div>
-
-        {/* Total & Estimasi Keuntungan */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-3 sm:px-4 py-3 gap-2">
-            <span className="text-xs sm:text-sm font-semibold text-slate-600">Total Bayar Pelanggan</span>
-            <span className="text-base sm:text-lg font-bold text-primary-600 flex-shrink-0">{formatRupiah(Number(form.serviceFee) || 0)}</span>
-          </div>
-          <div className={`flex items-center justify-between rounded-xl px-3 sm:px-4 py-3 gap-2 ${
-            ((Number(form.serviceFee)||0) - (Number(form.partsCost)||0)) >= 0
-              ? 'bg-green-50' : 'bg-red-50'
-          }`}>
-            <span className="text-xs sm:text-sm font-semibold text-slate-600">Estimasi Keuntungan</span>
-            <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${
-              ((Number(form.serviceFee)||0) - (Number(form.partsCost)||0)) >= 0
-                ? 'text-green-600' : 'text-red-500'
+          <div>
+            <label className="label">Estimasi Keuntungan</label>
+            <div className={`flex items-center justify-between rounded-xl px-3 sm:px-4 py-2.5 gap-2 border ${
+              estProfit >= 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'
             }`}>
-              {formatRupiah((Number(form.serviceFee)||0) - (Number(form.partsCost)||0))}
-            </span>
+              <span className="text-[11px] text-slate-500">Service − Modal Sparepart</span>
+              <span className={`text-base sm:text-lg font-bold flex-shrink-0 ${
+                estProfit >= 0 ? 'text-green-600' : 'text-red-500'
+              }`}>
+                {formatRupiah(estProfit)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -950,6 +991,667 @@ function TabArsip() {
 }
 
 
+// ══════════════════════════════════════════════════════════════
+// Sparepart Items Field — builder item sparepart di form transaksi
+// ══════════════════════════════════════════════════════════════
+function SparepartItemsField({ items, onChange }) {
+  const [showPicker, setShowPicker]   = useState(false);
+  const [pickMode, setPickMode]       = useState(null); // 'stok' | 'eksternal'
+  const [stockList, setStockList]     = useState([]);
+  const [loadingStok, setLoadingStok] = useState(false);
+  const [stokQuery, setStokQuery]     = useState('');
+  const [draft, setDraft]             = useState(null); // item sedang disusun
+
+  const total = (items || []).reduce(
+    (s, it) => s + (Number(it.hargaBeli) || 0) * (Number(it.qty) || 0),
+    0
+  );
+
+  const openPicker = () => { setShowPicker(true); setPickMode(null); setDraft(null); setStokQuery(''); };
+  const closePicker = () => { setShowPicker(false); setPickMode(null); setDraft(null); };
+
+  // Load stok sparepart saat user pilih mode "Dari Stok"
+  useEffect(() => {
+    if (pickMode !== 'stok') return;
+    let cancelled = false;
+    setLoadingStok(true);
+    sparepartAPI.getAll()
+      .then(r => { if (!cancelled) setStockList(r.data?.data || []); })
+      .catch(() => { if (!cancelled) setStockList([]); })
+      .finally(() => { if (!cancelled) setLoadingStok(false); });
+    return () => { cancelled = true; };
+  }, [pickMode]);
+
+  const filteredStok = useMemo(() => {
+    const q = stokQuery.trim().toLowerCase();
+    const base = stockList.filter(s => s.isActive !== false);
+    if (!q) return base;
+    return base.filter(s =>
+      (s.nama || '').toLowerCase().includes(q) ||
+      (s.kategori || '').toLowerCase().includes(q)
+    );
+  }, [stockList, stokQuery]);
+
+  function pickFromStok(sp) {
+    setDraft({
+      source: 'stok', sparepartId: sp._id,
+      nama: sp.nama,
+      qty: 1,
+      hargaBeli: sp.hargaBeli || 0,
+      hargaJual: sp.hargaJual || 0,
+      satuan: sp.satuan || '',
+      _stokTersedia: sp.stok || 0,
+    });
+  }
+
+  function startEksternal() {
+    setDraft({
+      source: 'eksternal', sparepartId: null,
+      nama: '', qty: 1, hargaBeli: 0, hargaJual: 0, satuan: '',
+    });
+  }
+
+  function commitDraft() {
+    if (!draft) return;
+    if (!draft.nama?.trim()) return toast.error('Nama item wajib diisi');
+    if (!draft.qty || Number(draft.qty) <= 0) return toast.error('Qty harus > 0');
+    if (draft.source === 'stok' && Number(draft.qty) > Number(draft._stokTersedia || 0)) {
+      return toast.error(`Stok tidak cukup. Tersedia: ${draft._stokTersedia}`);
+    }
+    const { _stokTersedia, ...clean } = draft;
+    onChange([...(items || []), clean]);
+    closePicker();
+  }
+
+  function removeItem(idx) {
+    onChange((items || []).filter((_, i) => i !== idx));
+  }
+
+  function updateItem(idx, patch) {
+    onChange((items || []).map((it, i) => i === idx ? { ...it, ...patch } : it));
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="label !mb-0">Sparepart Digunakan</label>
+        <button type="button" onClick={openPicker}
+          className="btn btn-outline py-1.5 px-3 text-xs">
+          <Plus size={13} /> Tambah Sparepart
+        </button>
+      </div>
+
+      {(!items || items.length === 0) ? (
+        <div className="text-xs text-slate-400 italic bg-slate-50 border border-dashed border-slate-200 rounded-xl px-3 py-4 text-center">
+          Belum ada sparepart. Klik tombol di atas untuk menambahkan.
+        </div>
+      ) : (
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {items.map((it, idx) => {
+              const subtotal = (Number(it.hargaBeli) || 0) * (Number(it.qty) || 0);
+              return (
+                <div key={idx} className="px-3 py-2 bg-white">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm text-slate-700 truncate">{it.nama}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          it.source === 'stok' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
+                        }`}>
+                          {it.source === 'stok' ? 'STOK' : 'EKSTERNAL'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-1.5">
+                        <div>
+                          <p className="text-[10px] text-slate-400">Qty</p>
+                          <input type="number" min="1" step="1"
+                            className="input !py-1 !px-2 text-xs"
+                            value={it.qty}
+                            onChange={e => updateItem(idx, { qty: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-400">Harga Jual</p>
+                          <RupiahInput
+                            value={it.hargaJual}
+                            onChange={v => updateItem(idx, { hargaJual: v })}
+                          />
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400">Subtotal</p>
+                          <p className="text-xs font-bold text-slate-700 mt-1.5">{formatRupiah(subtotal)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => removeItem(idx)}
+                      className="text-red-500 hover:bg-red-50 rounded-lg p-1.5 flex-shrink-0" title="Hapus">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-t border-slate-200">
+            <span className="text-xs font-semibold text-slate-600">Total Biaya Sparepart</span>
+            <span className="text-sm font-bold text-primary-600">{formatRupiah(total)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Picker Modal */}
+      <Modal open={showPicker} onClose={closePicker} title="Tambah Sparepart" size="md">
+        {!pickMode && !draft && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">Pilih sumber sparepart:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button type="button" onClick={() => setPickMode('stok')}
+                className="group border-2 border-slate-200 hover:border-primary-500 hover:bg-primary-50 rounded-xl p-4 text-left transition-all">
+                <Boxes className="text-primary-600 mb-2" size={22} />
+                <p className="font-bold text-slate-800 text-sm">Dari Stok</p>
+                <p className="text-xs text-slate-500 mt-0.5">Pilih item dari stok sparepart yang ada, stok otomatis berkurang.</p>
+              </button>
+              <button type="button" onClick={() => { setPickMode('eksternal'); startEksternal(); }}
+                className="group border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 rounded-xl p-4 text-left transition-all">
+                <PackagePlus className="text-amber-600 mb-2" size={22} />
+                <p className="font-bold text-slate-800 text-sm">Belanja / Eksternal</p>
+                <p className="text-xs text-slate-500 mt-0.5">Input manual, untuk sparepart yang baru dibeli khusus servis ini.</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {pickMode === 'stok' && !draft && (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input className="input pl-9" placeholder="Cari sparepart..."
+                value={stokQuery} onChange={e => setStokQuery(e.target.value)} />
+            </div>
+            {loadingStok ? <Loader /> : filteredStok.length === 0 ? (
+              <EmptyState message="Tidak ada sparepart di stok" />
+            ) : (
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                {filteredStok.map(sp => (
+                  <button key={sp._id} type="button" onClick={() => pickFromStok(sp)}
+                    className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-slate-700 truncate">{sp.nama}</p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {sp.kategori || '—'} · Stok: <span className={`font-bold ${sp.stok > 0 ? 'text-green-600' : 'text-red-500'}`}>{sp.stok}</span> {sp.satuan || ''}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-slate-400">Jual</p>
+                        <p className="text-sm font-bold text-primary-600">{formatRupiah(sp.hargaJual || 0)}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button type="button" onClick={() => setPickMode(null)} className="btn btn-outline w-full">
+              Kembali
+            </button>
+          </div>
+        )}
+
+        {draft && (
+          <div className="space-y-3">
+            {draft.source === 'eksternal' ? (
+              <div>
+                <label className="label">Nama Sparepart *</label>
+                <input className="input" placeholder="LCD iPhone 11, Baterai Oppo A5s..."
+                  value={draft.nama}
+                  onChange={e => setDraft(d => ({ ...d, nama: e.target.value }))} />
+              </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <p className="text-xs text-blue-500">Sparepart dari stok</p>
+                <p className="font-bold text-blue-800">{draft.nama}</p>
+                <p className="text-[11px] text-blue-500 mt-0.5">
+                  Stok tersedia: <span className="font-bold">{draft._stokTersedia}</span> {draft.satuan}
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="label">Qty *</label>
+                <input type="number" min="1" step="1" className="input"
+                  value={draft.qty}
+                  onChange={e => setDraft(d => ({ ...d, qty: e.target.value }))} />
+              </div>
+              <div>
+                <label className="label">Harga Beli</label>
+                <RupiahInput value={draft.hargaBeli}
+                  onChange={v => setDraft(d => ({ ...d, hargaBeli: v }))} />
+              </div>
+              <div>
+                <label className="label">Harga Jual</label>
+                <RupiahInput value={draft.hargaJual}
+                  onChange={v => setDraft(d => ({ ...d, hargaJual: v }))} />
+              </div>
+            </div>
+            {draft.source === 'eksternal' && (
+              <div>
+                <label className="label">Satuan</label>
+                <input className="input" placeholder="pcs, unit, set..."
+                  value={draft.satuan}
+                  onChange={e => setDraft(d => ({ ...d, satuan: e.target.value }))} />
+              </div>
+            )}
+            <div className="bg-slate-50 rounded-xl px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-slate-500">Subtotal</span>
+              <span className="font-bold text-primary-600">
+                {formatRupiah((Number(draft.hargaJual) || 0) * (Number(draft.qty) || 0))}
+              </span>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <button type="button" onClick={() => setDraft(null)}
+                className="btn btn-outline">Kembali</button>
+              <button type="button" onClick={commitDraft}
+                className="btn btn-primary">
+                <Plus size={14} /> Tambahkan
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Modal Form Sparepart (tambah / edit)
+// ══════════════════════════════════════════════════════════════
+const defaultSparepart = {
+  nama: '', kategori: '', hargaBeli: 0, hargaJual: 0, stok: 0, satuan: 'pcs',
+};
+
+function SparepartFormModal({ open, onClose, onSaved, editData }) {
+  const [form, setForm]     = useState(defaultSparepart);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm(editData ? {
+        nama:      editData.nama      || '',
+        kategori:  editData.kategori  || '',
+        hargaBeli: editData.hargaBeli || 0,
+        hargaJual: editData.hargaJual || 0,
+        stok:      editData.stok      || 0,
+        satuan:    editData.satuan    || 'pcs',
+      } : defaultSparepart);
+    }
+  }, [open, editData]);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  async function handleSave() {
+    if (!form.nama.trim()) return toast.error('Nama sparepart wajib diisi');
+    setSaving(true);
+    try {
+      // Saat edit, field "stok" tidak dikirim: tambah stok lewat endpoint
+      // khusus /add-stock supaya backend bisa log pergerakan.
+      const payload = editData
+        ? { nama: form.nama, kategori: form.kategori, hargaBeli: Number(form.hargaBeli) || 0, hargaJual: Number(form.hargaJual) || 0, satuan: form.satuan }
+        : { ...form, hargaBeli: Number(form.hargaBeli) || 0, hargaJual: Number(form.hargaJual) || 0, stok: Number(form.stok) || 0 };
+      if (editData) {
+        await sparepartAPI.update(editData._id, payload);
+        toast.success('Sparepart diperbarui');
+      } else {
+        await sparepartAPI.create(payload);
+        toast.success('Sparepart ditambahkan');
+      }
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menyimpan');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={editData ? 'Edit Sparepart' : 'Tambah Sparepart'} size="sm">
+      <div className="space-y-3">
+        <div>
+          <label className="label">Nama Sparepart *</label>
+          <input className="input" placeholder="LCD iPhone 11, Baterai Oppo..."
+            value={form.nama} onChange={e => set('nama', e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Kategori</label>
+            <input className="input" placeholder="LCD, Baterai, Konektor..."
+              value={form.kategori} onChange={e => set('kategori', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Satuan</label>
+            <input className="input" placeholder="pcs, unit, set"
+              value={form.satuan} onChange={e => set('satuan', e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Harga Beli</label>
+            <RupiahInput value={form.hargaBeli} onChange={v => set('hargaBeli', v)} />
+          </div>
+          <div>
+            <label className="label">Harga Jual</label>
+            <RupiahInput value={form.hargaJual} onChange={v => set('hargaJual', v)} />
+          </div>
+        </div>
+        {!editData && (
+          <div>
+            <label className="label">Stok Awal</label>
+            <input type="number" min="0" step="1" className="input"
+              value={form.stok} onChange={e => set('stok', e.target.value)} />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Untuk menambah stok di kemudian hari, gunakan tombol "Tambah Stok" di daftar.
+            </p>
+          </div>
+        )}
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+          <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
+            {saving ? 'Menyimpan...' : editData ? 'Simpan Perubahan' : 'Tambah'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Modal Tambah Stok Sparepart
+// ══════════════════════════════════════════════════════════════
+function AddStockModal({ open, onClose, onSaved, sparepart }) {
+  const [jumlah, setJumlah] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setJumlah(''); }, [open]);
+
+  async function handleSave() {
+    const n = Number(jumlah);
+    if (!n || n <= 0) return toast.error('Jumlah harus lebih dari 0');
+    setSaving(true);
+    try {
+      await sparepartAPI.addStock(sparepart._id, n);
+      toast.success(`Stok ${sparepart.nama} +${n}`);
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal tambah stok');
+    } finally { setSaving(false); }
+  }
+
+  if (!sparepart) return null;
+  return (
+    <Modal open={open} onClose={onClose} title="Tambah Stok" size="sm">
+      <div className="space-y-3">
+        <div className="bg-slate-50 rounded-xl p-3">
+          <p className="text-xs text-slate-400">Sparepart</p>
+          <p className="font-bold text-slate-800">{sparepart.nama}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Stok sekarang: <span className="font-bold text-slate-700">{sparepart.stok}</span> {sparepart.satuan || ''}
+          </p>
+        </div>
+        <div>
+          <label className="label">Jumlah Ditambahkan *</label>
+          <input type="number" min="1" step="1" autoFocus
+            className="input" value={jumlah}
+            onChange={e => setJumlah(e.target.value)} />
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+          <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
+            {saving ? 'Menyimpan...' : 'Tambah Stok'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Tab: Stok Sparepart
+// ══════════════════════════════════════════════════════════════
+function TabSparepart({ isAdmin }) {
+  const [data, setData]           = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editData, setEditData]   = useState(null);
+  const [stockFor, setStockFor]   = useState(null);
+  const [delConfirm, setDelConfirm] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = showInactive ? { includeInactive: true } : {};
+      const r = await sparepartAPI.getAll(params);
+      setData(r.data?.data || []);
+    } catch { toast.error('Gagal memuat sparepart'); }
+    finally { setLoading(false); }
+  }, [showInactive]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter(s =>
+      (s.nama || '').toLowerCase().includes(q) ||
+      (s.kategori || '').toLowerCase().includes(q)
+    );
+  }, [data, search]);
+
+  async function handleDelete() {
+    if (!delConfirm) return;
+    try {
+      await sparepartAPI.delete(delConfirm._id);
+      toast.success('Sparepart dinonaktifkan');
+      setDelConfirm(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menonaktifkan');
+    }
+  }
+
+  const openNew  = () => { setEditData(null); setModalOpen(true); };
+  const openEdit = (d) => { setEditData(d); setModalOpen(true); };
+
+  // Summary ringan
+  const totalItem   = data.length;
+  const totalStok   = data.reduce((s, x) => s + (Number(x.stok) || 0), 0);
+  const totalModal  = data.reduce((s, x) => s + (Number(x.stok) || 0) * (Number(x.hargaBeli) || 0), 0);
+  const lowStok     = data.filter(x => (Number(x.stok) || 0) <= 2 && x.isActive !== false).length;
+
+  return (
+    <div className="min-w-0">
+      {/* Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Jumlah Item</p>
+          <p className="font-bold text-slate-700 text-xs sm:text-sm">{totalItem}</p>
+        </div>
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Total Stok</p>
+          <p className="font-bold text-blue-600 text-xs sm:text-sm">{totalStok}</p>
+        </div>
+        <div className="card py-3 px-2 text-center min-w-0 bg-amber-50 border-amber-100">
+          <p className="text-[11px] sm:text-xs text-amber-500 truncate">Nilai Modal</p>
+          <p className="font-bold text-amber-700 text-xs sm:text-sm truncate">{formatRupiah(totalModal)}</p>
+        </div>
+        <div className={`card py-3 px-2 text-center min-w-0 ${lowStok > 0 ? 'bg-red-50 border-red-100' : ''}`}>
+          <p className={`text-[11px] sm:text-xs truncate ${lowStok > 0 ? 'text-red-400' : 'text-slate-400'}`}>Stok Menipis</p>
+          <p className={`font-bold text-xs sm:text-sm ${lowStok > 0 ? 'text-red-600' : 'text-slate-700'}`}>{lowStok} item</p>
+        </div>
+      </div>
+
+      {/* Filter & action */}
+      <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
+        <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input className="input pl-9" placeholder="Cari nama, kategori..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <button
+          onClick={() => setShowInactive(v => !v)}
+          className={`btn py-2 px-3 text-xs flex-shrink-0 ${showInactive ? 'btn-primary' : 'btn-outline'}`}>
+          {showInactive ? <Eye size={14} /> : <EyeOff size={14} />}
+          {showInactive ? 'Tampil Nonaktif' : 'Sembunyikan Nonaktif'}
+        </button>
+        <button className="btn btn-outline py-2 px-3 flex-shrink-0" onClick={load}>
+          <RefreshCw size={14} />
+        </button>
+        <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={openNew}>
+          <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Sparepart
+        </button>
+      </div>
+
+      {loading ? <Loader /> : (
+        <>
+          {/* Desktop / tablet — tabel */}
+          <div className="card hidden sm:block">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Kategori</th>
+                    <th className="text-right">Harga Beli</th>
+                    <th className="text-right">Harga Jual</th>
+                    <th className="text-right">Stok</th>
+                    <th>Satuan</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {filtered.length === 0
+                    ? <tr><td colSpan={7}><EmptyState message="Belum ada sparepart" /></td></tr>
+                    : filtered.map(s => {
+                      const inactive = s.isActive === false;
+                      const low = (Number(s.stok) || 0) <= 2 && !inactive;
+                      return (
+                        <tr key={s._id} className={inactive ? 'opacity-50' : ''}>
+                          <td>
+                            <p className="font-semibold text-slate-700 text-sm">{s.nama}</p>
+                            {inactive && <span className="text-[10px] text-red-500 font-bold">NONAKTIF</span>}
+                          </td>
+                          <td className="text-xs text-slate-500">{s.kategori || '—'}</td>
+                          <td className="text-right text-sm">{formatRupiah(s.hargaBeli || 0)}</td>
+                          <td className="text-right text-sm font-semibold text-primary-600">{formatRupiah(s.hargaJual || 0)}</td>
+                          <td className={`text-right font-bold text-sm ${low ? 'text-red-500' : 'text-slate-700'}`}>
+                            {s.stok || 0}
+                          </td>
+                          <td className="text-xs text-slate-500">{s.satuan || '—'}</td>
+                          <td>
+                            <div className="flex gap-1 flex-wrap">
+                              {!inactive && (
+                                <button onClick={() => setStockFor(s)}
+                                  className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Tambah stok">
+                                  <PackagePlus size={12} /> Stok
+                                </button>
+                              )}
+                              <button onClick={() => openEdit(s)}
+                                className="btn btn-outline py-1 px-2 text-xs" title="Edit">
+                                <Pencil size={12} />
+                              </button>
+                              {isAdmin && !inactive && (
+                                <button onClick={() => setDelConfirm(s)}
+                                  className="btn btn-outline py-1 px-2 text-xs text-red-500" title="Nonaktifkan">
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile — kartu */}
+          <div className="sm:hidden space-y-2">
+            {filtered.length === 0
+              ? <div className="card"><EmptyState message="Belum ada sparepart" /></div>
+              : filtered.map(s => {
+                const inactive = s.isActive === false;
+                const low = (Number(s.stok) || 0) <= 2 && !inactive;
+                return (
+                  <div key={s._id} className={`card !p-3 ${inactive ? 'opacity-50' : ''}`}>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-slate-700 truncate">{s.nama}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{s.kategori || '—'}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className={`font-bold text-base ${low ? 'text-red-500' : 'text-slate-700'}`}>
+                          {s.stok || 0} <span className="text-xs font-normal text-slate-400">{s.satuan || ''}</span>
+                        </p>
+                        {inactive && <span className="text-[10px] text-red-500 font-bold">NONAKTIF</span>}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <div>
+                        <p className="text-[10px] text-slate-400">Harga Beli</p>
+                        <p className="text-xs font-semibold">{formatRupiah(s.hargaBeli || 0)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-400">Harga Jual</p>
+                        <p className="text-xs font-bold text-primary-600">{formatRupiah(s.hargaJual || 0)}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
+                      {!inactive && (
+                        <button onClick={() => setStockFor(s)}
+                          className="btn btn-outline py-1.5 px-2.5 text-xs flex-1 text-blue-500">
+                          <PackagePlus size={13} /> Tambah Stok
+                        </button>
+                      )}
+                      <button onClick={() => openEdit(s)}
+                        className="btn btn-outline py-1.5 px-2.5 text-xs">
+                        <Pencil size={13} />
+                      </button>
+                      {isAdmin && !inactive && (
+                        <button onClick={() => setDelConfirm(s)}
+                          className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        </>
+      )}
+
+      <SparepartFormModal
+        open={modalOpen} onClose={() => setModalOpen(false)}
+        onSaved={load} editData={editData}
+      />
+      <AddStockModal
+        open={!!stockFor} onClose={() => setStockFor(null)}
+        onSaved={load} sparepart={stockFor}
+      />
+      <ConfirmDialog
+        open={!!delConfirm} onClose={() => setDelConfirm(null)} onConfirm={handleDelete}
+        title="Nonaktifkan Sparepart?"
+        message={`Nonaktifkan "${delConfirm?.nama}"? Item tidak hilang, hanya disembunyikan dari daftar aktif.`}
+        confirmLabel="Ya, Nonaktifkan" danger
+      />
+    </div>
+  );
+}
+
 // Main ServicePage
 // ══════════════════════════════════════════════════════════════
 export default function ServicePage() {
@@ -978,6 +1680,7 @@ export default function ServicePage() {
           {[
             { key: 'transaksi', label: 'Transaksi Servis', icon: Wrench },
             { key: 'keuangan',  label: 'Keuangan Servis',  icon: DollarSign },
+            { key: 'sparepart', label: 'Stok Sparepart',   icon: Boxes },
             { key: 'arsip',     label: 'Arsip',             icon: Archive },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -992,6 +1695,7 @@ export default function ServicePage() {
 
       {tab === 'transaksi' && <TabTransaksiWithRef isAdmin={isAdmin} />}
       {tab === 'keuangan'  && <TabKeuangan isAdmin={isAdmin} />}
+      {tab === 'sparepart' && <TabSparepart isAdmin={isAdmin} />}
       {tab === 'arsip'     && <TabArsip />}
     </div>
   );
