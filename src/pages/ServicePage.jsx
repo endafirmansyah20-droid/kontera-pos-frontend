@@ -9,7 +9,8 @@ import {
   Wrench, Plus, Search, RefreshCw, Edit2, Trash2,
   CheckCircle, Clock, AlertCircle, XCircle, Package,
   TrendingUp, TrendingDown, DollarSign, ChevronRight,
-  Smartphone, User, Phone, FileText, X, Boxes, PackagePlus, EyeOff, Eye
+  Smartphone, User, Phone, FileText, X, Boxes, PackagePlus, EyeOff, Eye,
+  History, ShoppingCart, ChevronLeft
 } from 'lucide-react';
 
 // ─── Konstanta ────────────────────────────────────────────────
@@ -46,6 +47,7 @@ const defaultFinForm = { type: 'pengeluaran', amount: 0, description: '', catego
 // Modal Form Transaksi Servis
 // ══════════════════════════════════════════════════════════════
 function ServiceFormModal({ open, onClose, onSaved, editData }) {
+  const { user } = useAuth();
   const [form, setForm]       = useState(defaultForm);
   const [saving, setSaving]   = useState(false);
   const [memberList, setMemberList]   = useState([]);
@@ -64,9 +66,9 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
       if (editData) {
         if (Array.isArray(editData.sparepartItems) && editData.sparepartItems.length > 0) {
           items = editData.sparepartItems.map(it => ({
-            source:      it.sparepartId ? 'stok' : 'eksternal',
+            source:      it.source || (it.sparepartId ? 'stok' : 'eksternal'),
             sparepartId: it.sparepartId?._id || it.sparepartId || null,
-            nama:        it.nama || '',
+            name:        it.name || it.nama || '',
             qty:         Number(it.qty) || 1,
             hargaBeli:   Number(it.hargaBeli) || 0,
             hargaJual:   Number(it.hargaJual) || 0,
@@ -75,13 +77,18 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         } else if (Number(editData.partsCost) > 0) {
           items = [{
             source: 'eksternal', sparepartId: null,
-            nama: 'Sparepart', qty: 1,
+            name: 'Sparepart', qty: 1,
             hargaBeli: Number(editData.partsCost) || 0,
             hargaJual: Number(editData.partsCost) || 0,
             satuan: '',
           }];
         }
       }
+      // Karyawan yang bikin servis baru → default teknisi = dirinya sendiri.
+      // Role lain (admin/owner) tetap kosong supaya dipilih manual.
+      const defaultTechnician = (!editData && user?.role === 'karyawan')
+        ? (user._id || user.id || '')
+        : '';
       setForm(editData ? {
         customerName:  editData.customerName  || '',
         customerPhone: editData.customerPhone || '',
@@ -99,9 +106,9 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         estimatedDone: editData.estimatedDone ? editData.estimatedDone.slice(0, 10) : '',
         // technician bisa populated {_id,name} atau ObjectId string
         technician:    editData.technician?._id || editData.technician || '',
-      } : defaultForm);
+      } : { ...defaultForm, technician: defaultTechnician });
     }
-  }, [open, editData]);
+  }, [open, editData, user]);
 
   // Fetch daftar teknisi saat modal dibuka. /auth/users sudah di-scope
   // ke cabang user yang login di backend. Gagal → dropdown kosong (field
@@ -115,9 +122,35 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         const users = (r.data?.data || []).filter(u => ['admin','karyawan'].includes(u.role));
         setTechnicianList(users);
       })
-      .catch(() => { if (!cancelled) setTechnicianList([]); });
+      .catch((err) => {
+        if (cancelled) return;
+        // /auth/users adalah endpoint admin-only; karyawan dapat 403.
+        // Fallback: isi list dengan user sendiri supaya dropdown tetap
+        // bisa match default technician = user._id.
+        const uid = user?._id || user?.id;
+        if (err?.response?.status === 403 && user?.role === 'karyawan' && uid) {
+          setTechnicianList([{ _id: uid, name: user.name }]);
+        } else {
+          setTechnicianList([]);
+        }
+      });
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, user]);
+
+  // Default teknisi untuk karyawan — dipasang SETELAH technicianList ter-fetch.
+  // Perlu di sini supaya nilai technician di state match dengan option yang
+  // benar-benar ada di dropdown (kalau di-set saat list masih kosong,
+  // controlled select bisa tampil "— Belum ditentukan —" karena optionnya
+  // belum ada). Mode edit tidak disentuh, dan tidak overwrite kalau user
+  // sudah pilih manual.
+  useEffect(() => {
+    if (editData) return;
+    if (user?.role !== 'karyawan') return;
+    if (!technicianList.length) return;
+    const myId = user._id || user.id;
+    if (!myId) return;
+    setForm(f => f.technician ? f : { ...f, technician: myId });
+  }, [technicianList, user]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -150,8 +183,8 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
     if (!form.complaint.trim())    return toast.error('Keluhan wajib diisi');
     // Validasi item sparepart (kalau ada)
     for (const it of (form.sparepartItems || [])) {
-      if (!it.nama?.trim()) return toast.error('Nama item sparepart wajib diisi');
-      if (!it.qty || Number(it.qty) <= 0) return toast.error(`Qty untuk "${it.nama}" harus > 0`);
+      if (!it.name?.trim()) return toast.error('Nama item sparepart wajib diisi');
+      if (!it.qty || Number(it.qty) <= 0) return toast.error(`Qty untuk "${it.name}" harus > 0`);
     }
     setSaving(true);
     try {
@@ -162,7 +195,8 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
         technician: form.technician || null,
         sparepartItems: (form.sparepartItems || []).map(it => ({
           sparepartId: it.source === 'stok' ? it.sparepartId : null,
-          nama:        it.nama,
+          source:      it.source === 'stok' ? 'stok' : 'eksternal',
+          name:        it.name,
           qty:         Number(it.qty) || 0,
           hargaBeli:   Number(it.hargaBeli) || 0,
           hargaJual:   Number(it.hargaJual) || 0,
@@ -861,131 +895,204 @@ function TabKeuangan({ isAdmin }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Tab: Arsip — transaksi "diambil" dari bulan sebelumnya ke bawah.
+// Transaksi "diambil" bulan berjalan tetap di Tab Transaksi Servis.
 // ══════════════════════════════════════════════════════════════
-// TAB CLOSING SERVICE
-// ══════════════════════════════════════════════════════════════
-function TabArsip() {
-  const [arsipList, setArsipList] = useState([]);
+function TabArsip({ canEdit }) {
+  const [data, setData]           = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [detail, setDetail]       = useState(null);
-  const [loadingD, setLoadingD]   = useState(false);
+  const [search, setSearch]       = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editData, setEditData]   = useState(null);
 
-  useEffect(() => { loadArsip(); }, []);
-
-  async function loadArsip() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await serviceAPI.getArsipList();
-      setArsipList(res.data.data || []);
-    } catch(e) {} finally { setLoading(false); }
-  }
+      // Ambil semua transaksi status 'diambil', lalu filter frontend:
+      // hanya yang createdAt < awal bulan berjalan (= bulan lalu ke bawah).
+      const res = await serviceAPI.getAll({ status: 'diambil' });
+      const all = res.data?.data || [];
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const archived = all.filter(t => {
+        const ts = new Date(t.createdAt || t.receivedAt).getTime();
+        return !Number.isNaN(ts) && ts < startOfMonth;
+      });
+      setData(archived);
+    } catch { toast.error('Gagal memuat arsip'); }
+    finally { setLoading(false); }
+  }, []);
 
-  async function loadDetail(bulan, tahun) {
-    setLoadingD(true);
-    try {
-      const res = await serviceAPI.getArsipDetail(bulan, tahun);
-      setDetail(res.data.data);
-    } catch(e) {} finally { setLoadingD(false); }
-  }
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter(d =>
+      (d.invoiceNumber || '').toLowerCase().includes(q) ||
+      (d.customerName  || '').toLowerCase().includes(q) ||
+      (d.customerPhone || '').toLowerCase().includes(q) ||
+      (d.deviceBrand   || '').toLowerCase().includes(q) ||
+      (d.deviceModel   || '').toLowerCase().includes(q)
+    );
+  }, [data, search]);
+
+  const openEdit = (d) => { setEditData(d); setModalOpen(true); };
+
+  // Summary ringkas untuk arsip
+  const totalTx     = data.length;
+  const totalOmset  = data.reduce((s, t) => s + (Number(t.serviceFee) || 0), 0);
+  const totalProfit = data.reduce((s, t) => s + (Number(t.profit)     || 0), 0);
 
   return (
-    <div className="space-y-5 min-w-0">
-      <div className="card min-w-0">
-        <h3 className="font-bold text-slate-800 mb-1">📦 Arsip Transaksi Service</h3>
-        <p className="text-xs text-slate-400 mb-4">Transaksi bulan-bulan sebelumnya — otomatis tersimpan saat berganti bulan</p>
-        {loading ? <Loader /> : arsipList.length === 0 ? (
-          <EmptyState message="Belum ada arsip" />
-        ) : (
-          <div className="space-y-3">
-            {arsipList.map(a => (
-              <div key={`${a.bulan}-${a.tahun}`}
-                className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition cursor-pointer"
-                onClick={() => loadDetail(a.bulan, a.tahun)}>
-                <div className="min-w-0 flex-1">
-                  <p className="font-bold text-slate-800 text-sm sm:text-base truncate">{a.label}</p>
-                  <p className="text-[11px] sm:text-xs text-slate-400">{a.jumlahTx} transaksi</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-green-600 text-sm sm:text-base">{formatRupiah(a.laba)}</p>
-                  <p className="text-[11px] sm:text-xs text-slate-400">Laba Kotor</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+    <div className="min-w-0">
+      {/* Header kecil */}
+      <div className="mb-3">
+        <h3 className="font-bold text-slate-800 text-sm sm:text-base">📦 Arsip Transaksi Service</h3>
+        <p className="text-[11px] sm:text-xs text-slate-400">
+          Transaksi status "Diambil" dari bulan-bulan sebelumnya (bulan berjalan tetap di Tab Transaksi).
+        </p>
       </div>
 
-      {/* Modal Detail Arsip */}
-      {detail && (
-        <Modal open={!!detail} onClose={() => setDetail(null)} title={`Arsip ${detail.label}`} size="lg">
-          {loadingD ? <Loader /> : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
-                <div className="card py-3 text-center bg-blue-50">
-                  <p className="text-[11px] sm:text-xs text-slate-400">Omset</p>
-                  <p className="font-bold text-blue-600 text-xs sm:text-sm">{formatRupiah(detail.omset)}</p>
-                </div>
-                <div className="card py-3 text-center bg-green-50">
-                  <p className="text-[11px] sm:text-xs text-slate-400">Laba Kotor</p>
-                  <p className="font-bold text-green-600 text-xs sm:text-sm">{formatRupiah(detail.laba)}</p>
-                </div>
-                <div className="card py-3 text-center bg-red-50">
-                  <p className="text-[11px] sm:text-xs text-slate-400">Pengeluaran</p>
-                  <p className="font-bold text-red-500 text-xs sm:text-sm">{formatRupiah(detail.totalExpense)}</p>
-                </div>
-                <div className="card py-3 text-center bg-purple-50">
-                  <p className="text-[11px] sm:text-xs text-slate-400">Laba Bersih</p>
-                  <p className={`font-bold text-xs sm:text-sm ${detail.labaBersih >= 0 ? 'text-purple-600' : 'text-red-500'}`}>{formatRupiah(detail.labaBersih)}</p>
-                </div>
-              </div>
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Jumlah Transaksi</p>
+          <p className="font-bold text-slate-700 text-xs sm:text-sm">{totalTx}</p>
+        </div>
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Total Omset</p>
+          <p className="font-bold text-blue-600 text-xs sm:text-sm truncate">{formatRupiah(totalOmset)}</p>
+        </div>
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Total Laba</p>
+          <p className={`font-bold text-xs sm:text-sm truncate ${totalProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            {formatRupiah(totalProfit)}
+          </p>
+        </div>
+      </div>
 
-              {/* Desktop / tablet — tabel */}
-              <div className="overflow-x-auto hidden sm:block">
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b">
-                    <th className="text-left py-2">Invoice</th>
-                    <th className="text-left py-2">Pelanggan</th>
-                    <th className="text-left py-2">Device</th>
-                    <th className="text-left py-2">Status</th>
-                    <th className="text-right py-2">Bayar</th>
-                    <th className="text-right py-2">Biaya</th>
-                  </tr></thead>
-                  <tbody>
-                    {(detail.transactions || []).map(t => (
-                      <tr key={t._id} className="border-b hover:bg-slate-50">
-                        <td className="py-2 font-mono text-xs">{t.invoiceNumber}</td>
-                        <td className="py-2">{t.customerName}</td>
-                        <td className="py-2 text-xs">{t.deviceBrand} {t.deviceModel}</td>
-                        <td className="py-2"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${t.status === 'diambil' ? 'bg-green-100 text-green-700' : t.status === 'batal' ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-700'}`}>{t.status}</span></td>
-                        <td className="py-2 text-right text-xs">{t.isPaid ? '✅ Lunas' : '⏳ Belum'}</td>
-                        <td className="py-2 text-right font-semibold">{formatRupiah(t.totalCost)}</td>
+      {/* Search + refresh */}
+      <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
+        <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input className="input pl-9" placeholder="Cari invoice, nama, HP..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <button className="btn btn-outline py-2 px-3 flex-shrink-0" onClick={load}>
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {loading ? <Loader /> : (
+        <>
+          {/* Desktop / tablet — tabel */}
+          <div className="card hidden sm:block">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Pelanggan</th>
+                    <th>HP</th>
+                    <th>Sparepart</th>
+                    <th>Biaya Service</th>
+                    <th>Keuntungan</th>
+                    <th>Bayar</th>
+                    <th>Tgl</th>
+                    {canEdit && <th>Aksi</th>}
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {filtered.length === 0
+                    ? <tr><td colSpan={canEdit ? 9 : 8}><EmptyState message="Belum ada arsip transaksi" /></td></tr>
+                    : filtered.map(d => (
+                      <tr key={d._id}>
+                        <td><code className="text-xs font-mono text-primary-600">{d.invoiceNumber}</code></td>
+                        <td>
+                          <p className="font-semibold text-slate-700 text-sm">{d.customerName}</p>
+                          {d.customerPhone && <p className="text-xs text-slate-400">{d.customerPhone}</p>}
+                        </td>
+                        <td className="text-sm text-slate-600">{d.deviceBrand} {d.deviceModel}</td>
+                        <td className="text-sm">{formatRupiah(d.partsCost)}</td>
+                        <td className="text-sm">{formatRupiah(d.serviceFee)}</td>
+                        <td className={(d.profit || 0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>
+                          {formatRupiah(d.profit || 0)}
+                        </td>
+                        <td>
+                          <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                            {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                          </span>
+                        </td>
+                        <td className="text-xs text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</td>
+                        {canEdit && (
+                          <td>
+                            <button onClick={() => openEdit(d)}
+                              className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Edit">
+                              <Edit2 size={12} /> Edit
+                            </button>
+                          </td>
+                        )}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-              {/* Mobile — kartu */}
-              <div className="sm:hidden space-y-2">
-                {(detail.transactions || []).map(t => (
-                  <div key={t._id} className="p-3 bg-slate-50 rounded-xl">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <code className="text-xs font-mono text-slate-500 truncate">{t.invoiceNumber}</code>
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize flex-shrink-0 ${t.status === 'diambil' ? 'bg-green-100 text-green-700' : t.status === 'batal' ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-700'}`}>{t.status}</span>
+          {/* Mobile — kartu */}
+          <div className="sm:hidden space-y-2">
+            {filtered.length === 0
+              ? <div className="card"><EmptyState message="Belum ada arsip transaksi" /></div>
+              : filtered.map(d => (
+                <div key={d._id} className="card !p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
+                    <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                      {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                    </span>
+                  </div>
+                  <p className="font-semibold text-sm text-slate-700 truncate">{d.customerName}</p>
+                  {d.customerPhone && <p className="text-[11px] text-slate-400 mb-1">{d.customerPhone}</p>}
+                  <p className="text-xs text-slate-600 mb-2">{d.deviceBrand} {d.deviceModel}</p>
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                    <div>
+                      <p className="text-[10px] text-slate-400">Sparepart</p>
+                      <p className="text-[11px] font-semibold">{formatRupiah(d.partsCost)}</p>
                     </div>
-                    <p className="font-semibold text-sm text-slate-700 truncate">{t.customerName}</p>
-                    <p className="text-[11px] text-slate-500 mb-2 truncate">{t.deviceBrand} {t.deviceModel}</p>
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
-                      <p className="text-[11px]">{t.isPaid ? '✅ Lunas' : '⏳ Belum'}</p>
-                      <p className="font-bold text-sm">{formatRupiah(t.totalCost)}</p>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Service</p>
+                      <p className="text-[11px] font-semibold">{formatRupiah(d.serviceFee)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Untung</p>
+                      <p className={`text-[11px] font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {formatRupiah(d.profit || 0)}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
-        </Modal>
+                  <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-slate-100">
+                    <p className="text-[11px] text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</p>
+                    {canEdit && (
+                      <button onClick={() => openEdit(d)} className="btn btn-outline py-1.5 px-3 text-xs text-blue-500">
+                        <Edit2 size={13} /> Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </>
       )}
+
+      <ServiceFormModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSaved={load}
+        editData={editData}
+      />
     </div>
   );
 }
@@ -1035,7 +1142,7 @@ function SparepartItemsField({ items, onChange }) {
   function pickFromStok(sp) {
     setDraft({
       source: 'stok', sparepartId: sp._id,
-      nama: sp.nama,
+      name: sp.nama,
       qty: 1,
       hargaBeli: sp.hargaBeli || 0,
       hargaJual: sp.hargaJual || 0,
@@ -1047,13 +1154,13 @@ function SparepartItemsField({ items, onChange }) {
   function startEksternal() {
     setDraft({
       source: 'eksternal', sparepartId: null,
-      nama: '', qty: 1, hargaBeli: 0, hargaJual: 0, satuan: '',
+      name: '', qty: 1, hargaBeli: 0, hargaJual: 0, satuan: '',
     });
   }
 
   function commitDraft() {
     if (!draft) return;
-    if (!draft.nama?.trim()) return toast.error('Nama item wajib diisi');
+    if (!draft.name?.trim()) return toast.error('Nama item wajib diisi');
     if (!draft.qty || Number(draft.qty) <= 0) return toast.error('Qty harus > 0');
     if (draft.source === 'stok' && Number(draft.qty) > Number(draft._stokTersedia || 0)) {
       return toast.error(`Stok tidak cukup. Tersedia: ${draft._stokTersedia}`);
@@ -1095,7 +1202,7 @@ function SparepartItemsField({ items, onChange }) {
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-sm text-slate-700 truncate">{it.nama}</span>
+                        <span className="font-semibold text-sm text-slate-700 truncate">{it.name}</span>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                           it.source === 'stok' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
                         }`}>
@@ -1204,13 +1311,13 @@ function SparepartItemsField({ items, onChange }) {
               <div>
                 <label className="label">Nama Sparepart *</label>
                 <input className="input" placeholder="LCD iPhone 11, Baterai Oppo A5s..."
-                  value={draft.nama}
-                  onChange={e => setDraft(d => ({ ...d, nama: e.target.value }))} />
+                  value={draft.name}
+                  onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
               </div>
             ) : (
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
                 <p className="text-xs text-blue-500">Sparepart dari stok</p>
-                <p className="font-bold text-blue-800">{draft.nama}</p>
+                <p className="font-bold text-blue-800">{draft.name}</p>
                 <p className="text-[11px] text-blue-500 mt-0.5">
                   Stok tersedia: <span className="font-bold">{draft._stokTersedia}</span> {draft.satuan}
                 </p>
@@ -1283,7 +1390,8 @@ function SparepartFormModal({ open, onClose, onSaved, editData }) {
         hargaJual: editData.hargaJual || 0,
         stok:      editData.stok      || 0,
         satuan:    editData.satuan    || 'pcs',
-      } : defaultSparepart);
+        isActive:  editData.isActive !== false,
+      } : { ...defaultSparepart, isActive: true });
     }
   }, [open, editData]);
 
@@ -1293,10 +1401,17 @@ function SparepartFormModal({ open, onClose, onSaved, editData }) {
     if (!form.nama.trim()) return toast.error('Nama sparepart wajib diisi');
     setSaving(true);
     try {
-      // Saat edit, field "stok" tidak dikirim: tambah stok lewat endpoint
-      // khusus /add-stock supaya backend bisa log pergerakan.
+      // Stok TIDAK diubah lewat modal ini — tambah stok hanya via tab Pembelian
+      // supaya backend bisa catat log pergerakan.
       const payload = editData
-        ? { nama: form.nama, kategori: form.kategori, hargaBeli: Number(form.hargaBeli) || 0, hargaJual: Number(form.hargaJual) || 0, satuan: form.satuan }
+        ? {
+            nama: form.nama,
+            kategori: form.kategori,
+            hargaBeli: Number(form.hargaBeli) || 0,
+            hargaJual: Number(form.hargaJual) || 0,
+            satuan: form.satuan,
+            isActive: !!form.isActive,
+          }
         : { ...form, hargaBeli: Number(form.hargaBeli) || 0, hargaJual: Number(form.hargaJual) || 0, stok: Number(form.stok) || 0 };
       if (editData) {
         await sparepartAPI.update(editData._id, payload);
@@ -1313,7 +1428,7 @@ function SparepartFormModal({ open, onClose, onSaved, editData }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={editData ? 'Edit Sparepart' : 'Tambah Sparepart'} size="sm">
+    <Modal open={open} onClose={onClose} title={editData ? 'Edit Sparepart' : 'Daftarkan Sparepart Baru'} size="sm">
       <div className="space-y-3">
         <div>
           <label className="label">Nama Sparepart *</label>
@@ -1332,30 +1447,52 @@ function SparepartFormModal({ open, onClose, onSaved, editData }) {
               value={form.satuan} onChange={e => set('satuan', e.target.value)} />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Harga Beli</label>
-            <RupiahInput value={form.hargaBeli} onChange={v => set('hargaBeli', v)} />
+        {editData && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Harga Beli</label>
+              <RupiahInput value={form.hargaBeli} onChange={v => set('hargaBeli', v)} />
+            </div>
+            <div>
+              <label className="label">Harga Jual</label>
+              <RupiahInput value={form.hargaJual} onChange={v => set('hargaJual', v)} />
+            </div>
           </div>
-          <div>
-            <label className="label">Harga Jual</label>
-            <RupiahInput value={form.hargaJual} onChange={v => set('hargaJual', v)} />
-          </div>
-        </div>
+        )}
         {!editData && (
           <div>
             <label className="label">Stok Awal</label>
             <input type="number" min="0" step="1" className="input"
               value={form.stok} onChange={e => set('stok', e.target.value)} />
             <p className="text-[11px] text-slate-400 mt-1">
-              Untuk menambah stok di kemudian hari, gunakan tombol "Tambah Stok" di daftar.
+              Untuk menambah stok di kemudian hari, gunakan tab "Pembelian".
             </p>
+          </div>
+        )}
+        {editData && (
+          <div className="bg-slate-50 rounded-xl px-3 py-2.5 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Status Aktif</p>
+              <p className="text-[11px] text-slate-400">
+                {form.isActive
+                  ? 'Sparepart tampil di daftar aktif & bisa dipilih di transaksi.'
+                  : 'Dinonaktifkan — tersembunyi dari daftar aktif.'}
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-2 cursor-pointer flex-shrink-0">
+              <input type="checkbox" className="w-4 h-4 accent-primary-600"
+                checked={!!form.isActive}
+                onChange={e => set('isActive', e.target.checked)} />
+              <span className={`text-sm font-bold ${form.isActive ? 'text-green-600' : 'text-slate-500'}`}>
+                {form.isActive ? 'Aktif' : 'Nonaktif'}
+              </span>
+            </label>
           </div>
         )}
         <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
           <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
           <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
-            {saving ? 'Menyimpan...' : editData ? 'Simpan Perubahan' : 'Tambah'}
+            {saving ? 'Menyimpan...' : editData ? 'Simpan Perubahan' : 'Daftarkan'}
           </button>
         </div>
       </div>
@@ -1377,7 +1514,7 @@ function AddStockModal({ open, onClose, onSaved, sparepart }) {
     if (!n || n <= 0) return toast.error('Jumlah harus lebih dari 0');
     setSaving(true);
     try {
-      await sparepartAPI.addStock(sparepart._id, n);
+      await sparepartAPI.addStock(sparepart._id, { jumlah: n });
       toast.success(`Stok ${sparepart.nama} +${n}`);
       onSaved();
       onClose();
@@ -1415,16 +1552,573 @@ function AddStockModal({ open, onClose, onSaved, sparepart }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Helper: format tanggal log + komponen Pagination kecil
+// ══════════════════════════════════════════════════════════════
+function fmtLogDateTime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function PagerBar({ page, setPage, totalPages, total }) {
+  if (!totalPages || totalPages <= 1) return null;
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2">
+      <span className="text-xs text-slate-500">
+        Halaman {page} dari {totalPages} ({total} total)
+      </span>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page <= 1}
+          className="btn btn-outline py-1.5 px-3 text-xs disabled:opacity-40 disabled:pointer-events-none">
+          <ChevronLeft size={13} /> Prev
+        </button>
+        <button
+          type="button"
+          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+          disabled={page >= totalPages}
+          className="btn btn-outline py-1.5 px-3 text-xs disabled:opacity-40 disabled:pointer-events-none">
+          Next <ChevronRight size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Modal: SparePartLogModal — riwayat stok (masuk/keluar) per item
+// ══════════════════════════════════════════════════════════════
+function SparePartLogModal({ open, onClose, sparepart }) {
+  const [logs, setLogs]             = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [jenis, setJenis]           = useState(''); // '' | 'masuk' | 'keluar'
+  const [page, setPage]             = useState(1);
+  const [total, setTotal]           = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const limit = 10;
+
+  // Reset state saat modal buka / sparepart ganti / filter jenis berubah
+  useEffect(() => {
+    if (!open) return;
+    setPage(1);
+  }, [open, sparepart?._id, jenis]);
+
+  useEffect(() => {
+    if (!open || !sparepart?._id) return;
+    let cancelled = false;
+    setLoading(true);
+    const params = { page, limit };
+    if (jenis) params.jenis = jenis;
+    sparepartAPI.getLogs(sparepart._id, params)
+      .then(r => {
+        if (cancelled) return;
+        setLogs(r.data?.data || []);
+        setTotal(r.data?.total || 0);
+        setTotalPages(r.data?.totalPages || 0);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.error('getLogs error', err);
+        toast.error('Gagal memuat riwayat');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, sparepart?._id, page, jenis]);
+
+  if (!sparepart) return null;
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Riwayat Stok — ${sparepart.nama}`} size="lg">
+      <div className="space-y-3">
+        {/* Info stok saat ini */}
+        <div className="bg-slate-50 rounded-xl px-3 py-2 flex items-center justify-between">
+          <span className="text-xs text-slate-500">Stok saat ini</span>
+          <span className="font-bold text-slate-700">
+            {sparepart.stok || 0} <span className="text-xs font-normal text-slate-400">{sparepart.satuan || ''}</span>
+          </span>
+        </div>
+
+        {/* Filter jenis */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+          {[
+            { key: '',       label: 'Semua' },
+            { key: 'masuk',  label: '📥 Masuk' },
+            { key: 'keluar', label: '📤 Keluar' },
+          ].map(f => (
+            <button key={f.key || 'all'} type="button" onClick={() => setJenis(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                jenis === f.key ? 'bg-white shadow text-primary-700' : 'text-slate-500 hover:text-slate-700'
+              }`}>{f.label}</button>
+          ))}
+        </div>
+
+        {loading ? <Loader /> : logs.length === 0 ? (
+          <EmptyState message="Belum ada riwayat" />
+        ) : (
+          <>
+            {/* Desktop */}
+            <div className="hidden sm:block">
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Tanggal</th>
+                      <th>Jenis</th>
+                      <th className="text-right">Jumlah</th>
+                      <th className="text-right">Stok</th>
+                      <th>Keterangan</th>
+                      <th>Oleh</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white">
+                    {logs.map(l => (
+                      <tr key={l._id}>
+                        <td className="text-xs text-slate-500 whitespace-nowrap">{fmtLogDateTime(l.createdAt)}</td>
+                        <td>
+                          <span className={`badge ${l.jenis === 'masuk' ? 'badge-green' : 'badge-red'}`}>
+                            {l.jenis === 'masuk' ? '📥 Masuk' : '📤 Keluar'}
+                          </span>
+                        </td>
+                        <td className={`text-right text-sm font-bold ${l.jenis === 'masuk' ? 'text-green-600' : 'text-red-500'}`}>
+                          {l.jenis === 'masuk' ? '+' : '−'}{l.jumlah}
+                        </td>
+                        <td className="text-right text-xs text-slate-500 whitespace-nowrap">
+                          {l.stokSebelum} → <span className="font-bold text-slate-700">{l.stokSesudah}</span>
+                        </td>
+                        <td className="text-xs text-slate-600">{l.keterangan || '—'}</td>
+                        <td className="text-xs text-slate-500">{l.createdBy?.name || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile */}
+            <div className="sm:hidden space-y-2">
+              {logs.map(l => (
+                <div key={l._id} className="bg-slate-50 rounded-xl p-2.5">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <span className={`badge ${l.jenis === 'masuk' ? 'badge-green' : 'badge-red'}`}>
+                      {l.jenis === 'masuk' ? '📥 Masuk' : '📤 Keluar'} {l.jumlah}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{fmtLogDateTime(l.createdAt)}</span>
+                  </div>
+                  <p className="text-xs text-slate-600 mb-1">{l.keterangan || '—'}</p>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Stok: {l.stokSebelum} → <span className="font-bold text-slate-600">{l.stokSesudah}</span></span>
+                    <span>{l.createdBy?.name || '—'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <PagerBar page={page} setPage={setPage} totalPages={totalPages} total={total} />
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Modal: InputPembelianModal — input pembelian sparepart multi-item.
+// Submit = loop addStock per item.
+// ══════════════════════════════════════════════════════════════
+function InputPembelianModal({ open, onClose, onSaved }) {
+  const [spareList, setSpareList] = useState([]);
+  const [items, setItems]         = useState([]);
+  const [saving, setSaving]       = useState(false);
+  const [rowErrors, setRowErrors] = useState({}); // { [idx]: 'pesan' }
+
+  const emptyRow = () => ({ sparepartId: '', qty: 1, hargaBeli: 0, keterangan: '' });
+
+  // Fetch sparepart list + reset state tiap buka
+  useEffect(() => {
+    if (!open) return;
+    setItems([emptyRow()]);
+    setRowErrors({});
+    let cancelled = false;
+    sparepartAPI.getAll({ includeInactive: false })
+      .then(r => { if (!cancelled) setSpareList(r.data?.data || []); })
+      .catch(() => { if (!cancelled) setSpareList([]); });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  const addRow    = () => setItems(arr => [...arr, emptyRow()]);
+  const removeRow = (idx) => setItems(arr => arr.length > 1 ? arr.filter((_, i) => i !== idx) : arr);
+  const updateRow = (idx, patch) =>
+    setItems(arr => arr.map((it, i) => i === idx ? { ...it, ...patch } : it));
+
+  const totalPreview = items.reduce(
+    (s, it) => s + (Number(it.hargaBeli) || 0) * (Number(it.qty) || 0),
+    0
+  );
+
+  function validateAll() {
+    const errs = {};
+    const seen = new Set();
+    items.forEach((it, idx) => {
+      if (!it.sparepartId) errs[idx] = 'Pilih sparepart';
+      else if (seen.has(it.sparepartId)) errs[idx] = 'Sparepart ini sudah dipilih di baris lain';
+      else if (!it.qty || Number(it.qty) < 1) errs[idx] = 'Qty minimal 1';
+      else if (Number(it.hargaBeli) < 0) errs[idx] = 'Harga beli tidak boleh negatif';
+      if (it.sparepartId) seen.add(it.sparepartId);
+    });
+    setRowErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  async function handleSave() {
+    if (!validateAll()) return toast.error('Periksa kembali data pembelian');
+    setSaving(true);
+    const errs = {};
+    let okCount = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      try {
+        await sparepartAPI.addStock(it.sparepartId, {
+          jumlah: Number(it.qty),
+          hargaBeli: Number(it.hargaBeli) || 0,
+          keterangan: it.keterangan || '',
+        });
+        okCount++;
+      } catch (err) {
+        errs[i] = err.response?.data?.message || 'Gagal menyimpan item';
+      }
+    }
+    setSaving(false);
+    if (Object.keys(errs).length > 0) {
+      setRowErrors(errs);
+      toast.error(`${okCount} berhasil, ${Object.keys(errs).length} gagal. Periksa baris error.`);
+      // Tetap trigger onSaved kalau ada yang berhasil, supaya tabel refresh partial
+      if (okCount > 0) onSaved?.();
+      return;
+    }
+    toast.success(`Pembelian berhasil disimpan (${okCount} item)`);
+    onSaved?.();
+    onClose();
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Input Pembelian Sparepart" size="lg">
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">
+          Setiap baris akan menambah stok sparepart yang dipilih. Harga beli & keterangan
+          disimpan di log pembelian.
+        </p>
+
+        {/* List baris item */}
+        <div className="space-y-2">
+          {items.map((it, idx) => {
+            const err = rowErrors[idx];
+            return (
+              <div key={idx} className={`border rounded-xl p-2.5 ${err ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-slate-50/40'}`}>
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  {/* Sparepart dropdown */}
+                  <div className="col-span-12 sm:col-span-5">
+                    <label className="label">Sparepart *</label>
+                    <select className="input"
+                      value={it.sparepartId}
+                      onChange={e => updateRow(idx, { sparepartId: e.target.value })}>
+                      <option value="">— Pilih sparepart —</option>
+                      {spareList.map(s => (
+                        <option key={s._id} value={s._id}>
+                          {s.nama} (stok: {s.stok || 0})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Qty */}
+                  <div className="col-span-4 sm:col-span-2">
+                    <label className="label">Qty *</label>
+                    <input type="number" min="1" step="1" className="input"
+                      value={it.qty}
+                      onChange={e => updateRow(idx, { qty: e.target.value })} />
+                  </div>
+                  {/* Harga Beli — format rupiah */}
+                  <div className="col-span-7 sm:col-span-3">
+                    <label className="label">Harga Beli</label>
+                    <RupiahInput value={it.hargaBeli}
+                      onChange={v => updateRow(idx, { hargaBeli: v })} />
+                  </div>
+                  {/* Tombol hapus */}
+                  <div className="col-span-1 sm:col-span-2 flex justify-end">
+                    <button type="button" onClick={() => removeRow(idx)}
+                      disabled={items.length <= 1}
+                      className="btn btn-outline py-2 px-2 text-red-500 disabled:opacity-30 disabled:pointer-events-none"
+                      title="Hapus baris">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {/* Keterangan */}
+                  <div className="col-span-12">
+                    <label className="label">Keterangan (opsional)</label>
+                    <input type="text" className="input"
+                      placeholder="misal: Beli di Mangga Dua"
+                      value={it.keterangan}
+                      onChange={e => updateRow(idx, { keterangan: e.target.value })} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end pt-2 mt-1 border-t border-slate-100 text-xs">
+                  <span className="font-bold text-slate-700">
+                    Subtotal: {formatRupiah((Number(it.hargaBeli) || 0) * (Number(it.qty) || 0))}
+                  </span>
+                </div>
+                {err && <p className="text-xs text-red-500 mt-1">⚠ {err}</p>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Tambah item */}
+        <button type="button" onClick={addRow}
+          className="btn btn-outline w-full py-2 text-sm">
+          <Plus size={14} /> Tambah Item
+        </button>
+
+        {/* Total preview */}
+        <div className="flex items-center justify-between bg-slate-100 rounded-xl px-3 py-2.5">
+          <span className="text-sm font-semibold text-slate-600">Total Modal</span>
+          <span className="text-base font-bold text-primary-600">{formatRupiah(totalPreview)}</span>
+        </div>
+
+        {/* Action */}
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+          <button className="btn btn-outline w-full sm:w-auto" onClick={onClose} disabled={saving}>
+            Batal
+          </button>
+          <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
+            {saving ? 'Menyimpan...' : 'Simpan Pembelian'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Panel: Pembelian — riwayat log pembelian (jenis masuk, agregat)
+// ══════════════════════════════════════════════════════════════
+function PembelianPanel({ onSparepartChange }) {
+  const [data, setData]             = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [startDate, setStartDate]   = useState('');
+  const [endDate, setEndDate]       = useState('');
+  const [sparepart, setSparepart]   = useState('');
+  const [page, setPage]             = useState(1);
+  const [total, setTotal]           = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [spareList, setSpareList]   = useState([]);
+  const [inputOpen, setInputOpen]   = useState(false);
+  const limit = 20;
+
+  const loadSpareList = useCallback(() => {
+    let cancelled = false;
+    sparepartAPI.getAll({ includeInactive: true })
+      .then(r => { if (!cancelled) setSpareList(r.data?.data || []); })
+      .catch(() => { if (!cancelled) setSpareList([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const cleanup = loadSpareList();
+    return cleanup;
+  }, [loadSpareList]);
+
+  // Reset page saat filter berubah
+  useEffect(() => { setPage(1); }, [startDate, endDate, sparepart]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = { page, limit };
+    if (startDate) params.startDate = startDate;
+    if (endDate)   params.endDate   = endDate;
+    if (sparepart) params.sparepart = sparepart;
+    sparepartAPI.getLogPembelian(params)
+      .then(r => {
+        setData(r.data?.data || []);
+        setTotal(r.data?.total || 0);
+        setTotalPages(r.data?.totalPages || 0);
+      })
+      .catch(err => {
+        console.error('getLogPembelian error', err);
+        toast.error('Gagal memuat riwayat pembelian');
+      })
+      .finally(() => setLoading(false));
+  }, [page, startDate, endDate, sparepart]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const reset = () => {
+    setStartDate(''); setEndDate(''); setSparepart(''); setPage(1);
+  };
+
+  return (
+    <div className="min-w-0">
+      {/* Header + action */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h3 className="font-bold text-slate-800 text-sm sm:text-base">Riwayat Pembelian</h3>
+        <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0"
+          onClick={() => setInputOpen(true)}>
+          <ShoppingCart size={14} /> <span className="hidden sm:inline">Input </span>Pembelian
+        </button>
+      </div>
+
+      {/* Filter row */}
+      <div className="card mb-4 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+        <div>
+          <label className="label">Dari Tanggal</label>
+          <input type="date" className="input" value={startDate}
+            onChange={e => setStartDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Sampai Tanggal</label>
+          <input type="date" className="input" value={endDate}
+            onChange={e => setEndDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Sparepart</label>
+          <select className="input" value={sparepart}
+            onChange={e => setSparepart(e.target.value)}>
+            <option value="">Semua Sparepart</option>
+            {spareList.map(s => (
+              <option key={s._id} value={s._id}>{s.nama}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <button className="btn btn-outline py-2 px-3 text-xs flex-1" onClick={reset}>Reset</button>
+          <button className="btn btn-outline py-2 px-3" onClick={load}><RefreshCw size={14} /></button>
+        </div>
+      </div>
+
+      {loading ? <Loader /> : data.length === 0 ? (
+        <div className="card"><EmptyState message="Belum ada riwayat pembelian" /></div>
+      ) : (
+        <>
+          {/* Desktop */}
+          <div className="card hidden sm:block">
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th className="text-left w-[180px]">Tanggal</th>
+                    <th className="text-left min-w-[200px]">Nama Sparepart</th>
+                    <th className="text-center w-[120px]">Jumlah Masuk</th>
+                    <th className="text-right w-[130px]">Harga Beli</th>
+                    <th className="text-right w-[130px]">Total Modal</th>
+                    <th className="text-left w-[130px]">Dicatat Oleh</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {data.map(l => {
+                    const hb = Number(l.hargaBeli) || 0;
+                    const sub = hb * (Number(l.jumlah) || 0);
+                    return (
+                      <tr key={l._id}>
+                        <td className="text-left w-[180px] text-xs text-slate-500 whitespace-nowrap">{fmtLogDateTime(l.createdAt)}</td>
+                        <td className="text-left min-w-[200px] text-sm font-semibold text-slate-700">{l.sparepart?.nama || '—'}</td>
+                        <td className="text-center w-[120px] text-sm font-bold text-green-600">{l.jumlah}</td>
+                        <td className="text-right w-[130px] text-sm">{formatRupiah(hb)}</td>
+                        <td className="text-right w-[130px] text-sm">{formatRupiah(sub)}</td>
+                        <td className="text-left w-[130px] text-xs text-slate-500">{l.createdBy?.name || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-slate-100">
+                    <td colSpan={2} className="text-left text-xs text-slate-600 uppercase tracking-wide font-semibold">Total halaman ini</td>
+                    <td className="text-center w-[120px] text-sm text-green-700 font-semibold">
+                      {data.reduce((s, l) => s + (Number(l.jumlah) || 0), 0)}
+                    </td>
+                    <td className="text-right w-[130px] font-semibold"></td>
+                    <td className="text-right w-[130px] text-sm text-slate-700 font-semibold">
+                      {formatRupiah(data.reduce((s, l) => s + (Number(l.hargaBeli) || 0) * (Number(l.jumlah) || 0), 0))}
+                    </td>
+                    <td className="text-left w-[130px] font-semibold"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile */}
+          <div className="sm:hidden space-y-2">
+            {data.map(l => {
+              const hb = Number(l.hargaBeli) || 0;
+              const sub = hb * (Number(l.jumlah) || 0);
+              return (
+                <div key={l._id} className="card !p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="font-semibold text-sm text-slate-700 truncate">{l.sparepart?.nama || '—'}</p>
+                    <span className="text-[11px] font-bold text-green-600 flex-shrink-0">+{l.jumlah}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">{fmtLogDateTime(l.createdAt)}</p>
+                  <div className="grid grid-cols-2 gap-2 pt-2 mt-2 border-t border-slate-100 text-[11px]">
+                    <div>
+                      <span className="text-slate-400">Harga Beli:</span>{' '}
+                      <span className="text-slate-600 font-semibold">{hb > 0 ? formatRupiah(hb) : '—'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400">Total Modal:</span>{' '}
+                      <span className="text-slate-700 font-bold">{hb > 0 ? formatRupiah(sub) : '—'}</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Oleh: {l.createdBy?.name || '—'}</p>
+                </div>
+              );
+            })}
+            {/* Footer total untuk mobile */}
+            <div className="card !p-3 bg-slate-100 border-slate-200">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600 uppercase tracking-wide">Total halaman ini</span>
+                <div className="flex gap-3">
+                  <span className="font-bold text-green-700">
+                    +{data.reduce((s, l) => s + (Number(l.jumlah) || 0), 0)}
+                  </span>
+                  <span className="font-bold text-slate-700">
+                    {formatRupiah(data.reduce((s, l) => s + (Number(l.hargaBeli) || 0) * (Number(l.jumlah) || 0), 0))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <PagerBar page={page} setPage={setPage} totalPages={totalPages} total={total} />
+        </>
+      )}
+
+      <InputPembelianModal
+        open={inputOpen}
+        onClose={() => setInputOpen(false)}
+        onSaved={() => {
+          load();
+          loadSpareList();
+          onSparepartChange?.();
+        }}
+      />
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 // Tab: Stok Sparepart
 // ══════════════════════════════════════════════════════════════
 function TabSparepart({ isAdmin }) {
+  const [activeSpareTab, setActiveSpareTab] = useState('daftar'); // 'daftar' | 'pembelian'
+  const [logFor, setLogFor]       = useState(null); // sparepart yang dilihat log-nya
   const [data, setData]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData]   = useState(null);
-  const [stockFor, setStockFor]   = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
 
   const load = useCallback(async () => {
@@ -1471,6 +2165,27 @@ function TabSparepart({ isAdmin }) {
 
   return (
     <div className="min-w-0">
+      {/* Sub-tab bar */}
+      <div className="bg-slate-100 p-1 rounded-xl mb-4 w-fit">
+        <div className="flex gap-1">
+          {[
+            { key: 'daftar',    label: 'Daftar Stok', icon: Boxes },
+            { key: 'pembelian', label: 'Pembelian',   icon: ShoppingCart },
+          ].map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button" onClick={() => setActiveSpareTab(key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                activeSpareTab === key ? 'bg-white shadow text-primary-700' : 'text-slate-500 hover:text-slate-700'
+              }`}>
+              <Icon size={13} /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeSpareTab === 'pembelian' ? (
+        <PembelianPanel onSparepartChange={load} />
+      ) : (
+        <>
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
         <div className="card py-3 px-2 text-center min-w-0">
@@ -1508,7 +2223,7 @@ function TabSparepart({ isAdmin }) {
           <RefreshCw size={14} />
         </button>
         <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={openNew}>
-          <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Sparepart
+          <Plus size={14} /> <span className="hidden sm:inline">Daftarkan </span>Sparepart
         </button>
       </div>
 
@@ -1538,8 +2253,13 @@ function TabSparepart({ isAdmin }) {
                       return (
                         <tr key={s._id} className={inactive ? 'opacity-50' : ''}>
                           <td>
-                            <p className="font-semibold text-slate-700 text-sm">{s.nama}</p>
-                            {inactive && <span className="text-[10px] text-red-500 font-bold">NONAKTIF</span>}
+                            <button type="button" onClick={() => setLogFor(s)}
+                              className="font-semibold text-slate-700 text-sm text-left hover:text-primary-600 hover:underline inline-flex items-center gap-1"
+                              title="Lihat riwayat stok">
+                              {s.nama}
+                              <History size={11} className="text-slate-400" />
+                            </button>
+                            {inactive && <div><span className="text-[10px] text-red-500 font-bold">NONAKTIF</span></div>}
                           </td>
                           <td className="text-xs text-slate-500">{s.kategori || '—'}</td>
                           <td className="text-right text-sm">{formatRupiah(s.hargaBeli || 0)}</td>
@@ -1550,12 +2270,6 @@ function TabSparepart({ isAdmin }) {
                           <td className="text-xs text-slate-500">{s.satuan || '—'}</td>
                           <td>
                             <div className="flex gap-1 flex-wrap">
-                              {!inactive && (
-                                <button onClick={() => setStockFor(s)}
-                                  className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Tambah stok">
-                                  <PackagePlus size={12} /> Stok
-                                </button>
-                              )}
                               <button onClick={() => openEdit(s)}
                                 className="btn btn-outline py-1 px-2 text-xs" title="Edit">
                                 <Pencil size={12} />
@@ -1588,7 +2302,12 @@ function TabSparepart({ isAdmin }) {
                   <div key={s._id} className={`card !p-3 ${inactive ? 'opacity-50' : ''}`}>
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-slate-700 truncate">{s.nama}</p>
+                        <button type="button" onClick={() => setLogFor(s)}
+                          className="font-semibold text-sm text-slate-700 truncate w-full text-left hover:text-primary-600 inline-flex items-center gap-1"
+                          title="Lihat riwayat stok">
+                          <span className="truncate">{s.nama}</span>
+                          <History size={11} className="text-slate-400 flex-shrink-0" />
+                        </button>
                         <p className="text-[11px] text-slate-400 truncate">{s.kategori || '—'}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
@@ -1609,15 +2328,9 @@ function TabSparepart({ isAdmin }) {
                       </div>
                     </div>
                     <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
-                      {!inactive && (
-                        <button onClick={() => setStockFor(s)}
-                          className="btn btn-outline py-1.5 px-2.5 text-xs flex-1 text-blue-500">
-                          <PackagePlus size={13} /> Tambah Stok
-                        </button>
-                      )}
                       <button onClick={() => openEdit(s)}
-                        className="btn btn-outline py-1.5 px-2.5 text-xs">
-                        <Pencil size={13} />
+                        className="btn btn-outline py-1.5 px-2.5 text-xs flex-1">
+                        <Pencil size={13} /> Edit
                       </button>
                       {isAdmin && !inactive && (
                         <button onClick={() => setDelConfirm(s)}
@@ -1633,20 +2346,22 @@ function TabSparepart({ isAdmin }) {
           </div>
         </>
       )}
+        </>
+      )}
 
       <SparepartFormModal
         open={modalOpen} onClose={() => setModalOpen(false)}
         onSaved={load} editData={editData}
-      />
-      <AddStockModal
-        open={!!stockFor} onClose={() => setStockFor(null)}
-        onSaved={load} sparepart={stockFor}
       />
       <ConfirmDialog
         open={!!delConfirm} onClose={() => setDelConfirm(null)} onConfirm={handleDelete}
         title="Nonaktifkan Sparepart?"
         message={`Nonaktifkan "${delConfirm?.nama}"? Item tidak hilang, hanya disembunyikan dari daftar aktif.`}
         confirmLabel="Ya, Nonaktifkan" danger
+      />
+      <SparePartLogModal
+        open={!!logFor} onClose={() => setLogFor(null)}
+        sparepart={logFor}
       />
     </div>
   );
@@ -1655,7 +2370,8 @@ function TabSparepart({ isAdmin }) {
 // Main ServicePage
 // ══════════════════════════════════════════════════════════════
 export default function ServicePage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isOwner } = useAuth();
+  const canEditArsip = isAdmin || isOwner;
   const [tab, setTab] = useState('transaksi');
 
   return (
@@ -1696,7 +2412,7 @@ export default function ServicePage() {
       {tab === 'transaksi' && <TabTransaksiWithRef isAdmin={isAdmin} />}
       {tab === 'keuangan'  && <TabKeuangan isAdmin={isAdmin} />}
       {tab === 'sparepart' && <TabSparepart isAdmin={isAdmin} />}
-      {tab === 'arsip'     && <TabArsip />}
+      {tab === 'arsip'     && <TabArsip canEdit={canEditArsip} />}
     </div>
   );
 }

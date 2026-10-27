@@ -258,5 +258,7 @@ export const sparepartAPI = {
   create:   (d)         => api.post('/sparepart', d),
   update:   (id, d)     => api.put(`/sparepart/${id}`, d),
   delete:   (id)        => api.delete(`/sparepart/${id}`),
-  addStock: (id, jumlah)=> api.post(`/sparepart/${id}/add-stock`, { jumlah }),
+  addStock: (id, payload) => api.post(`/sparepart/${id}/add-stock`, payload),
+  getLogs:         (id, params) => api.get(`/sparepart/${id}/log`, { params }),
+  getLogPembelian: (params)     => api.get('/sparepart/logs/pembelian', { params }),
 };
