@@ -262,3 +262,11 @@ export const sparepartAPI = {
   getLogs:         (id, params) => api.get(`/sparepart/${id}/log`, { params }),
   getLogPembelian: (params)     => api.get('/sparepart/logs/pembelian', { params }),
 };
+
+// ─── Service Price (daftar harga servis) ─────────
+export const servicePriceAPI = {
+  getAll: (params)  => api.get('/service-price', { params }),
+  create: (data)    => api.post('/service-price', data),
+  update: (id, data) => api.put(`/service-price/${id}`, data),
+  delete: (id)      => api.delete(`/service-price/${id}`),
+};

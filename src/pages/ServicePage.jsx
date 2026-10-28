@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { serviceAPI, customerAPI, authAPI, sparepartAPI } from '../services/api';
+import { serviceAPI, customerAPI, authAPI, sparepartAPI, servicePriceAPI } from '../services/api';
 import { formatRupiah, formatDate, formatDateTime } from '../utils/helpers';
 import { PageHeader, Modal, Loader, EmptyState, ConfirmDialog, RupiahInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,7 @@ import {
   CheckCircle, Clock, AlertCircle, XCircle, Package,
   TrendingUp, TrendingDown, DollarSign, ChevronRight,
   Smartphone, User, Phone, FileText, X, Boxes, PackagePlus, EyeOff, Eye,
-  History, ShoppingCart, ChevronLeft
+  History, ShoppingCart, ChevronLeft, Tag
 } from 'lucide-react';
 
 // ─── Konstanta ────────────────────────────────────────────────
@@ -2010,8 +2010,8 @@ function PembelianPanel({ onSparepartChange }) {
                     <th className="text-left w-[180px]">Tanggal</th>
                     <th className="text-left min-w-[200px]">Nama Sparepart</th>
                     <th className="text-center w-[120px]">Jumlah Masuk</th>
-                    <th className="text-right w-[130px]">Harga Beli</th>
-                    <th className="text-right w-[130px]">Total Modal</th>
+                    <th className="text-center w-[130px]">Harga Beli</th>
+                    <th className="text-center w-[130px]">Total Modal</th>
                     <th className="text-left w-[130px]">Dicatat Oleh</th>
                   </tr>
                 </thead>
@@ -2024,8 +2024,8 @@ function PembelianPanel({ onSparepartChange }) {
                         <td className="text-left w-[180px] text-xs text-slate-500 whitespace-nowrap">{fmtLogDateTime(l.createdAt)}</td>
                         <td className="text-left min-w-[200px] text-sm font-semibold text-slate-700">{l.sparepart?.nama || '—'}</td>
                         <td className="text-center w-[120px] text-sm font-bold text-green-600">{l.jumlah}</td>
-                        <td className="text-right w-[130px] text-sm">{formatRupiah(hb)}</td>
-                        <td className="text-right w-[130px] text-sm">{formatRupiah(sub)}</td>
+                        <td className="text-center w-[130px] text-sm">{formatRupiah(hb)}</td>
+                        <td className="text-center w-[130px] text-sm">{formatRupiah(sub)}</td>
                         <td className="text-left w-[130px] text-xs text-slate-500">{l.createdBy?.name || '—'}</td>
                       </tr>
                     );
@@ -2038,7 +2038,7 @@ function PembelianPanel({ onSparepartChange }) {
                       {data.reduce((s, l) => s + (Number(l.jumlah) || 0), 0)}
                     </td>
                     <td className="text-right w-[130px] font-semibold"></td>
-                    <td className="text-right w-[130px] text-sm text-slate-700 font-semibold">
+                    <td className="text-center w-[130px] text-sm text-slate-700 font-semibold">
                       {formatRupiah(data.reduce((s, l) => s + (Number(l.hargaBeli) || 0) * (Number(l.jumlah) || 0), 0))}
                     </td>
                     <td className="text-left w-[130px] font-semibold"></td>
@@ -2232,16 +2232,16 @@ function TabSparepart({ isAdmin }) {
           {/* Desktop / tablet — tabel */}
           <div className="card hidden sm:block">
             <div className="table-wrap">
-              <table className="table">
+              <table className="table table-fixed w-full">
                 <thead>
                   <tr>
-                    <th>Nama</th>
-                    <th>Kategori</th>
-                    <th className="text-right">Harga Beli</th>
-                    <th className="text-right">Harga Jual</th>
-                    <th className="text-right">Stok</th>
-                    <th>Satuan</th>
-                    <th>Aksi</th>
+                    <th className="text-left min-w-[200px]">Nama</th>
+                    <th className="text-left w-[120px]">Kategori</th>
+                    <th className="text-center w-[130px]">Harga Beli</th>
+                    <th className="text-center w-[130px]">Harga Jual</th>
+                    <th className="text-center w-[80px]">Stok</th>
+                    <th className="text-center w-[80px]">Satuan</th>
+                    <th className="text-center w-[80px]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
@@ -2252,7 +2252,7 @@ function TabSparepart({ isAdmin }) {
                       const low = (Number(s.stok) || 0) <= 2 && !inactive;
                       return (
                         <tr key={s._id} className={inactive ? 'opacity-50' : ''}>
-                          <td>
+                          <td className="text-left min-w-[200px]">
                             <button type="button" onClick={() => setLogFor(s)}
                               className="font-semibold text-slate-700 text-sm text-left hover:text-primary-600 hover:underline inline-flex items-center gap-1"
                               title="Lihat riwayat stok">
@@ -2261,15 +2261,15 @@ function TabSparepart({ isAdmin }) {
                             </button>
                             {inactive && <div><span className="text-[10px] text-red-500 font-bold">NONAKTIF</span></div>}
                           </td>
-                          <td className="text-xs text-slate-500">{s.kategori || '—'}</td>
-                          <td className="text-right text-sm">{formatRupiah(s.hargaBeli || 0)}</td>
-                          <td className="text-right text-sm font-semibold text-primary-600">{formatRupiah(s.hargaJual || 0)}</td>
-                          <td className={`text-right font-bold text-sm ${low ? 'text-red-500' : 'text-slate-700'}`}>
+                          <td className="text-left w-[120px] text-xs text-slate-500">{s.kategori || '—'}</td>
+                          <td className="text-center w-[130px] text-sm">{formatRupiah(s.hargaBeli || 0)}</td>
+                          <td className="text-center w-[130px] text-sm font-semibold text-primary-600">{formatRupiah(s.hargaJual || 0)}</td>
+                          <td className={`text-center w-[80px] font-bold text-sm ${low ? 'text-red-500' : 'text-slate-700'}`}>
                             {s.stok || 0}
                           </td>
-                          <td className="text-xs text-slate-500">{s.satuan || '—'}</td>
-                          <td>
-                            <div className="flex gap-1 flex-wrap">
+                          <td className="text-center w-[80px] text-xs text-slate-500">{s.satuan || '—'}</td>
+                          <td className="text-center w-[80px]">
+                            <div className="flex gap-1 flex-wrap justify-center">
                               <button onClick={() => openEdit(s)}
                                 className="btn btn-outline py-1 px-2 text-xs" title="Edit">
                                 <Pencil size={12} />
@@ -2367,6 +2367,297 @@ function TabSparepart({ isAdmin }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════
+// Tab Daftar Harga Servis
+// ══════════════════════════════════════════════════════════════
+function TabDaftarHarga({ canEdit }) {
+  const [prices, setPrices]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [search, setSearch]           = useState('');
+  const [filterMerek, setFilterMerek] = useState('');
+  const [showModal, setShowModal]     = useState(false);
+  const [editData, setEditData]       = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Debounce search 300ms
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (filterMerek)     params.merek  = filterMerek;
+      const r = await servicePriceAPI.getAll(params);
+      setPrices(r.data?.data || r.data || []);
+    } catch { toast.error('Gagal memuat daftar harga'); }
+    finally { setLoading(false); }
+  }, [debouncedSearch, filterMerek]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Merek unik untuk dropdown & datalist
+  const merekList = useMemo(() => {
+    const set = new Set();
+    prices.forEach(p => { if (p.merek) set.add(p.merek); });
+    return Array.from(set).sort();
+  }, [prices]);
+
+  const jenisKerusakanList = useMemo(() => {
+    const set = new Set();
+    prices.forEach(p => { if (p.jenisKerusakan) set.add(p.jenisKerusakan); });
+    return Array.from(set).sort();
+  }, [prices]);
+
+  const openNew  = () => { setEditData(null); setShowModal(true); };
+  const openEdit = (d) => { setEditData(d); setShowModal(true); };
+  const resetFilter = () => { setSearch(''); setFilterMerek(''); };
+
+  async function handleDelete() {
+    if (!confirmDelete) return;
+    try {
+      await servicePriceAPI.delete(confirmDelete._id);
+      toast.success('Harga dihapus');
+      setConfirmDelete(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menghapus');
+    }
+  }
+
+  return (
+    <div className="min-w-0">
+      {/* Filter & action */}
+      <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input className="input pl-9" placeholder="Cari tipe HP atau jenis kerusakan..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <select className="input sm:w-[180px] flex-shrink-0"
+          value={filterMerek} onChange={e => setFilterMerek(e.target.value)}>
+          <option value="">Semua Merek</option>
+          {merekList.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <button className="btn btn-outline py-2 px-3 text-xs flex-shrink-0" onClick={resetFilter}>
+          <RefreshCw size={14} /> Reset
+        </button>
+        {canEdit && (
+          <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={openNew}>
+            <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Harga
+          </button>
+        )}
+      </div>
+
+      {loading ? <Loader /> : (
+        <>
+          {/* Desktop / tablet — tabel */}
+          <div className="card hidden sm:block">
+            <div className="table-wrap">
+              <table className="table table-fixed w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left min-w-[160px]">Tipe HP</th>
+                    <th className="text-left w-[120px]">Merek</th>
+                    <th className="text-left min-w-[160px]">Jenis Kerusakan</th>
+                    <th className="text-center w-[130px]">Harga</th>
+                    <th className="text-left min-w-[160px]">Keterangan</th>
+                    {canEdit && <th className="text-center w-[90px]">Aksi</th>}
+                  </tr>
+                </thead>
+                <tbody className="bg-white">
+                  {prices.length === 0
+                    ? <tr><td colSpan={canEdit ? 6 : 5}><EmptyState message="Belum ada daftar harga" /></td></tr>
+                    : prices.map(p => (
+                      <tr key={p._id}>
+                        <td className="text-left min-w-[160px] text-sm font-semibold text-slate-700">{p.tipeHP || '—'}</td>
+                        <td className="text-left w-[120px]">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+                            {p.merek || '—'}
+                          </span>
+                        </td>
+                        <td className="text-left min-w-[160px] text-sm text-slate-600">{p.jenisKerusakan || '—'}</td>
+                        <td className="text-center w-[130px] text-sm font-bold text-primary-600">{formatRupiah(p.harga || 0)}</td>
+                        <td className="text-left min-w-[160px] text-xs text-slate-500">{p.keterangan || '—'}</td>
+                        {canEdit && (
+                          <td className="text-center w-[90px]">
+                            <div className="flex gap-1 flex-wrap justify-center">
+                              <button onClick={() => openEdit(p)}
+                                className="btn btn-outline py-1 px-2 text-xs" title="Edit">
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => setConfirmDelete(p)}
+                                className="btn btn-outline py-1 px-2 text-xs text-red-500" title="Hapus">
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile — kartu */}
+          <div className="sm:hidden space-y-2">
+            {prices.length === 0
+              ? <div className="card"><EmptyState message="Belum ada daftar harga" /></div>
+              : prices.map(p => (
+                <div key={p._id} className="card !p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-slate-700 truncate">{p.tipeHP || '—'}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                          {p.merek || '—'}
+                        </span>
+                        <span className="text-[11px] text-slate-500 truncate">{p.jenisKerusakan || '—'}</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-base text-primary-600">{formatRupiah(p.harga || 0)}</p>
+                    </div>
+                  </div>
+                  {p.keterangan && (
+                    <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100 mt-1">{p.keterangan}</p>
+                  )}
+                  {canEdit && (
+                    <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
+                      <button onClick={() => openEdit(p)}
+                        className="btn btn-outline py-1.5 px-2.5 text-xs flex-1">
+                        <Pencil size={13} /> Edit
+                      </button>
+                      <button onClick={() => setConfirmDelete(p)}
+                        className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </>
+      )}
+
+      <ServicePriceModal
+        open={showModal} onClose={() => setShowModal(false)}
+        onSaved={load} editData={editData}
+        merekList={merekList} jenisKerusakanList={jenisKerusakanList}
+      />
+      <ConfirmDialog
+        open={!!confirmDelete} onClose={() => setConfirmDelete(null)} onConfirm={handleDelete}
+        title="Hapus Daftar Harga?"
+        message={`Hapus harga "${confirmDelete?.tipeHP} — ${confirmDelete?.jenisKerusakan}"? Tindakan ini tidak bisa dibatalkan.`}
+        confirmLabel="Ya, Hapus" danger
+      />
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// Modal Tambah/Edit Daftar Harga
+// ══════════════════════════════════════════════════════════════
+function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisKerusakanList }) {
+  const [form, setForm] = useState({
+    tipeHP: '', merek: '', jenisKerusakan: '', harga: 0, keterangan: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm(editData ? {
+        tipeHP:         editData.tipeHP         || '',
+        merek:          editData.merek          || '',
+        jenisKerusakan: editData.jenisKerusakan || '',
+        harga:          editData.harga          || 0,
+        keterangan:     editData.keterangan     || '',
+      } : { tipeHP: '', merek: '', jenisKerusakan: '', harga: 0, keterangan: '' });
+    }
+  }, [open, editData]);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  async function handleSave() {
+    if (!form.tipeHP.trim())         return toast.error('Tipe HP wajib diisi');
+    if (!form.merek.trim())          return toast.error('Merek wajib diisi');
+    if (!form.jenisKerusakan.trim()) return toast.error('Jenis kerusakan wajib diisi');
+    if (!(Number(form.harga) > 0))   return toast.error('Harga wajib diisi');
+
+    setSaving(true);
+    try {
+      const payload = {
+        tipeHP:         form.tipeHP.trim(),
+        merek:          form.merek.trim(),
+        jenisKerusakan: form.jenisKerusakan.trim(),
+        harga:          Number(form.harga) || 0,
+        keterangan:     form.keterangan.trim(),
+      };
+      if (editData) {
+        await servicePriceAPI.update(editData._id, payload);
+        toast.success('Harga diperbarui');
+      } else {
+        await servicePriceAPI.create(payload);
+        toast.success('Harga ditambahkan');
+      }
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menyimpan');
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={editData ? 'Edit Harga' : 'Tambah Harga Baru'} size="sm">
+      <div className="space-y-3">
+        <div>
+          <label className="label">Tipe HP *</label>
+          <input className="input" placeholder="iPhone 11, Samsung A51..."
+            value={form.tipeHP} onChange={e => set('tipeHP', e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Merek *</label>
+          <input className="input" list="merekList" placeholder="Apple, Samsung, Xiaomi..."
+            value={form.merek} onChange={e => set('merek', e.target.value)} />
+          <datalist id="merekList">
+            {(merekList || []).map(m => <option key={m} value={m} />)}
+          </datalist>
+        </div>
+        <div>
+          <label className="label">Jenis Kerusakan *</label>
+          <input className="input" list="jenisKerusakanList" placeholder="Ganti LCD, Ganti Baterai..."
+            value={form.jenisKerusakan} onChange={e => set('jenisKerusakan', e.target.value)} />
+          <datalist id="jenisKerusakanList">
+            {(jenisKerusakanList || []).map(j => <option key={j} value={j} />)}
+          </datalist>
+        </div>
+        <div>
+          <label className="label">Harga *</label>
+          <RupiahInput value={form.harga} onChange={v => set('harga', v)} />
+        </div>
+        <div>
+          <label className="label">Keterangan</label>
+          <input className="input" placeholder="misal: termasuk sparepart original"
+            value={form.keterangan} onChange={e => set('keterangan', e.target.value)} />
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+          <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
+            {saving ? 'Menyimpan...' : editData ? 'Simpan Perubahan' : 'Tambahkan'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // Main ServicePage
 // ══════════════════════════════════════════════════════════════
 export default function ServicePage() {
@@ -2394,10 +2685,11 @@ export default function ServicePage() {
       <div className="bg-slate-100 p-1 rounded-xl mb-5 overflow-x-auto sm:w-fit">
         <div className="flex gap-1 w-max sm:w-auto">
           {[
-            { key: 'transaksi', label: 'Transaksi Servis', icon: Wrench },
-            { key: 'keuangan',  label: 'Keuangan Servis',  icon: DollarSign },
-            { key: 'sparepart', label: 'Stok Sparepart',   icon: Boxes },
-            { key: 'arsip',     label: 'Arsip',             icon: Archive },
+            { key: 'transaksi',    label: 'Transaksi Servis', icon: Wrench },
+            { key: 'keuangan',     label: 'Keuangan Servis',  icon: DollarSign },
+            { key: 'sparepart',    label: 'Stok Sparepart',   icon: Boxes },
+            { key: 'arsip',        label: 'Arsip',            icon: Archive },
+            { key: 'daftarHarga',  label: 'Daftar Harga',     icon: Tag },
           ].map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
@@ -2409,10 +2701,11 @@ export default function ServicePage() {
         </div>
       </div>
 
-      {tab === 'transaksi' && <TabTransaksiWithRef isAdmin={isAdmin} />}
-      {tab === 'keuangan'  && <TabKeuangan isAdmin={isAdmin} />}
-      {tab === 'sparepart' && <TabSparepart isAdmin={isAdmin} />}
-      {tab === 'arsip'     && <TabArsip canEdit={canEditArsip} />}
+      {tab === 'transaksi'   && <TabTransaksiWithRef isAdmin={isAdmin} />}
+      {tab === 'keuangan'    && <TabKeuangan isAdmin={isAdmin} />}
+      {tab === 'sparepart'   && <TabSparepart isAdmin={isAdmin} />}
+      {tab === 'arsip'       && <TabArsip canEdit={canEditArsip} />}
+      {tab === 'daftarHarga' && <TabDaftarHarga canEdit={canEditArsip} />}
     </div>
   );
 }
