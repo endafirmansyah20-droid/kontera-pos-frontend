@@ -1679,7 +1679,7 @@ function OwnerUserManagement() {
 }
 
 export function PengaturanPage() {
-  const { user: currentUser, isAdmin, isSuperAdmin } = useAuth();
+  const { user: currentUser, isAdmin, isSuperAdmin, isOwner } = useAuth();
   const [settings, setSettings]   = useState(null);
   const [users, setUsers]         = useState([]);
   const [cabangs, setCabangs]     = useState([]);
@@ -2627,9 +2627,11 @@ export function PengaturanPage() {
                 <p className="text-xs text-slate-400 mt-0.5">Owner & karyawan dari semua client</p>
               )}
             </div>
-            <button className="btn btn-primary" onClick={() => setShowUserModal(true)}>
-              <Plus size={16} /> Tambah User
-            </button>
+            {(isSuperAdmin || isOwner) && (
+              <button className="btn btn-primary" onClick={() => setShowUserModal(true)}>
+                <Plus size={16} /> Tambah User
+              </button>
+            )}
           </div>
           <div className="space-y-2">
             {users.map(u => (
@@ -2669,6 +2671,7 @@ export function PengaturanPage() {
       )}
 
       {/* Modal Tambah User */}
+      {(isSuperAdmin || isOwner) && (
       <Modal open={showUserModal} onClose={() => setShowUserModal(false)} title="Tambah Pengguna" size="sm">
         <div className="space-y-3">
           <div><label className="label">Nama Lengkap *</label>
@@ -2705,6 +2708,7 @@ export function PengaturanPage() {
           </button>
         </div>
       </Modal>
+      )}
 
       {/* Modal Edit User */}
       <Modal open={!!editUser} onClose={() => setEditUser(null)} title={`Edit: ${editUser?.name}`} size="sm">
