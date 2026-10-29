@@ -1824,7 +1824,7 @@ export function PengaturanPage() {
     if (isAdmin) loadUsers();
     loadBackupInfo();
     loadRewards();
-    // Load cabang untuk superadmin
+    // Load cabang untuk superadmin dan admin
     if (isSuperAdmin || isAdmin) {
       cabangAPI.getAll().then(r => setCabangs(r.data.data || [])).catch(() => {});
     }
@@ -1839,7 +1839,7 @@ export function PengaturanPage() {
 
   const handleAddUser = async () => {
     if (!userForm.name || !userForm.username || !userForm.password) return toast.error('Semua field wajib diisi');
-    if (isSuperAdmin && !userForm.cabang) return toast.error('Pilih cabang untuk user ini');
+    if ((isSuperAdmin || isAdmin) && !userForm.cabang) return toast.error('Pilih cabang untuk user ini');
     setAddingUser(true);
     try {
       await authAPI.register({
