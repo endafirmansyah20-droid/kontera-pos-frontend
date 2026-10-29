@@ -1825,7 +1825,7 @@ export function PengaturanPage() {
     loadBackupInfo();
     loadRewards();
     // Load cabang untuk superadmin
-    if (isSuperAdmin) {
+    if (isSuperAdmin || isAdmin) {
       cabangAPI.getAll().then(r => setCabangs(r.data.data || [])).catch(() => {});
     }
   }, [isAdmin, isSuperAdmin, loadRewards]);
