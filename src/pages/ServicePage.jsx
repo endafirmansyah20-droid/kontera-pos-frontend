@@ -938,7 +938,8 @@ function TabArsip({ canEdit }) {
     setDetailLoading(true);
     try {
       const res = await serviceAPI.getArsipDetail(bulan, tahun);
-      setDetailData(res.data?.data || []);
+      const txs = res.data?.data?.transactions || [];
+      setDetailData(Array.isArray(txs) ? txs : []);
     } catch {
       toast.error('Gagal memuat detail arsip');
       setDetailData([]);
