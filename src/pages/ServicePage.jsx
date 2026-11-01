@@ -895,8 +895,8 @@ function TabKeuangan({ isAdmin }) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Tab: Arsip — transaksi "diambil" dari bulan sebelumnya ke bawah.
-// Transaksi "diambil" bulan berjalan tetap di Tab Transaksi Servis.
+// Tab: Arsip — rekap bulanan transaksi "diambil" dari bulan
+// sebelumnya ke bawah. Bulan berjalan tetap di Tab Transaksi.
 // ══════════════════════════════════════════════════════════════
 function TabArsip({ canEdit }) {
   const [data, setData]           = useState([]);
@@ -905,20 +905,20 @@ function TabArsip({ canEdit }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData]   = useState(null);
 
+  // Drill-down detail per bulan
+  const [detailOpen, setDetailOpen]       = useState(false);
+  const [detailLabel, setDetailLabel]     = useState('');
+  const [detailBulan, setDetailBulan]     = useState(null);
+  const [detailTahun, setDetailTahun]     = useState(null);
+  const [detailData, setDetailData]       = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Ambil semua transaksi status 'diambil', lalu filter frontend:
-      // hanya yang createdAt < awal bulan berjalan (= bulan lalu ke bawah).
-      const res = await serviceAPI.getAll({ status: 'diambil' });
-      const all = res.data?.data || [];
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const archived = all.filter(t => {
-        const ts = new Date(t.createdAt || t.receivedAt).getTime();
-        return !Number.isNaN(ts) && ts < startOfMonth;
-      });
-      setData(archived);
+      const res = await serviceAPI.getArsipList();
+      const list = res.data?.data || [];
+      setData(list);
     } catch { toast.error('Gagal memuat arsip'); }
     finally { setLoading(false); }
   }, []);
@@ -928,21 +928,41 @@ function TabArsip({ canEdit }) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return data;
-    return data.filter(d =>
-      (d.invoiceNumber || '').toLowerCase().includes(q) ||
-      (d.customerName  || '').toLowerCase().includes(q) ||
-      (d.customerPhone || '').toLowerCase().includes(q) ||
-      (d.deviceBrand   || '').toLowerCase().includes(q) ||
-      (d.deviceModel   || '').toLowerCase().includes(q)
+    return data.filter(m =>
+      (m.label || '').toLowerCase().includes(q) ||
+      String(m.tahun || '').includes(q)
     );
   }, [data, search]);
 
+  const loadDetail = useCallback(async (bulan, tahun) => {
+    setDetailLoading(true);
+    try {
+      const res = await serviceAPI.getArsipDetail(bulan, tahun);
+      setDetailData(res.data?.data || []);
+    } catch {
+      toast.error('Gagal memuat detail arsip');
+      setDetailData([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const openDetail = (m) => {
+    setDetailBulan(m.bulan);
+    setDetailTahun(m.tahun);
+    setDetailLabel(m.label || `${m.bulan}/${m.tahun}`);
+    setDetailData([]);
+    setDetailOpen(true);
+    loadDetail(m.bulan, m.tahun);
+  };
+
   const openEdit = (d) => { setEditData(d); setModalOpen(true); };
 
-  // Summary ringkas untuk arsip
-  const totalTx     = data.length;
-  const totalOmset  = data.reduce((s, t) => s + (Number(t.serviceFee) || 0), 0);
-  const totalProfit = data.reduce((s, t) => s + (Number(t.profit)     || 0), 0);
+  // Summary rekap bulanan
+  const totalBulan  = data.length;
+  const totalTx     = data.reduce((s, m) => s + (Number(m.jumlahTx) || 0), 0);
+  const totalOmset  = data.reduce((s, m) => s + (Number(m.omset)    || 0), 0);
+  const totalProfit = data.reduce((s, m) => s + (Number(m.laba)     || 0), 0);
 
   return (
     <div className="min-w-0">
@@ -950,14 +970,18 @@ function TabArsip({ canEdit }) {
       <div className="mb-3">
         <h3 className="font-bold text-slate-800 text-sm sm:text-base">📦 Arsip Transaksi Service</h3>
         <p className="text-[11px] sm:text-xs text-slate-400">
-          Transaksi status "Diambil" dari bulan-bulan sebelumnya (bulan berjalan tetap di Tab Transaksi).
+          Rekap bulanan transaksi status "Diambil" dari bulan-bulan sebelumnya (bulan berjalan tetap di Tab Transaksi).
         </p>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
         <div className="card py-3 px-2 text-center min-w-0">
-          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Jumlah Transaksi</p>
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Jumlah Bulan</p>
+          <p className="font-bold text-slate-700 text-xs sm:text-sm">{totalBulan}</p>
+        </div>
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Total Transaksi</p>
           <p className="font-bold text-slate-700 text-xs sm:text-sm">{totalTx}</p>
         </div>
         <div className="card py-3 px-2 text-center min-w-0">
@@ -976,7 +1000,7 @@ function TabArsip({ canEdit }) {
       <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
         <div className="relative flex-1 min-w-0 sm:min-w-[180px]">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input pl-9" placeholder="Cari invoice, nama, HP..."
+          <input className="input pl-9" placeholder="Cari bulan / tahun..."
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <button className="btn btn-outline py-2 px-3 flex-shrink-0" onClick={load}>
@@ -986,53 +1010,36 @@ function TabArsip({ canEdit }) {
 
       {loading ? <Loader /> : (
         <>
-          {/* Desktop / tablet — tabel */}
+          {/* Desktop / tablet — tabel rekap bulanan */}
           <div className="card hidden sm:block">
             <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Invoice</th>
-                    <th>Pelanggan</th>
-                    <th>HP</th>
-                    <th>Sparepart</th>
-                    <th>Biaya Service</th>
-                    <th>Keuntungan</th>
-                    <th>Bayar</th>
-                    <th>Tgl</th>
-                    {canEdit && <th>Aksi</th>}
+                    <th>Bulan</th>
+                    <th>Jumlah Transaksi</th>
+                    <th>Omset</th>
+                    <th>Laba</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
                   {filtered.length === 0
-                    ? <tr><td colSpan={canEdit ? 9 : 8}><EmptyState message="Belum ada arsip transaksi" /></td></tr>
-                    : filtered.map(d => (
-                      <tr key={d._id}>
-                        <td><code className="text-xs font-mono text-primary-600">{d.invoiceNumber}</code></td>
-                        <td>
-                          <p className="font-semibold text-slate-700 text-sm">{d.customerName}</p>
-                          {d.customerPhone && <p className="text-xs text-slate-400">{d.customerPhone}</p>}
-                        </td>
-                        <td className="text-sm text-slate-600">{d.deviceBrand} {d.deviceModel}</td>
-                        <td className="text-sm">{formatRupiah(d.partsCost)}</td>
-                        <td className="text-sm">{formatRupiah(d.serviceFee)}</td>
-                        <td className={(d.profit || 0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>
-                          {formatRupiah(d.profit || 0)}
+                    ? <tr><td colSpan={5}><EmptyState message="Belum ada arsip bulanan" /></td></tr>
+                    : filtered.map(m => (
+                      <tr key={`${m.tahun}-${m.bulan}`}>
+                        <td className="font-semibold text-slate-700 text-sm">{m.label}</td>
+                        <td className="text-sm">{m.jumlahTx || 0}</td>
+                        <td className="text-sm font-semibold text-blue-600">{formatRupiah(m.omset || 0)}</td>
+                        <td className={(m.laba || 0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>
+                          {formatRupiah(m.laba || 0)}
                         </td>
                         <td>
-                          <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                            {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                          </span>
+                          <button onClick={() => openDetail(m)}
+                            className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Detail">
+                            <ChevronRight size={12} /> Detail
+                          </button>
                         </td>
-                        <td className="text-xs text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</td>
-                        {canEdit && (
-                          <td>
-                            <button onClick={() => openEdit(d)}
-                              className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Edit">
-                              <Edit2 size={12} /> Edit
-                            </button>
-                          </td>
-                        )}
                       </tr>
                     ))
                   }
@@ -1041,44 +1048,32 @@ function TabArsip({ canEdit }) {
             </div>
           </div>
 
-          {/* Mobile — kartu */}
+          {/* Mobile — kartu rekap bulanan */}
           <div className="sm:hidden space-y-2">
             {filtered.length === 0
-              ? <div className="card"><EmptyState message="Belum ada arsip transaksi" /></div>
-              : filtered.map(d => (
-                <div key={d._id} className="card !p-3">
+              ? <div className="card"><EmptyState message="Belum ada arsip bulanan" /></div>
+              : filtered.map(m => (
+                <div key={`${m.tahun}-${m.bulan}`} className="card !p-3">
                   <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
-                    <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                      {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                    </span>
+                    <p className="font-semibold text-slate-700">{m.label}</p>
+                    <span className="text-[11px] text-slate-400 flex-shrink-0">{m.jumlahTx || 0} tx</span>
                   </div>
-                  <p className="font-semibold text-sm text-slate-700 truncate">{d.customerName}</p>
-                  {d.customerPhone && <p className="text-[11px] text-slate-400 mb-1">{d.customerPhone}</p>}
-                  <p className="text-xs text-slate-600 mb-2">{d.deviceBrand} {d.deviceModel}</p>
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-center">
                     <div>
-                      <p className="text-[10px] text-slate-400">Sparepart</p>
-                      <p className="text-[11px] font-semibold">{formatRupiah(d.partsCost)}</p>
+                      <p className="text-[10px] text-slate-400">Omset</p>
+                      <p className="text-[11px] font-semibold text-blue-600">{formatRupiah(m.omset || 0)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400">Service</p>
-                      <p className="text-[11px] font-semibold">{formatRupiah(d.serviceFee)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400">Untung</p>
-                      <p className={`text-[11px] font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {formatRupiah(d.profit || 0)}
+                      <p className="text-[10px] text-slate-400">Laba</p>
+                      <p className={`text-[11px] font-bold ${(m.laba || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {formatRupiah(m.laba || 0)}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-slate-100">
-                    <p className="text-[11px] text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</p>
-                    {canEdit && (
-                      <button onClick={() => openEdit(d)} className="btn btn-outline py-1.5 px-3 text-xs text-blue-500">
-                        <Edit2 size={13} /> Edit
-                      </button>
-                    )}
+                  <div className="flex items-center justify-end pt-2 mt-2 border-t border-slate-100">
+                    <button onClick={() => openDetail(m)} className="btn btn-outline py-1.5 px-3 text-xs text-blue-500">
+                      <ChevronRight size={13} /> Detail
+                    </button>
                   </div>
                 </div>
               ))
@@ -1087,10 +1082,122 @@ function TabArsip({ canEdit }) {
         </>
       )}
 
+      {/* Modal Detail per Bulan */}
+      <Modal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        title={`Detail Arsip — ${detailLabel}`}
+        size="xl"
+      >
+        {detailLoading ? <Loader /> : (
+          detailData.length === 0 ? (
+            <EmptyState message="Tidak ada transaksi di bulan ini" />
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Invoice</th>
+                        <th>Pelanggan</th>
+                        <th>HP</th>
+                        <th>Sparepart</th>
+                        <th>Biaya Service</th>
+                        <th>Keuntungan</th>
+                        <th>Bayar</th>
+                        <th>Tgl</th>
+                        {canEdit && <th>Aksi</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {detailData.map(d => (
+                        <tr key={d._id}>
+                          <td><code className="text-xs font-mono text-primary-600">{d.invoiceNumber}</code></td>
+                          <td>
+                            <p className="font-semibold text-slate-700 text-sm">{d.customerName}</p>
+                            {d.customerPhone && <p className="text-xs text-slate-400">{d.customerPhone}</p>}
+                          </td>
+                          <td className="text-sm text-slate-600">{d.deviceBrand} {d.deviceModel}</td>
+                          <td className="text-sm">{formatRupiah(d.partsCost)}</td>
+                          <td className="text-sm">{formatRupiah(d.serviceFee)}</td>
+                          <td className={(d.profit || 0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>
+                            {formatRupiah(d.profit || 0)}
+                          </td>
+                          <td>
+                            <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                              {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                            </span>
+                          </td>
+                          <td className="text-xs text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</td>
+                          {canEdit && (
+                            <td>
+                              <button onClick={() => openEdit(d)}
+                                className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Edit">
+                                <Edit2 size={12} /> Edit
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="sm:hidden space-y-2">
+                {detailData.map(d => (
+                  <div key={d._id} className="card !p-3">
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
+                      <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                        {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                      </span>
+                    </div>
+                    <p className="font-semibold text-sm text-slate-700 truncate">{d.customerName}</p>
+                    {d.customerPhone && <p className="text-[11px] text-slate-400 mb-1">{d.customerPhone}</p>}
+                    <p className="text-xs text-slate-600 mb-2">{d.deviceBrand} {d.deviceModel}</p>
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                      <div>
+                        <p className="text-[10px] text-slate-400">Sparepart</p>
+                        <p className="text-[11px] font-semibold">{formatRupiah(d.partsCost)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400">Service</p>
+                        <p className="text-[11px] font-semibold">{formatRupiah(d.serviceFee)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400">Untung</p>
+                        <p className={`text-[11px] font-bold ${(d.profit || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          {formatRupiah(d.profit || 0)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-slate-100">
+                      <p className="text-[11px] text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</p>
+                      {canEdit && (
+                        <button onClick={() => openEdit(d)} className="btn btn-outline py-1.5 px-3 text-xs text-blue-500">
+                          <Edit2 size={13} /> Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )
+        )}
+      </Modal>
+
       <ServiceFormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSaved={load}
+        onSaved={() => {
+          load();
+          if (detailBulan != null && detailTahun != null) loadDetail(detailBulan, detailTahun);
+        }}
         editData={editData}
       />
     </div>
