@@ -617,9 +617,12 @@ function TabTransaksi({ isAdmin }) {
                         ) : <StatusBadge status={d.status} />}
                       </td>
                       <td>
-                        <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                          {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                        </span>
+                        {d.status === 'batal'
+                          ? <span className="text-xs text-slate-400">-</span>
+                          : <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                              {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                            </span>
+                        }
                       </td>
                       <td className="text-xs text-slate-400">{formatDate(d.receivedAt)}</td>
                       <td>
@@ -1108,6 +1111,7 @@ function TabArsip({ canEdit }) {
                         <th>Biaya Service</th>
                         <th>Keuntungan</th>
                         <th>Bayar</th>
+                        <th>Status</th>
                         <th>Tgl</th>
                         {canEdit && <th>Aksi</th>}
                       </tr>
@@ -1127,10 +1131,14 @@ function TabArsip({ canEdit }) {
                             {formatRupiah(d.profit || 0)}
                           </td>
                           <td>
-                            <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                              {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                            </span>
+                            {d.status === 'batal'
+                              ? <span className="text-xs text-slate-400">-</span>
+                              : <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                                  {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                                </span>
+                            }
                           </td>
+                          <td><StatusBadge status={d.status} /></td>
                           <td className="text-xs text-slate-400">{formatDate(d.createdAt || d.receivedAt)}</td>
                           {canEdit && (
                             <td>
@@ -1153,9 +1161,12 @@ function TabArsip({ canEdit }) {
                   <div key={d._id} className="card !p-3">
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
-                      <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                        {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                      </span>
+                      {d.status === 'batal'
+                        ? <span className="text-[11px] text-slate-400 flex-shrink-0">-</span>
+                        : <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                            {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                          </span>
+                      }
                     </div>
                     <p className="font-semibold text-sm text-slate-700 truncate">{d.customerName}</p>
                     {d.customerPhone && <p className="text-[11px] text-slate-400 mb-1">{d.customerPhone}</p>}
@@ -2973,9 +2984,12 @@ function TabTransaksiWithRef({ isAdmin }) {
                           ) : <StatusBadge status={d.status} />}
                         </td>
                         <td>
-                          <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                            {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                          </span>
+                          {d.status === 'batal'
+                            ? <span className="text-xs text-slate-400">-</span>
+                            : <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                                {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                              </span>
+                          }
                         </td>
                         <td className="text-xs text-slate-400">{formatDate(d.receivedAt)}</td>
                         <td>
@@ -2997,9 +3011,12 @@ function TabTransaksiWithRef({ isAdmin }) {
                 <div key={d._id} className={`card !p-3 ${d.isVoid ? 'opacity-50' : ''}`}>
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
-                    <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
-                      {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
-                    </span>
+                    {d.status === 'batal'
+                      ? <span className="text-[11px] text-slate-400 flex-shrink-0">-</span>
+                      : <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
+                          {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
+                        </span>
+                    }
                   </div>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="font-semibold text-sm text-slate-700 truncate flex-1">{d.customerName}</p>
