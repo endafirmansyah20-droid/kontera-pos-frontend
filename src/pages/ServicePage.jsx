@@ -618,7 +618,7 @@ function TabTransaksi({ isAdmin }) {
                       </td>
                       <td>
                         {d.status === 'batal'
-                          ? <span className="text-xs text-slate-400">-</span>
+                          ? <span className="block text-center text-xs text-slate-400">-</span>
                           : <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
                               {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
                             </span>
@@ -1132,7 +1132,7 @@ function TabArsip({ canEdit }) {
                           </td>
                           <td>
                             {d.status === 'batal'
-                              ? <span className="text-xs text-slate-400">-</span>
+                              ? <span className="block text-center text-xs text-slate-400">-</span>
                               : <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
                                   {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
                                 </span>
@@ -1162,7 +1162,7 @@ function TabArsip({ canEdit }) {
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
                       {d.status === 'batal'
-                        ? <span className="text-[11px] text-slate-400 flex-shrink-0">-</span>
+                        ? <span className="block text-center text-[11px] text-slate-400 flex-shrink-0">-</span>
                         : <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
                             {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
                           </span>
@@ -2985,7 +2985,7 @@ function TabTransaksiWithRef({ isAdmin }) {
                         </td>
                         <td>
                           {d.status === 'batal'
-                            ? <span className="text-xs text-slate-400">-</span>
+                            ? <span className="block text-center text-xs text-slate-400">-</span>
                             : <span className={`text-xs font-bold ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
                                 {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
                               </span>
@@ -3012,7 +3012,7 @@ function TabTransaksiWithRef({ isAdmin }) {
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <code className="text-xs font-mono text-primary-600 truncate">{d.invoiceNumber}</code>
                     {d.status === 'batal'
-                      ? <span className="text-[11px] text-slate-400 flex-shrink-0">-</span>
+                      ? <span className="block text-center text-[11px] text-slate-400 flex-shrink-0">-</span>
                       : <span className={`text-[11px] font-bold flex-shrink-0 ${d.isPaid ? 'text-green-600' : 'text-orange-500'}`}>
                           {d.isPaid ? '✓ Lunas' : '⏳ Belum'}
                         </span>
