@@ -8,7 +8,7 @@ import { Archive, Pencil } from 'lucide-react';
 import {
   Wrench, Plus, Search, RefreshCw, Edit2, Trash2,
   CheckCircle, Clock, AlertCircle, XCircle, Package,
-  TrendingUp, TrendingDown, DollarSign, ChevronRight,
+  TrendingUp, TrendingDown, DollarSign, ChevronRight, ChevronDown,
   Smartphone, User, Phone, FileText, X, Boxes, PackagePlus, EyeOff, Eye,
   History, ShoppingCart, ChevronLeft, Tag
 } from 'lucide-react';
@@ -2489,6 +2489,13 @@ function TabSparepart({ isAdmin }) {
 // ══════════════════════════════════════════════════════════════
 // Tab Daftar Harga Servis
 // ══════════════════════════════════════════════════════════════
+// Normalisasi: dukung data lama (harga + keterangan) & baru (hargaList)
+function toHargaList(p) {
+  if (Array.isArray(p?.hargaList) && p.hargaList.length > 0) return p.hargaList;
+  if (p?.harga != null) return [{ harga: p.harga, keterangan: p.keterangan || '' }];
+  return [];
+}
+
 function TabDaftarHarga({ canEdit }) {
   const [prices, setPrices]           = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -2497,6 +2504,9 @@ function TabDaftarHarga({ canEdit }) {
   const [showModal, setShowModal]     = useState(false);
   const [editData, setEditData]       = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [expandedId, setExpandedId]   = useState(null);
+
+  const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
 
   // Debounce search 300ms
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -2584,40 +2594,82 @@ function TabDaftarHarga({ canEdit }) {
                     <th className="text-left w-[120px]">Merek</th>
                     <th className="text-left min-w-[160px]">Jenis Kerusakan</th>
                     <th className="text-center w-[130px]">Harga</th>
-                    <th className="text-left min-w-[160px]">Keterangan</th>
                     {canEdit && <th className="text-center w-[90px]">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody className="bg-white">
                   {prices.length === 0
-                    ? <tr><td colSpan={canEdit ? 6 : 5}><EmptyState message="Belum ada daftar harga" /></td></tr>
-                    : prices.map(p => (
-                      <tr key={p._id}>
-                        <td className="text-left min-w-[160px] text-sm font-semibold text-slate-700">{p.tipeHP || '—'}</td>
-                        <td className="text-left w-[120px]">
-                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
-                            {p.merek || '—'}
-                          </span>
-                        </td>
-                        <td className="text-left min-w-[160px] text-sm text-slate-600">{p.jenisKerusakan || '—'}</td>
-                        <td className="text-center w-[130px] text-sm font-bold text-primary-600">{formatRupiah(p.harga || 0)}</td>
-                        <td className="text-left min-w-[160px] text-xs text-slate-500">{p.keterangan || '—'}</td>
-                        {canEdit && (
-                          <td className="text-center w-[90px]">
-                            <div className="flex gap-1 flex-wrap justify-center">
-                              <button onClick={() => openEdit(p)}
-                                className="btn btn-outline py-1 px-2 text-xs" title="Edit">
-                                <Pencil size={12} />
-                              </button>
-                              <button onClick={() => setConfirmDelete(p)}
-                                className="btn btn-outline py-1 px-2 text-xs text-red-500" title="Hapus">
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))
+                    ? <tr><td colSpan={canEdit ? 5 : 4}><EmptyState message="Belum ada daftar harga" /></td></tr>
+                    : prices.map(p => {
+                      const list       = toHargaList(p);
+                      const first      = list[0] || { harga: 0, keterangan: '' };
+                      const hasMore    = list.length > 1;
+                      const isExpanded = expandedId === p._id;
+                      return (
+                        <React.Fragment key={p._id}>
+                          <tr>
+                            <td className="text-left min-w-[160px] text-sm font-semibold text-slate-700">{p.tipeHP || '—'}</td>
+                            <td className="text-left w-[120px]">
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+                                {p.merek || '—'}
+                              </span>
+                            </td>
+                            <td className="text-left min-w-[160px] text-sm text-slate-600">{p.jenisKerusakan || '—'}</td>
+                            <td className="text-center w-[130px]">
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-sm font-bold text-primary-600">{formatRupiah(first.harga || 0)}</span>
+                                {hasMore && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpand(p._id)}
+                                    className="p-0.5 rounded hover:bg-slate-100 text-slate-500"
+                                    title={isExpanded ? 'Tutup' : `Lihat ${list.length} harga`}
+                                  >
+                                    {isExpanded
+                                      ? <ChevronDown size={14} />
+                                      : <ChevronRight size={14} />}
+                                  </button>
+                                )}
+                              </div>
+                              {hasMore && (
+                                <span className="block text-[10px] text-slate-400 mt-0.5">+{list.length - 1} harga lain</span>
+                              )}
+                            </td>
+                            {canEdit && (
+                              <td className="text-center w-[90px]">
+                                <div className="flex gap-1 flex-wrap justify-center">
+                                  <button onClick={() => openEdit(p)}
+                                    className="btn btn-outline py-1 px-2 text-xs" title="Edit">
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button onClick={() => setConfirmDelete(p)}
+                                    className="btn btn-outline py-1 px-2 text-xs text-red-500" title="Hapus">
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                          {isExpanded && hasMore && (
+                            <tr className="bg-slate-50">
+                              <td colSpan={canEdit ? 5 : 4} className="px-4 py-3">
+                                <div className="space-y-1.5">
+                                  {list.map((h, idx) => (
+                                    <div key={idx} className="flex items-center gap-3 text-xs">
+                                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary-100 text-primary-600 font-semibold text-[10px] flex-shrink-0">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="font-bold text-primary-600 min-w-[110px]">{formatRupiah(h.harga || 0)}</span>
+                                      <span className="text-slate-500 truncate">{h.keterangan || '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
                   }
                 </tbody>
               </table>
@@ -2628,39 +2680,75 @@ function TabDaftarHarga({ canEdit }) {
           <div className="sm:hidden space-y-2">
             {prices.length === 0
               ? <div className="card"><EmptyState message="Belum ada daftar harga" /></div>
-              : prices.map(p => (
-                <div key={p._id} className="card !p-3">
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-slate-700 truncate">{p.tipeHP || '—'}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
-                          {p.merek || '—'}
-                        </span>
-                        <span className="text-[11px] text-slate-500 truncate">{p.jenisKerusakan || '—'}</span>
+              : prices.map(p => {
+                const list       = toHargaList(p);
+                const first      = list[0] || { harga: 0, keterangan: '' };
+                const hasMore    = list.length > 1;
+                const isExpanded = expandedId === p._id;
+                return (
+                  <div key={p._id} className="card !p-3">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-slate-700 truncate">{p.tipeHP || '—'}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                            {p.merek || '—'}
+                          </span>
+                          <span className="text-[11px] text-slate-500 truncate">{p.jenisKerusakan || '—'}</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="flex items-center justify-end gap-1">
+                          <p className="font-bold text-base text-primary-600">{formatRupiah(first.harga || 0)}</p>
+                          {hasMore && (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(p._id)}
+                              className="p-0.5 rounded hover:bg-slate-100 text-slate-500"
+                              title={isExpanded ? 'Tutup' : `Lihat ${list.length} harga`}
+                            >
+                              {isExpanded
+                                ? <ChevronDown size={16} />
+                                : <ChevronRight size={16} />}
+                            </button>
+                          )}
+                        </div>
+                        {hasMore && (
+                          <span className="block text-[10px] text-slate-400">+{list.length - 1} harga lain</span>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="font-bold text-base text-primary-600">{formatRupiah(p.harga || 0)}</p>
-                    </div>
+                    {first.keterangan && !isExpanded && (
+                      <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100 mt-1">{first.keterangan}</p>
+                    )}
+                    {isExpanded && hasMore && (
+                      <div className="pt-2 border-t border-slate-100 mt-1 space-y-1.5">
+                        {list.map((h, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-[11px]">
+                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary-100 text-primary-600 font-semibold text-[9px] flex-shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="font-bold text-primary-600 min-w-[80px]">{formatRupiah(h.harga || 0)}</span>
+                            <span className="text-slate-500 truncate">{h.keterangan || '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {canEdit && (
+                      <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
+                        <button onClick={() => openEdit(p)}
+                          className="btn btn-outline py-1.5 px-2.5 text-xs flex-1">
+                          <Pencil size={13} /> Edit
+                        </button>
+                        <button onClick={() => setConfirmDelete(p)}
+                          className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {p.keterangan && (
-                    <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100 mt-1">{p.keterangan}</p>
-                  )}
-                  {canEdit && (
-                    <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
-                      <button onClick={() => openEdit(p)}
-                        className="btn btn-outline py-1.5 px-2.5 text-xs flex-1">
-                        <Pencil size={13} /> Edit
-                      </button>
-                      <button onClick={() => setConfirmDelete(p)}
-                        className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))
+                );
+              })
             }
           </div>
         </>
@@ -2686,29 +2774,53 @@ function TabDaftarHarga({ canEdit }) {
 // ══════════════════════════════════════════════════════════════
 function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisKerusakanList }) {
   const [form, setForm] = useState({
-    tipeHP: '', merek: '', jenisKerusakan: '', harga: 0, keterangan: '',
+    tipeHP: '', merek: '', jenisKerusakan: '',
+    hargaList: [{ harga: 0, keterangan: '' }],
   });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(editData ? {
-        tipeHP:         editData.tipeHP         || '',
-        merek:          editData.merek          || '',
-        jenisKerusakan: editData.jenisKerusakan || '',
-        harga:          editData.harga          || 0,
-        keterangan:     editData.keterangan     || '',
-      } : { tipeHP: '', merek: '', jenisKerusakan: '', harga: 0, keterangan: '' });
+      if (editData) {
+        const list = toHargaList(editData);
+        setForm({
+          tipeHP:         editData.tipeHP         || '',
+          merek:          editData.merek          || '',
+          jenisKerusakan: editData.jenisKerusakan || '',
+          hargaList: list.length > 0
+            ? list.map(h => ({ harga: h.harga || 0, keterangan: h.keterangan || '' }))
+            : [{ harga: 0, keterangan: '' }],
+        });
+      } else {
+        setForm({
+          tipeHP: '', merek: '', jenisKerusakan: '',
+          hargaList: [{ harga: 0, keterangan: '' }],
+        });
+      }
     }
   }, [open, editData]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const setHargaRow = (idx, key, val) => setForm(f => ({
+    ...f,
+    hargaList: f.hargaList.map((h, i) => i === idx ? { ...h, [key]: val } : h),
+  }));
+  const addHargaRow    = () => setForm(f => ({ ...f, hargaList: [...f.hargaList, { harga: 0, keterangan: '' }] }));
+  const removeHargaRow = (idx) => setForm(f => ({
+    ...f,
+    hargaList: f.hargaList.length <= 1 ? f.hargaList : f.hargaList.filter((_, i) => i !== idx),
+  }));
+
   async function handleSave() {
     if (!form.tipeHP.trim())         return toast.error('Tipe HP wajib diisi');
     if (!form.merek.trim())          return toast.error('Merek wajib diisi');
     if (!form.jenisKerusakan.trim()) return toast.error('Jenis kerusakan wajib diisi');
-    if (!(Number(form.harga) > 0))   return toast.error('Harga wajib diisi');
+
+    const cleanList = form.hargaList
+      .map(h => ({ harga: Number(h.harga) || 0, keterangan: (h.keterangan || '').trim() }))
+      .filter(h => h.harga > 0);
+    if (cleanList.length === 0) return toast.error('Minimal 1 harga wajib diisi');
 
     setSaving(true);
     try {
@@ -2716,8 +2828,7 @@ function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisK
         tipeHP:         form.tipeHP.trim(),
         merek:          form.merek.trim(),
         jenisKerusakan: form.jenisKerusakan.trim(),
-        harga:          Number(form.harga) || 0,
-        keterangan:     form.keterangan.trim(),
+        hargaList:      cleanList,
       };
       if (editData) {
         await servicePriceAPI.update(editData._id, payload);
@@ -2758,13 +2869,38 @@ function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisK
           </datalist>
         </div>
         <div>
-          <label className="label">Harga *</label>
-          <RupiahInput value={form.harga} onChange={v => set('harga', v)} />
-        </div>
-        <div>
-          <label className="label">Keterangan</label>
-          <input className="input" placeholder="misal: termasuk sparepart original"
-            value={form.keterangan} onChange={e => set('keterangan', e.target.value)} />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="label !mb-0">Harga *</label>
+            <button type="button" onClick={addHargaRow}
+              className="btn btn-outline py-1 px-2 text-xs">
+              <Plus size={12} /> Tambah Harga
+            </button>
+          </div>
+          <div className="space-y-2">
+            {form.hargaList.map((h, idx) => (
+              <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50 p-2 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary-100 text-primary-600 font-semibold text-[10px] flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1">
+                    <RupiahInput value={h.harga} onChange={v => setHargaRow(idx, 'harga', v)} />
+                  </div>
+                  {form.hargaList.length > 1 && (
+                    <button type="button" onClick={() => removeHargaRow(idx)}
+                      className="btn btn-outline py-1.5 px-2 text-xs text-red-500 flex-shrink-0"
+                      title="Hapus harga">
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+                <input className="input !py-1.5 text-xs"
+                  placeholder="Keterangan (misal: original, OEM, aftermarket...)"
+                  value={h.keterangan}
+                  onChange={e => setHargaRow(idx, 'keterangan', e.target.value)} />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
           <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
