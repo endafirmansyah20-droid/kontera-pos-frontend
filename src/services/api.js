@@ -249,6 +249,10 @@ export const serviceAPI = {
   // Arsip servis
   getArsipList:   ()        => api.get('/service/arsip'),
   getArsipDetail: (b, t)    => api.get(`/service/arsip/${b}/${t}`),
+  // Arsip keuangan servis
+  getArsipKeuanganList:   ()        => api.get('/service/finance/arsip'),
+  getArsipKeuanganDetail: (bulan, tahun) =>
+    api.get('/service/finance/arsip/detail', { params: { bulan, tahun } }),
 };
 
 // ─── Sparepart (stok service) ────────────────────

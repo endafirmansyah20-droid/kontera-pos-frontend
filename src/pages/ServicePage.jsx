@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { serviceAPI, customerAPI, authAPI, sparepartAPI, servicePriceAPI } from '../services/api';
-import { formatRupiah, formatDate, formatDateTime } from '../utils/helpers';
+import { formatRupiah, formatDate, formatDateTime, thisMonthRange } from '../utils/helpers';
 import { PageHeader, Modal, Loader, EmptyState, ConfirmDialog, RupiahInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -10,7 +10,7 @@ import {
   CheckCircle, Clock, AlertCircle, XCircle, Package,
   TrendingUp, TrendingDown, DollarSign, ChevronRight, ChevronDown,
   Smartphone, User, Phone, FileText, X, Boxes, PackagePlus, EyeOff, Eye,
-  History, ShoppingCart, ChevronLeft, Tag
+  History, ShoppingCart, ChevronLeft, Tag, Lock
 } from 'lucide-react';
 
 // ─── Konstanta ────────────────────────────────────────────────
@@ -658,6 +658,7 @@ function TabTransaksi({ isAdmin }) {
 // ══════════════════════════════════════════════════════════════
 function TabKeuangan({ isAdmin }) {
   const [finance, setFinance]   = useState([]);
+  const [autoTx, setAutoTx]     = useState([]); // transaksi servis diambil + lunas bulan ini
   const [summary, setSummary]   = useState(null);
   const [loading, setLoading]   = useState(true);
   const [form, setForm]         = useState(defaultFinForm);
@@ -669,14 +670,55 @@ function TabKeuangan({ isAdmin }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [f, s] = await Promise.all([serviceAPI.getFinance(), serviceAPI.getSummary()]);
+      const { startDate, endDate } = thisMonthRange();
+      const [f, s, tx] = await Promise.all([
+        serviceAPI.getFinance(),
+        serviceAPI.getSummary(),
+        serviceAPI.getAll({ status: 'diambil', isPaid: true, startDate, endDate }),
+      ]);
       setFinance(f.data.data || []);
       setSummary(s.data.data);
+      const list = tx.data?.data || [];
+      setAutoTx(Array.isArray(list) ? list : []);
     } catch { toast.error('Gagal memuat data keuangan'); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Gabungan: catatan keuangan manual + histori pemasukan servis (readonly)
+  const mergedRows = useMemo(() => {
+    const manual = (finance || []).map(f => ({
+      _key:    `fin-${f._id}`,
+      _auto:   false,
+      _raw:    f,
+      type:    f.type,
+      category: f.category,
+      description: f.description,
+      amount:  Number(f.amount) || 0,
+      date:    f.date,
+    }));
+    const auto = (autoTx || []).map(t => {
+      const nominal = Number(t.totalCost) > 0
+        ? Number(t.totalCost)
+        : (Number(t.serviceFee) || 0) + (Number(t.partsCost) || 0);
+      return {
+        _key:    `tx-${t._id}`,
+        _auto:   true,
+        _raw:    t,
+        type:    'pemasukan',
+        category: 'Servis',
+        description: `${t.invoiceNumber || '-'} - ${t.customerName || '-'}`,
+        amount:  nominal,
+        date:    t.paidAt || t.updatedAt || t.createdAt,
+      };
+    });
+    return [...manual, ...auto].sort((a, b) => {
+      const da = new Date(a.date || 0).getTime();
+      const db = new Date(b.date || 0).getTime();
+      return db - da;
+    });
+  }, [finance, autoTx]);
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -777,31 +819,44 @@ function TabKeuangan({ isAdmin }) {
                   </tr>
                 </thead>
                 <tbody className="bg-white">
-                  {finance.length === 0
+                  {mergedRows.length === 0
                     ? <tr><td colSpan={6}><EmptyState message="Belum ada catatan keuangan servis" /></td></tr>
-                    : finance.map(f => (
-                      <tr key={f._id}>
-                        <td className="text-xs text-slate-400">{formatDate(f.date)}</td>
+                    : mergedRows.map(r => (
+                      <tr key={r._key} className={r._auto ? 'bg-slate-50/40' : ''}>
+                        <td className="text-xs text-slate-400">{formatDate(r.date)}</td>
                         <td>
-                          <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'}`}>
-                            {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                          <span className={`badge ${r.type === 'pemasukan' ? 'badge-green' : 'badge-red'}`}>
+                            {r.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
                           </span>
                         </td>
-                        <td className="text-xs text-slate-500 capitalize">{f.category}</td>
-                        <td className="text-sm text-slate-700">{f.description}</td>
-                        <td className={`text-right font-bold text-sm ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
-                          {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
+                        <td className="text-xs text-slate-500 capitalize">{r.category}</td>
+                        <td className="text-sm text-slate-700">
+                          <div className="flex items-center gap-1.5">
+                            <span>{r.description}</span>
+                            {r._auto && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500" title="Dari transaksi servis — readonly">
+                                <Lock size={10} /> Auto
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={`text-right font-bold text-sm ${r.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
+                          {r.type === 'pemasukan' ? '+' : '-'}{formatRupiah(r.amount)}
                         </td>
                         {isAdmin && (
                           <td>
-                            <div className="flex gap-1">
-                              <button onClick={() => handleEdit(f)} className="btn btn-outline py-1 px-2 text-xs text-blue-500">
-                                <Pencil size={12} />
-                              </button>
-                              <button onClick={() => setDelConfirm(f)} className="btn btn-outline py-1 px-2 text-xs text-red-500">
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
+                            {r._auto ? (
+                              <span className="text-[10px] text-slate-300">—</span>
+                            ) : (
+                              <div className="flex gap-1">
+                                <button onClick={() => handleEdit(r._raw)} className="btn btn-outline py-1 px-2 text-xs text-blue-500">
+                                  <Pencil size={12} />
+                                </button>
+                                <button onClick={() => setDelConfirm(r._raw)} className="btn btn-outline py-1 px-2 text-xs text-red-500">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            )}
                           </td>
                         )}
                       </tr>
@@ -814,28 +869,35 @@ function TabKeuangan({ isAdmin }) {
 
           {/* Mobile — kartu */}
           <div className="sm:hidden space-y-2">
-            {finance.length === 0
+            {mergedRows.length === 0
               ? <div className="card"><EmptyState message="Belum ada catatan keuangan servis" /></div>
-              : finance.map(f => (
-                <div key={f._id} className="card !p-3">
+              : mergedRows.map(r => (
+                <div key={r._key} className={`card !p-3 ${r._auto ? 'bg-slate-50/40' : ''}`}>
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'} flex-shrink-0`}>
-                      {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
-                    </span>
-                    <p className="text-[11px] text-slate-400 flex-shrink-0">{formatDate(f.date)}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`badge ${r.type === 'pemasukan' ? 'badge-green' : 'badge-red'} flex-shrink-0`}>
+                        {r.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                      </span>
+                      {r._auto && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500" title="Dari transaksi servis — readonly">
+                          <Lock size={10} /> Auto
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 flex-shrink-0">{formatDate(r.date)}</p>
                   </div>
-                  <p className="text-sm text-slate-700 mb-0.5">{f.description}</p>
-                  <p className="text-[11px] text-slate-500 capitalize mb-2">Kategori: {f.category}</p>
+                  <p className="text-sm text-slate-700 mb-0.5">{r.description}</p>
+                  <p className="text-[11px] text-slate-500 capitalize mb-2">Kategori: {r.category}</p>
                   <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                    <span className={`font-bold text-base ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
-                      {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
+                    <span className={`font-bold text-base ${r.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
+                      {r.type === 'pemasukan' ? '+' : '-'}{formatRupiah(r.amount)}
                     </span>
-                    {isAdmin && (
+                    {isAdmin && !r._auto && (
                       <div className="flex gap-1 flex-shrink-0">
-                        <button onClick={() => handleEdit(f)} className="btn btn-outline py-1.5 px-2.5 text-xs text-blue-500">
+                        <button onClick={() => handleEdit(r._raw)} className="btn btn-outline py-1.5 px-2.5 text-xs text-blue-500">
                           <Pencil size={13} />
                         </button>
-                        <button onClick={() => setDelConfirm(f)} className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
+                        <button onClick={() => setDelConfirm(r._raw)} className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
                           <Trash2 size={13} />
                         </button>
                       </div>
@@ -902,50 +964,107 @@ function TabKeuangan({ isAdmin }) {
 // sebelumnya ke bawah. Bulan berjalan tetap di Tab Transaksi.
 // ══════════════════════════════════════════════════════════════
 function TabArsip({ canEdit }) {
-  const [data, setData]           = useState([]);
+  const [data, setData]           = useState([]); // arsip transaksi
+  const [finArsip, setFinArsip]   = useState([]); // arsip keuangan
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData]   = useState(null);
 
-  // Drill-down detail per bulan
+  // Drill-down detail per bulan (gabungan transaksi + keuangan)
   const [detailOpen, setDetailOpen]       = useState(false);
   const [detailLabel, setDetailLabel]     = useState('');
   const [detailBulan, setDetailBulan]     = useState(null);
   const [detailTahun, setDetailTahun]     = useState(null);
-  const [detailData, setDetailData]       = useState([]);
+  const [detailTab, setDetailTab]         = useState('transaksi'); // 'transaksi' | 'keuangan'
+  const [detailData, setDetailData]       = useState([]);          // transaksi
+  const [finDetailData, setFinDetailData] = useState([]);          // keuangan
   const [detailLoading, setDetailLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await serviceAPI.getArsipList();
-      const list = res.data?.data || [];
-      setData(list);
+      const [arsipRes, finRes] = await Promise.all([
+        serviceAPI.getArsipList(),
+        serviceAPI.getArsipKeuanganList(),
+      ]);
+      setData(arsipRes.data?.data || []);
+      const finList = finRes.data?.data || [];
+      setFinArsip(Array.isArray(finList) ? finList : []);
     } catch { toast.error('Gagal memuat arsip'); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  // Merge arsip transaksi + arsip keuangan per (bulan, tahun)
+  const merged = useMemo(() => {
+    const map = new Map();
+    const keyOf = (bulan, tahun) => `${tahun}-${bulan}`;
+
+    (data || []).forEach(m => {
+      map.set(keyOf(m.bulan, m.tahun), {
+        bulan: m.bulan,
+        tahun: m.tahun,
+        label: m.label || `${m.bulan}/${m.tahun}`,
+        jumlahTx:      Number(m.jumlahTx) || 0,
+        omset:         Number(m.omset)    || 0,
+        pemasukan:     0,
+        pengeluaran:   0,
+        jumlahCatatan: 0,
+      });
+    });
+
+    (finArsip || []).forEach(m => {
+      const k = keyOf(m.bulan, m.tahun);
+      const prev = map.get(k) || {
+        bulan: m.bulan,
+        tahun: m.tahun,
+        label: m.label || `${m.bulan}/${m.tahun}`,
+        jumlahTx: 0,
+        omset: 0,
+        pemasukan: 0,
+        pengeluaran: 0,
+        jumlahCatatan: 0,
+      };
+      prev.pemasukan     = Number(m.totalPemasukan)   || Number(m.pemasukan)   || 0;
+      prev.pengeluaran   = Number(m.totalPengeluaran) || Number(m.pengeluaran) || 0;
+      prev.jumlahCatatan = Number(m.jumlahCatatan)    || 0;
+      map.set(k, prev);
+    });
+
+    const list = Array.from(map.values());
+    list.sort((a, b) => (b.tahun - a.tahun) || (b.bulan - a.bulan));
+    return list;
+  }, [data, finArsip]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(m =>
+    if (!q) return merged;
+    return merged.filter(m =>
       (m.label || '').toLowerCase().includes(q) ||
       String(m.tahun || '').includes(q)
     );
-  }, [data, search]);
+  }, [merged, search]);
 
   const loadDetail = useCallback(async (bulan, tahun) => {
     setDetailLoading(true);
     try {
-      const res = await serviceAPI.getArsipDetail(bulan, tahun);
-      const txs = res.data?.data?.transactions || [];
+      const [txRes, finRes] = await Promise.all([
+        serviceAPI.getArsipDetail(bulan, tahun),
+        serviceAPI.getArsipKeuanganDetail(bulan, tahun),
+      ]);
+      const txs = txRes.data?.data?.transactions || [];
       setDetailData(Array.isArray(txs) ? txs : []);
+      const finD = finRes.data?.data;
+      const finList = Array.isArray(finD)
+        ? finD
+        : (finD?.records || finD?.catatan || finD?.items || []);
+      setFinDetailData(Array.isArray(finList) ? finList : []);
     } catch {
       toast.error('Gagal memuat detail arsip');
       setDetailData([]);
+      setFinDetailData([]);
     } finally {
       setDetailLoading(false);
     }
@@ -955,7 +1074,9 @@ function TabArsip({ canEdit }) {
     setDetailBulan(m.bulan);
     setDetailTahun(m.tahun);
     setDetailLabel(m.label || `${m.bulan}/${m.tahun}`);
+    setDetailTab('transaksi');
     setDetailData([]);
+    setFinDetailData([]);
     setDetailOpen(true);
     loadDetail(m.bulan, m.tahun);
   };
@@ -963,23 +1084,24 @@ function TabArsip({ canEdit }) {
   const openEdit = (d) => { setEditData(d); setModalOpen(true); };
 
   // Summary rekap bulanan
-  const totalBulan  = data.length;
-  const totalTx     = data.reduce((s, m) => s + (Number(m.jumlahTx) || 0), 0);
-  const totalOmset  = data.reduce((s, m) => s + (Number(m.omset)    || 0), 0);
-  const totalProfit = data.reduce((s, m) => s + (Number(m.laba)     || 0), 0);
+  const totalBulan       = merged.length;
+  const totalTx          = merged.reduce((s, m) => s + (Number(m.jumlahTx)    || 0), 0);
+  const totalOmset       = merged.reduce((s, m) => s + (Number(m.omset)       || 0), 0);
+  const totalPemasukan   = merged.reduce((s, m) => s + (Number(m.pemasukan)   || 0), 0);
+  const totalPengeluaran = merged.reduce((s, m) => s + (Number(m.pengeluaran) || 0), 0);
 
   return (
     <div className="min-w-0">
       {/* Header kecil */}
       <div className="mb-3">
-        <h3 className="font-bold text-slate-800 text-sm sm:text-base">📦 Arsip Transaksi Service</h3>
+        <h3 className="font-bold text-slate-800 text-sm sm:text-base">📦 Arsip Service</h3>
         <p className="text-[11px] sm:text-xs text-slate-400">
-          Rekap bulanan transaksi status "Diambil" dari bulan-bulan sebelumnya (bulan berjalan tetap di Tab Transaksi).
+          Rekap bulanan transaksi "Diambil" + catatan keuangan servis dari bulan-bulan sebelumnya (bulan berjalan tetap di Tab Transaksi &amp; Keuangan).
         </p>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
         <div className="card py-3 px-2 text-center min-w-0">
           <p className="text-[11px] sm:text-xs text-slate-400 truncate">Jumlah Bulan</p>
           <p className="font-bold text-slate-700 text-xs sm:text-sm">{totalBulan}</p>
@@ -993,10 +1115,12 @@ function TabArsip({ canEdit }) {
           <p className="font-bold text-blue-600 text-xs sm:text-sm truncate">{formatRupiah(totalOmset)}</p>
         </div>
         <div className="card py-3 px-2 text-center min-w-0">
-          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Total Laba</p>
-          <p className={`font-bold text-xs sm:text-sm truncate ${totalProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-            {formatRupiah(totalProfit)}
-          </p>
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Pemasukan</p>
+          <p className="font-bold text-green-600 text-xs sm:text-sm truncate">{formatRupiah(totalPemasukan)}</p>
+        </div>
+        <div className="card py-3 px-2 text-center min-w-0">
+          <p className="text-[11px] sm:text-xs text-slate-400 truncate">Pengeluaran</p>
+          <p className="font-bold text-red-500 text-xs sm:text-sm truncate">{formatRupiah(totalPengeluaran)}</p>
         </div>
       </div>
 
@@ -1014,31 +1138,31 @@ function TabArsip({ canEdit }) {
 
       {loading ? <Loader /> : (
         <>
-          {/* Desktop / tablet — tabel rekap bulanan */}
+          {/* Desktop / tablet — tabel rekap bulanan gabungan */}
           <div className="card hidden sm:block">
             <div className="table-wrap">
-              <table className="table">
+              <table className="table w-full table-fixed">
                 <thead>
                   <tr>
-                    <th>Bulan</th>
-                    <th>Jumlah Transaksi</th>
-                    <th>Omset</th>
-                    <th>Laba</th>
-                    <th>Aksi</th>
+                    <th style={{ width: '22%' }}>Bulan</th>
+                    <th style={{ width: '13%', textAlign: 'center' }}>Transaksi</th>
+                    <th style={{ width: '17%', textAlign: 'center' }}>Omset</th>
+                    <th style={{ width: '17%', textAlign: 'center' }}>Pemasukan</th>
+                    <th style={{ width: '17%', textAlign: 'center' }}>Pengeluaran</th>
+                    <th style={{ width: '14%', textAlign: 'center' }}>Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white">
                   {filtered.length === 0
-                    ? <tr><td colSpan={5}><EmptyState message="Belum ada arsip bulanan" /></td></tr>
+                    ? <tr><td colSpan={6}><EmptyState message="Belum ada arsip bulanan" /></td></tr>
                     : filtered.map(m => (
                       <tr key={`${m.tahun}-${m.bulan}`}>
                         <td className="font-semibold text-slate-700 text-sm">{m.label}</td>
-                        <td className="text-sm">{m.jumlahTx || 0}</td>
-                        <td className="text-sm font-semibold text-blue-600">{formatRupiah(m.omset || 0)}</td>
-                        <td className={(m.laba || 0) >= 0 ? "font-bold text-green-600" : "font-bold text-red-500"}>
-                          {formatRupiah(m.laba || 0)}
-                        </td>
-                        <td>
+                        <td style={{ textAlign: 'center' }} className="text-sm">{m.jumlahTx || 0}</td>
+                        <td style={{ textAlign: 'center' }} className="text-sm font-semibold text-blue-600">{formatRupiah(m.omset || 0)}</td>
+                        <td style={{ textAlign: 'center' }} className="text-sm font-semibold text-green-600">{formatRupiah(m.pemasukan || 0)}</td>
+                        <td style={{ textAlign: 'center' }} className="text-sm font-semibold text-red-500">{formatRupiah(m.pengeluaran || 0)}</td>
+                        <td style={{ textAlign: 'center' }}>
                           <button onClick={() => openDetail(m)}
                             className="btn btn-outline py-1 px-2 text-xs text-blue-500" title="Detail">
                             <ChevronRight size={12} /> Detail
@@ -1052,7 +1176,7 @@ function TabArsip({ canEdit }) {
             </div>
           </div>
 
-          {/* Mobile — kartu rekap bulanan */}
+          {/* Mobile — kartu rekap bulanan gabungan */}
           <div className="sm:hidden space-y-2">
             {filtered.length === 0
               ? <div className="card"><EmptyState message="Belum ada arsip bulanan" /></div>
@@ -1062,16 +1186,18 @@ function TabArsip({ canEdit }) {
                     <p className="font-semibold text-slate-700">{m.label}</p>
                     <span className="text-[11px] text-slate-400 flex-shrink-0">{m.jumlahTx || 0} tx</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-center">
+                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
                     <div>
                       <p className="text-[10px] text-slate-400">Omset</p>
                       <p className="text-[11px] font-semibold text-blue-600">{formatRupiah(m.omset || 0)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400">Laba</p>
-                      <p className={`text-[11px] font-bold ${(m.laba || 0) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {formatRupiah(m.laba || 0)}
-                      </p>
+                      <p className="text-[10px] text-slate-400">Pemasukan</p>
+                      <p className="text-[11px] font-semibold text-green-600">{formatRupiah(m.pemasukan || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400">Pengeluaran</p>
+                      <p className="text-[11px] font-semibold text-red-500">{formatRupiah(m.pengeluaran || 0)}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-end pt-2 mt-2 border-t border-slate-100">
@@ -1086,14 +1212,33 @@ function TabArsip({ canEdit }) {
         </>
       )}
 
-      {/* Modal Detail per Bulan */}
+      {/* Modal Detail per Bulan — Tabs: Transaksi + Keuangan */}
       <Modal
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         title={`Detail Arsip — ${detailLabel}`}
         size="xl"
       >
-        {detailLoading ? <Loader /> : (
+        {/* Tab switcher di dalam modal */}
+        <div className="flex gap-1 mb-3 border-b border-slate-200">
+          {[
+            { key: 'transaksi', label: 'Transaksi', count: detailData.length },
+            { key: 'keuangan',  label: 'Keuangan',  count: finDetailData.length },
+          ].map(t => (
+            <button key={t.key}
+              onClick={() => setDetailTab(t.key)}
+              className={`py-2 px-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                detailTab === t.key
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t.label} <span className="text-xs text-slate-400">({t.count})</span>
+            </button>
+          ))}
+        </div>
+
+        {detailLoading ? <Loader /> : detailTab === 'transaksi' ? (
           detailData.length === 0 ? (
             <EmptyState message="Tidak ada transaksi di bulan ini" />
           ) : (
@@ -1194,6 +1339,67 @@ function TabArsip({ canEdit }) {
                           <Edit2 size={13} /> Edit
                         </button>
                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )
+        ) : (
+          finDetailData.length === 0 ? (
+            <EmptyState message="Tidak ada catatan keuangan di bulan ini" />
+          ) : (
+            <>
+              {/* Desktop — tabel catatan keuangan */}
+              <div className="hidden sm:block">
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Tanggal</th>
+                        <th>Tipe</th>
+                        <th>Kategori</th>
+                        <th>Keterangan</th>
+                        <th className="text-right">Nominal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {finDetailData.map(f => (
+                        <tr key={f._id || `${f.date}-${f.description}-${f.amount}`}>
+                          <td className="text-xs text-slate-400">{formatDate(f.date)}</td>
+                          <td>
+                            <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'}`}>
+                              {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                            </span>
+                          </td>
+                          <td className="text-xs text-slate-500 capitalize">{f.category}</td>
+                          <td className="text-sm text-slate-700">{f.description}</td>
+                          <td className={`text-right font-bold text-sm ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
+                            {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mobile — kartu catatan keuangan */}
+              <div className="sm:hidden space-y-2">
+                {finDetailData.map(f => (
+                  <div key={f._id || `${f.date}-${f.description}-${f.amount}`} className="card !p-3">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className={`badge ${f.type === 'pemasukan' ? 'badge-green' : 'badge-red'} flex-shrink-0`}>
+                        {f.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran'}
+                      </span>
+                      <p className="text-[11px] text-slate-400 flex-shrink-0">{formatDate(f.date)}</p>
+                    </div>
+                    <p className="text-sm text-slate-700 mb-0.5">{f.description}</p>
+                    <p className="text-[11px] text-slate-500 capitalize mb-2">Kategori: {f.category}</p>
+                    <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                      <span className={`font-bold text-base ${f.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
+                        {f.type === 'pemasukan' ? '+' : '-'}{formatRupiah(f.amount)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1442,7 +1648,7 @@ function SparepartItemsField({ items, onChange }) {
                 </p>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="label">Qty *</label>
                 <input type="number" min="1" step="1" className="input"
@@ -1450,14 +1656,9 @@ function SparepartItemsField({ items, onChange }) {
                   onChange={e => setDraft(d => ({ ...d, qty: e.target.value }))} />
               </div>
               <div>
-                <label className="label">Harga Beli</label>
+                <label className="label">Harga</label>
                 <RupiahInput value={draft.hargaBeli}
                   onChange={v => setDraft(d => ({ ...d, hargaBeli: v }))} />
-              </div>
-              <div>
-                <label className="label">Harga Jual</label>
-                <RupiahInput value={draft.hargaJual}
-                  onChange={v => setDraft(d => ({ ...d, hargaJual: v }))} />
               </div>
             </div>
             {draft.source === 'eksternal' && (
@@ -1471,7 +1672,7 @@ function SparepartItemsField({ items, onChange }) {
             <div className="bg-slate-50 rounded-xl px-3 py-2 flex items-center justify-between">
               <span className="text-xs text-slate-500">Subtotal</span>
               <span className="font-bold text-primary-600">
-                {formatRupiah((Number(draft.hargaJual) || 0) * (Number(draft.qty) || 0))}
+                {formatRupiah((Number(draft.hargaBeli) || 0) * (Number(draft.qty) || 0))}
               </span>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
