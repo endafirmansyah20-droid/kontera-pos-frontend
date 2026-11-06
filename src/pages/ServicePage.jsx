@@ -193,15 +193,23 @@ function ServiceFormModal({ open, onClose, onSaved, editData }) {
       const payload = {
         ...form,
         technician: form.technician || null,
-        sparepartItems: (form.sparepartItems || []).map(it => ({
-          sparepartId: it.source === 'stok' ? it.sparepartId : null,
-          source:      it.source === 'stok' ? 'stok' : 'eksternal',
-          name:        it.name,
-          qty:         Number(it.qty) || 0,
-          hargaBeli:   Number(it.hargaBeli) || 0,
-          hargaJual:   Number(it.hargaJual) || 0,
-          satuan:      it.satuan || '',
-        })),
+        sparepartItems: (form.sparepartItems || []).map(it => {
+          const isStok   = it.source === 'stok';
+          const hargaBeli = Number(it.hargaBeli) || 0;
+          // Eksternal: input UI cuma 1 harga (hargaBeli). Backend hitung
+          // partsCost dari hargaJual, jadi mirror hargaBeli → hargaJual
+          // supaya partsCost tidak jadi 0 untuk item eksternal.
+          const hargaJual = isStok ? (Number(it.hargaJual) || 0) : hargaBeli;
+          return {
+            sparepartId: isStok ? it.sparepartId : null,
+            source:      isStok ? 'stok' : 'eksternal',
+            name:        it.name,
+            qty:         Number(it.qty) || 0,
+            hargaBeli,
+            hargaJual,
+            satuan:      it.satuan || '',
+          };
+        }),
       };
       if (editData) {
         await serviceAPI.update(editData._id, payload);
@@ -1534,7 +1542,7 @@ function SparepartItemsField({ items, onChange }) {
                           {it.source === 'stok' ? 'STOK' : 'EKSTERNAL'}
                         </span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 mt-1.5">
+                      <div className={`grid ${it.source === 'eksternal' ? 'grid-cols-2' : 'grid-cols-3'} gap-2 mt-1.5`}>
                         <div>
                           <p className="text-[10px] text-slate-400">Qty</p>
                           <input type="number" min="1" step="1"
@@ -1543,13 +1551,15 @@ function SparepartItemsField({ items, onChange }) {
                             onChange={e => updateItem(idx, { qty: e.target.value })}
                           />
                         </div>
-                        <div>
-                          <p className="text-[10px] text-slate-400">Harga Jual</p>
-                          <RupiahInput
-                            value={it.hargaJual}
-                            onChange={v => updateItem(idx, { hargaJual: v })}
-                          />
-                        </div>
+                        {it.source !== 'eksternal' && (
+                          <div>
+                            <p className="text-[10px] text-slate-400">Harga Jual</p>
+                            <RupiahInput
+                              value={it.hargaJual}
+                              onChange={v => updateItem(idx, { hargaJual: v })}
+                            />
+                          </div>
+                        )}
                         <div className="text-right">
                           <p className="text-[10px] text-slate-400">Subtotal</p>
                           <p className="text-xs font-bold text-slate-700 mt-1.5">{formatRupiah(subtotal)}</p>
