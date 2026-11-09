@@ -557,31 +557,35 @@ function PembelianTab({ cabangId }) {
 }
 
 // ─── Target Bulanan per Cabang ──────────────────────────────────
-// Owner men-set target omset & transaksi untuk cabang `cabangId` pada
-// bulan berjalan. Backend menyimpan di dokumen MonthlyTarget terpisah
-// (per { cabangId, bulan, tahun }), bukan di dokumen Cabang.
-function TargetCabangSection({ cabangId }) {
-  const [data, setData]     = useState(null);  // null = belum loaded
+// Owner men-set target omset & transaksi untuk cabang pada bulan berjalan.
+// Field targetOmset / targetTransaksi datang dari payload /owner/cabang-summary
+// yang di-fetch parent — tidak ada fetch tambahan di sini supaya form langsung
+// ter-prefill dengan nilai yang sudah tersimpan.
+function TargetCabangSection({ cabang }) {
+  const cabangId = cabang?._id;
   const [omset, setOmset]   = useState('');    // string digit only
   const [tx,    setTx]      = useState('');
-  const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
+  // Nilai "terakhir tersimpan" — ditampilkan di label kanan atas. Diinisialisasi
+  // dari cabang prop; di-update setelah save berhasil (tanpa menunggu parent
+  // reload) supaya tetap akurat.
+  const [savedOmset, setSavedOmset] = useState(0);
+  const [savedTx,    setSavedTx]    = useState(0);
+  const [savedBulan, setSavedBulan] = useState('');
 
-  const load = useCallback(async () => {
-    if (!cabangId) return;
-    setLoading(true);
-    try {
-      const r = await ownerAPI.getCabangTarget(cabangId);
-      const d = r?.data?.data || {};
-      setData(d);
-      setOmset(d.targetOmset ? String(d.targetOmset) : '');
-      setTx(d.targetTransaksi ? String(d.targetTransaksi) : '');
-    } catch {
-      setData({});
-    } finally { setLoading(false); }
-  }, [cabangId]);
-
-  useEffect(() => { load(); }, [load]);
+  // Sync initial & re-sync saat cabang berubah (mis. owner buka detail cabang
+  // berbeda). Dependency sengaja ke _id, bukan ke objek cabang, supaya edit
+  // form tidak ter-overwrite kalau parent re-render dengan referensi baru.
+  useEffect(() => {
+    if (!cabang) return;
+    const o = Number(cabang.targetOmset)     || 0;
+    const t = Number(cabang.targetTransaksi) || 0;
+    setSavedOmset(o);
+    setSavedTx(t);
+    setSavedBulan(cabang.bulan || cabang.targetBulan || '');
+    setOmset(o ? String(o) : '');
+    setTx(t ? String(t) : '');
+  }, [cabang?._id, cabang?.targetOmset, cabang?.targetTransaksi]);
 
   const handleSave = async () => {
     const valOmset = parseInt(omset.replace(/\D/g, ''), 10) || 0;
@@ -590,14 +594,26 @@ function TargetCabangSection({ cabangId }) {
       toast.error('Isi minimal salah satu target');
       return;
     }
+    if (!cabangId) return;
     setSaving(true);
     try {
-      await ownerAPI.setCabangTarget(cabangId, {
+      const r = await ownerAPI.setCabangTarget(cabangId, {
         targetOmset:     valOmset,
         targetTransaksi: valTx,
       });
       toast.success('Target cabang disimpan');
-      await load();
+      // Update state lokal langsung dari nilai yang baru disimpan — prefer
+      // response backend (yang mungkin include field turunan: bulan, tahun)
+      // dan fallback ke nilai yang dikirim supaya form tidak reset kalau
+      // backend return payload minim.
+      const saved = r?.data?.data || {};
+      const nextOmset = Number(saved.targetOmset)     || valOmset;
+      const nextTx    = Number(saved.targetTransaksi) || valTx;
+      setSavedOmset(nextOmset);
+      setSavedTx(nextTx);
+      if (saved.bulan || saved.targetBulan) setSavedBulan(saved.bulan || saved.targetBulan);
+      setOmset(String(nextOmset));
+      setTx(String(nextTx));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal menyimpan target');
     } finally { setSaving(false); }
@@ -618,10 +634,6 @@ function TargetCabangSection({ cabangId }) {
   };
   const inputRpStyle = { ...inputStyle, paddingLeft: 34 };
 
-  const existingOmset = Number(data?.targetOmset)     || 0;
-  const existingTx    = Number(data?.targetTransaksi) || 0;
-  const bulan         = data?.bulan || '';
-
   return (
     <div style={{
       background: 'rgba(255,255,255,0.06)',
@@ -640,74 +652,68 @@ function TargetCabangSection({ cabangId }) {
           <div>
             <p style={{ margin: 0, color: '#fff', fontSize: 13, fontWeight: 700 }}>Target Bulanan</p>
             <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>
-              {bulan ? `Berlaku untuk ${bulan}` : 'Berlaku untuk bulan berjalan'}
+              {savedBulan ? `Berlaku untuk ${savedBulan}` : 'Berlaku untuk bulan berjalan'}
             </p>
           </div>
         </div>
-        {!loading && (existingOmset > 0 || existingTx > 0) && (
+        {(savedOmset > 0 || savedTx > 0) && (
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>
             Terakhir diset:
-            {' '}<span style={{ color: '#AFA9EC', fontWeight: 600 }}>{fmtRp(existingOmset)}</span>
+            {' '}<span style={{ color: '#AFA9EC', fontWeight: 600 }}>{fmtRp(savedOmset)}</span>
             {' / '}
-            <span style={{ color: '#FDBA74', fontWeight: 600 }}>{existingTx.toLocaleString('id-ID')} tx</span>
+            <span style={{ color: '#FDBA74', fontWeight: 600 }}>{savedTx.toLocaleString('id-ID')} tx</span>
           </p>
         )}
       </div>
 
-      {loading ? (
-        <div style={{ height: 76, borderRadius: 10, background: 'rgba(255,255,255,0.04)' }} className="animate-pulse" />
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
-                Target Omset
-              </label>
-              <div style={{ position: 'relative' }}>
-                <span style={{
-                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                  color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, pointerEvents: 'none',
-                }}>Rp</span>
-                <input
-                  type="text" inputMode="numeric" placeholder="0"
-                  value={fmtDigit(omset)}
-                  onChange={e => setOmset(e.target.value.replace(/\D/g, ''))}
-                  style={inputRpStyle}
-                />
-              </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
-                Target Transaksi
-              </label>
-              <input
-                type="text" inputMode="numeric" placeholder="0"
-                value={fmtDigit(tx)}
-                onChange={e => setTx(e.target.value.replace(/\D/g, ''))}
-                style={inputStyle}
-              />
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
+            Target Omset
+          </label>
+          <div style={{ position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+              color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, pointerEvents: 'none',
+            }}>Rp</span>
+            <input
+              type="text" inputMode="numeric" placeholder="0"
+              value={fmtDigit(omset)}
+              onChange={e => setOmset(e.target.value.replace(/\D/g, ''))}
+              style={inputRpStyle}
+            />
           </div>
+        </div>
+        <div>
+          <label style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
+            Target Transaksi
+          </label>
+          <input
+            type="text" inputMode="numeric" placeholder="0"
+            value={fmtDigit(tx)}
+            onChange={e => setTx(e.target.value.replace(/\D/g, ''))}
+            style={inputStyle}
+          />
+        </div>
+      </div>
 
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              style={{
-                padding: '8px 14px', borderRadius: 10,
-                background: saving ? 'rgba(127,119,221,0.25)' : 'linear-gradient(135deg, #7F77DD 0%, #5D54C5 100%)',
-                border: '0.5px solid rgba(255,255,255,0.15)',
-                color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                fontSize: 12, fontWeight: 700,
-                opacity: saving ? 0.7 : 1,
-              }}>
-              <Save size={13} /> {saving ? 'Menyimpan...' : 'Simpan Target'}
-            </button>
-          </div>
-        </>
-      )}
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            padding: '8px 14px', borderRadius: 10,
+            background: saving ? 'rgba(127,119,221,0.25)' : 'linear-gradient(135deg, #7F77DD 0%, #5D54C5 100%)',
+            border: '0.5px solid rgba(255,255,255,0.15)',
+            color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6,
+            cursor: saving ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 700,
+            opacity: saving ? 0.7 : 1,
+          }}>
+          <Save size={13} /> {saving ? 'Menyimpan...' : 'Simpan Target'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -920,7 +926,7 @@ export default function OwnerCabangDetailPage() {
       </div>
 
       {/* Target Bulanan */}
-      <TargetCabangSection cabangId={id} />
+      <TargetCabangSection cabang={cabang} />
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
