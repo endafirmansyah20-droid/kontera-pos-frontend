@@ -290,8 +290,13 @@ function SuperAdminDashboard({ subscriptions, cabangList, loading, onRefresh }) 
 }
 
 // ── Target Omset Widget ───────────────────────────────────────────────────
+// Sumber target (priority):
+//   1. useAuth().cabang.targetOmset — di-set Owner via halaman detail cabang,
+//      di-populate backend ke response /auth/me.
+//   2. /dashboard/target-omset — fallback legacy. Pencapaian (omsetBulanIni,
+//      bulan, sisaHari) tetap dari endpoint karena cabang hanya expose target.
 function TargetOmsetWidget() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, cabang } = useAuth();
   const [target, setTarget]     = useState(null);
   const [showEdit, setShowEdit] = useState(false);
   const [inputVal, setInputVal] = useState('');
@@ -299,7 +304,7 @@ function TargetOmsetWidget() {
 
   const load = useCallback(async () => {
     try { const r = await api.get('/dashboard/target-omset'); setTarget(r.data.data); }
-    catch { /* silent */ }
+    catch { setTarget({}); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -319,8 +324,17 @@ function TargetOmsetWidget() {
 
   if (!target) return <div className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse" />;
 
-  const { targetOmset, omsetBulanIni, persentase, sisaHari, bulan } = target;
-  const pct = persentase || 0;
+  const cabangTargetOmset   = Number(cabang?.targetOmset)  || 0;
+  const endpointTargetOmset = Number(target?.targetOmset)  || 0;
+  // Prioritaskan target dari cabang (owner-managed); fallback ke endpoint legacy.
+  const targetOmset   = cabangTargetOmset || endpointTargetOmset;
+  const omsetBulanIni = Number(target?.omsetBulanIni) || 0;
+  const sisaHari      = target?.sisaHari ?? 0;
+  const bulan         = target?.bulan    ?? '';
+  // Hitung ulang persentase karena effective target bisa beda dari endpoint.
+  const pct = targetOmset > 0
+    ? Math.min(Math.round((omsetBulanIni / targetOmset) * 100), 999)
+    : 0;
   const barColor = pct>=100?'#22c55e':pct>=70?'#3b82f6':pct>=40?'#f59e0b':'#ef4444';
   const barGradient = pct>=100?'from-emerald-400 to-emerald-500':pct>=70?'from-blue-400 to-blue-500':pct>=40?'from-amber-400 to-amber-500':'from-red-400 to-red-500';
 
@@ -407,12 +421,14 @@ function TargetOmsetWidget() {
 }
 
 // ── Target Transaksi Widget ───────────────────────────────────────────────
-// Mirror struktur TargetOmsetWidget. Backend menyimpan targetOmset &
-// targetTransaksi di dokumen yang sama, jadi endpoint-nya pun satu
-// (/dashboard/target-omset). monthTransactions dipakai sebagai fallback
-// pencapaian kalau backend belum mengembalikan transaksiBulanIni di payload.
+// Sumber target (priority):
+//   1. useAuth().cabang.targetTransaksi — di-set Owner via halaman detail cabang,
+//      di-populate backend ke response /auth/me.
+//   2. /dashboard/target-omset (field targetTransaksi) — fallback legacy.
+// Pencapaian (transaksiBulanIni) tetap dari endpoint, fallback ke prop
+// monthTransactions dari dashboard summary.
 function TargetTransaksiWidget({ monthTransactions = 0 }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, cabang } = useAuth();
   const [target, setTarget]     = useState(null);
   const [loaded, setLoaded]     = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -450,7 +466,10 @@ function TargetTransaksiWidget({ monthTransactions = 0 }) {
 
   if (!loaded) return <div className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse" />;
 
-  const targetTransaksi   = Number(target?.targetTransaksi) || 0;
+  const cabangTargetTransaksi   = Number(cabang?.targetTransaksi)  || 0;
+  const endpointTargetTransaksi = Number(target?.targetTransaksi)  || 0;
+  // Prioritaskan target dari cabang (owner-managed); fallback ke endpoint legacy.
+  const targetTransaksi = cabangTargetTransaksi || endpointTargetTransaksi;
   // Backend boleh kirim transaksiBulanIni/jumlahTransaksi/totalTx di payload;
   // kalau tidak ada, pakai count dari data dashboard (data.month.transactions).
   const transaksiBulanIni = Number(
