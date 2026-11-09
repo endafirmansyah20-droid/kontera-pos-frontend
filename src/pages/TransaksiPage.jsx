@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import ReactDOM from 'react-dom';
-import { productAPI, transactionAPI, settingsAPI, saldoAPI, customerAPI, pointAPI } from '../services/api';
-import { formatRupiah, formatDateTime, PAYMENT_LABELS, PAYMENT_COLORS } from '../utils/helpers';
+import api, { productAPI, transactionAPI, settingsAPI, saldoAPI, customerAPI, pointAPI } from '../services/api';
+import { formatRupiah, formatNumber, formatDateTime, PAYMENT_LABELS, PAYMENT_COLORS } from '../utils/helpers';
 import { Modal, EmptyState, ReceiptView, PageHeader, Loader, SearchInput } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
@@ -435,6 +435,97 @@ const JasaForm = memo(({ onAddToCart }) => {
     </div>
   );
 });
+
+// ══════════════════════════════════════════════════════════════
+// Widget mini target (readonly, tampil di atas tabel Riwayat untuk semua
+// role — termasuk karyawan). Item disembunyikan kalau target-nya = 0;
+// widget disembunyikan seluruhnya kalau kedua target belum diset.
+//
+// Pencapaian (omset + jumlah transaksi) dihitung dari transactionAPI.getAll
+// bulan berjalan supaya karyawan juga bisa akses — endpoint /dashboard/*
+// admin-only dan akan 403 untuk karyawan.
+// ══════════════════════════════════════════════════════════════
+function TargetMiniWidget() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const now   = new Date();
+      const year  = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const [targetRes, txRes] = await Promise.all([
+        api.get('/dashboard/target-omset').catch(() => null),
+        transactionAPI.getAll({ year, month, limit: 9999 }, { timeout: 45000 }).catch(() => null),
+      ]);
+      if (cancelled) return;
+      const t   = targetRes?.data?.data || {};
+      const txs = Array.isArray(txRes?.data?.data) ? txRes.data.data : [];
+      // Filter non-void bulan ini — defensive kalau backend belum filter
+      // server-side (behavior sama dengan OtherPages.loadTxList).
+      const monthTxs = txs.filter(x => {
+        if (x.isVoid) return false;
+        const d = new Date(x.transactionDate);
+        return d.getFullYear() === year && (d.getMonth() + 1) === month;
+      });
+      const omsetFromTx = monthTxs.reduce((s, x) => s + (Number(x.total) || 0), 0);
+      const countFromTx = monthTxs.length;
+      setData({
+        targetOmset:       Number(t.targetOmset)     || 0,
+        targetTransaksi:   Number(t.targetTransaksi) || 0,
+        omsetBulanIni:     Number(t.omsetBulanIni ?? omsetFromTx) || 0,
+        transaksiBulanIni: Number(
+          t.transaksiBulanIni ?? t.jumlahTransaksi ?? t.totalTx ?? countFromTx
+        ) || 0,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!data) return null;
+  const { targetOmset, targetTransaksi, omsetBulanIni, transaksiBulanIni } = data;
+
+  const items = [];
+  if (targetOmset > 0) {
+    const pct = Math.min(Math.round((omsetBulanIni / targetOmset) * 100), 999);
+    items.push({
+      label:   'Target Omset Bulan Ini',
+      progress: `${formatRupiah(omsetBulanIni)} / ${formatRupiah(targetOmset)}`,
+      pct,
+      bar:     'bg-blue-500',
+    });
+  }
+  if (targetTransaksi > 0) {
+    const pct = Math.min(Math.round((transaksiBulanIni / targetTransaksi) * 100), 999);
+    items.push({
+      label:   'Target Transaksi Bulan Ini',
+      progress: `${formatNumber(transaksiBulanIni)} / ${formatNumber(targetTransaksi)} transaksi`,
+      pct,
+      bar:     'bg-violet-500',
+    });
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3 mb-4">
+      <div className={`grid grid-cols-1 ${items.length === 2 ? 'sm:grid-cols-2' : ''} gap-3 sm:gap-5`}>
+        {items.map((it, i) => (
+          <div key={i} className="min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-[11px] font-semibold text-slate-500 truncate">{it.label}</p>
+              <p className="text-[11px] font-bold text-slate-700 flex-shrink-0">{it.pct}%</p>
+            </div>
+            <p className="text-xs text-slate-500 mb-1.5 truncate">{it.progress}</p>
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full ${it.bar} transition-all duration-700`}
+                style={{ width: `${Math.min(it.pct, 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════
 // KOMPONEN UTAMA
@@ -1612,6 +1703,7 @@ export default function TransaksiPage() {
       {/* ══ RIWAYAT ══ */}
       {activeMainTab === 'riwayat' && (
         <div className="pb-24 lg:pb-0">
+          <TargetMiniWidget />
           <div className="card mb-4">
             {isPrivileged && (
               <div className="flex items-center gap-2 mb-2">
