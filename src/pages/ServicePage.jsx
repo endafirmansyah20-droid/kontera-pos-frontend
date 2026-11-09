@@ -2707,6 +2707,9 @@ function toHargaList(p) {
   return [];
 }
 
+// Key khusus untuk grup item yang tidak punya tipeHP.
+const TIPE_LAINNYA = '__lainnya__';
+
 function TabDaftarHarga({ canEdit }) {
   const [prices, setPrices]           = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -2716,6 +2719,15 @@ function TabDaftarHarga({ canEdit }) {
   const [editData, setEditData]       = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [expandedId, setExpandedId]   = useState(null);
+  // null = tampil list tipe HP, string = tampil detail tipe (key grup).
+  const [selectedTipe, setSelectedTipe] = useState(null);
+  // Modal khusus "Tambah Tipe HP" (hanya tipeHP + merek, belum ada kerusakan).
+  const [showTipeModal, setShowTipeModal] = useState(false);
+  // Tipe HP yang baru dibuat dari modal "Tambah Tipe HP" tapi belum punya
+  // entri harga apa pun di backend — disimpan di client supaya langsung muncul
+  // di list. Akan auto-cleanup begitu user menambah kerusakan pertama untuk
+  // tipe itu (lihat useEffect di bawah).
+  const [pendingTipes, setPendingTipes] = useState([]);
 
   const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
 
@@ -2726,17 +2738,34 @@ function TabDaftarHarga({ canEdit }) {
     return () => clearTimeout(t);
   }, [search]);
 
+  // Reset search tiap kali ganti antara list ↔ detail — konteks pencariannya beda.
+  useEffect(() => { setSearch(''); setExpandedId(null); }, [selectedTipe]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (filterMerek)     params.merek  = filterMerek;
-      const r = await servicePriceAPI.getAll(params);
-      setPrices(r.data?.data || r.data || []);
+      // Ambil semua — grouping & filter dilakukan di client supaya navigasi
+      // list ↔ detail tidak refetch, dan tetap konsisten kalau backend
+      // mengembalikan data flat maupun grouped.
+      const r = await servicePriceAPI.getAll({});
+      const raw = r.data?.data || r.data || [];
+      // Dukung dua bentuk payload:
+      // 1) Flat: [{ _id, tipeHP, merek, jenisKerusakan, hargaList }]
+      // 2) Grouped: [{ tipeHP, items: [...] }]
+      let flat = [];
+      if (Array.isArray(raw)) {
+        if (raw.length > 0 && Array.isArray(raw[0]?.items)) {
+          flat = raw.flatMap(g =>
+            (g.items || []).map(it => ({ tipeHP: g.tipeHP, ...it }))
+          );
+        } else {
+          flat = raw;
+        }
+      }
+      setPrices(flat);
     } catch { toast.error('Gagal memuat daftar harga'); }
     finally { setLoading(false); }
-  }, [debouncedSearch, filterMerek]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -2753,9 +2782,126 @@ function TabDaftarHarga({ canEdit }) {
     return Array.from(set).sort();
   }, [prices]);
 
-  const openNew  = () => { setEditData(null); setShowModal(true); };
+  const tipeHPList = useMemo(() => {
+    const set = new Set();
+    prices.forEach(p => {
+      const t = (p.tipeHP || '').trim();
+      if (t) set.add(t);
+    });
+    return Array.from(set).sort();
+  }, [prices]);
+
+  // Grup per tipeHP; item tanpa tipeHP masuk ke "Lainnya".
+  // Pending tipes (baru dibuat, belum punya kerusakan) di-merge supaya
+  // tetap muncul di list — walau belum ada entri harga di backend.
+  const grouped = useMemo(() => {
+    const map = new Map();
+    prices.forEach(p => {
+      const tipe = (p.tipeHP || '').trim();
+      const key  = tipe || TIPE_LAINNYA;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          tipeHP: tipe,
+          label:  tipe || 'Lainnya',
+          mereks: new Set(),
+          items:  [],
+        });
+      }
+      const g = map.get(key);
+      g.items.push(p);
+      if (p.merek) g.mereks.add(p.merek);
+    });
+    pendingTipes.forEach(pt => {
+      const key = pt.tipeHP;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          tipeHP: pt.tipeHP,
+          label:  pt.tipeHP,
+          mereks: new Set(pt.merek ? [pt.merek] : []),
+          items:  [],
+        });
+      }
+    });
+    return Array.from(map.values())
+      .map(g => ({ ...g, mereks: Array.from(g.mereks).sort() }))
+      .sort((a, b) => {
+        if (a.key === TIPE_LAINNYA) return 1;
+        if (b.key === TIPE_LAINNYA) return -1;
+        return a.label.localeCompare(b.label);
+      });
+  }, [prices, pendingTipes]);
+
+  // Begitu suatu pending tipe sudah punya entri harga di backend (prices
+  // sudah memuatnya), buang dari pendingTipes supaya tidak dobel/stale.
+  useEffect(() => {
+    if (pendingTipes.length === 0) return;
+    const existing = new Set(
+      prices.map(p => (p.tipeHP || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const next = pendingTipes.filter(pt => !existing.has(pt.tipeHP.toLowerCase()));
+    if (next.length !== pendingTipes.length) setPendingTipes(next);
+  }, [prices, pendingTipes]);
+
+  // Filter list tipe HP (search by tipe + filter merek).
+  const filteredGroups = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    return grouped.filter(g => {
+      if (filterMerek && !g.mereks.includes(filterMerek)) return false;
+      if (q && !g.label.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [grouped, debouncedSearch, filterMerek]);
+
+  // Grup yang sedang dibuka di detail view.
+  const currentGroup = useMemo(() => {
+    if (!selectedTipe) return null;
+    return grouped.find(g => g.key === selectedTipe) || null;
+  }, [grouped, selectedTipe]);
+
+  // Filter item kerusakan di detail view (search by jenis kerusakan).
+  const filteredDetailItems = useMemo(() => {
+    if (!currentGroup) return [];
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return currentGroup.items;
+    return currentGroup.items.filter(p =>
+      (p.jenisKerusakan || '').toLowerCase().includes(q)
+    );
+  }, [currentGroup, debouncedSearch]);
+
+  // Kalau tipe yang sedang dibuka hilang (mis. semua item-nya terhapus),
+  // balik ke list view secara otomatis supaya tidak nge-render null.
+  useEffect(() => {
+    if (!loading && selectedTipe && !currentGroup) {
+      setSelectedTipe(null);
+    }
+  }, [loading, selectedTipe, currentGroup]);
+
+  // "Tambah Tipe HP" (list view): modal sederhana 2 field (tipeHP + merek).
+  // Tidak hit backend — tipe baru disimpan di pendingTipes & langsung masuk
+  // detail view supaya user bisa langsung tambah kerusakan.
+  const openNewTipe  = () => setShowTipeModal(true);
+  // "Tambah Harga" (detail view): modal lengkap untuk menambah kerusakan
+  // di bawah tipe HP yang sedang dibuka.
+  const openNewHarga = () => { setEditData(null); setShowModal(true); };
   const openEdit = (d) => { setEditData(d); setShowModal(true); };
   const resetFilter = () => { setSearch(''); setFilterMerek(''); };
+
+  function handleTipeSubmit({ tipeHP, merek }) {
+    const key = tipeHP; // tipeHP sudah di-trim di dalam modal
+    setPendingTipes(prev => {
+      // Dedup: kalau tipeHP sama sudah ada (pending atau di prices), skip.
+      const existsInPending = prev.some(p => p.tipeHP.toLowerCase() === key.toLowerCase());
+      const existsInPrices  = prices.some(p =>
+        (p.tipeHP || '').trim().toLowerCase() === key.toLowerCase()
+      );
+      if (existsInPending || existsInPrices) return prev;
+      return [...prev, { tipeHP: key, merek }];
+    });
+    setSelectedTipe(key);
+    toast.success(`Tipe HP "${key}" ditambahkan`);
+  }
 
   async function handleDelete() {
     if (!confirmDelete) return;
@@ -2769,206 +2915,290 @@ function TabDaftarHarga({ canEdit }) {
     }
   }
 
+  // Saat di detail view, tipeHP di modal dikunci ke tipe yang sedang dibuka.
+  // Pengecualian: grup "Lainnya" tidak di-lock supaya user bisa reklasifikasi
+  // item lama yang belum punya tipeHP.
+  const lockTipeHP   = currentGroup && currentGroup.tipeHP ? currentGroup.tipeHP : null;
+  const defaultMerek = currentGroup && currentGroup.mereks[0] ? currentGroup.mereks[0] : '';
+
   return (
     <div className="min-w-0">
-      {/* Filter & action */}
-      <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
-        <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input pl-9" placeholder="Cari tipe HP atau jenis kerusakan..."
-            value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <select className="input sm:w-[180px] flex-shrink-0"
-          value={filterMerek} onChange={e => setFilterMerek(e.target.value)}>
-          <option value="">Semua Merek</option>
-          {merekList.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <button className="btn btn-outline py-2 px-3 text-xs flex-shrink-0" onClick={resetFilter}>
-          <RefreshCw size={14} /> Reset
-        </button>
-        {canEdit && (
-          <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={openNew}>
-            <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Harga
-          </button>
-        )}
-      </div>
-
-      {loading ? <Loader /> : (
+      {!selectedTipe ? (
+        /* ─────── LIST VIEW: daftar tipe HP ─────── */
         <>
-          {/* Desktop / tablet — tabel */}
-          <div className="card hidden sm:block">
-            <div className="table-wrap">
-              <table className="table table-fixed w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left min-w-[160px]">Tipe HP</th>
-                    <th className="text-left w-[120px]">Merek</th>
-                    <th className="text-left min-w-[160px]">Jenis Kerusakan</th>
-                    <th className="text-center w-[130px]">Harga</th>
-                    {canEdit && <th className="text-center w-[90px]">Aksi</th>}
-                  </tr>
-                </thead>
-                <tbody className="bg-white">
-                  {prices.length === 0
-                    ? <tr><td colSpan={canEdit ? 5 : 4}><EmptyState message="Belum ada daftar harga" /></td></tr>
-                    : prices.map(p => {
-                      const list       = toHargaList(p);
-                      const first      = list[0] || { harga: 0, keterangan: '' };
-                      const hasMore    = list.length > 1;
-                      const isExpanded = expandedId === p._id;
-                      return (
-                        <React.Fragment key={p._id}>
-                          <tr>
-                            <td className="text-left min-w-[160px] text-sm font-semibold text-slate-700">{p.tipeHP || '—'}</td>
-                            <td className="text-left w-[120px]">
-                              <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
-                                {p.merek || '—'}
-                              </span>
-                            </td>
-                            <td className="text-left min-w-[160px] text-sm text-slate-600">{p.jenisKerusakan || '—'}</td>
-                            <td className="text-center w-[130px]">
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="text-sm font-bold text-primary-600">{formatRupiah(first.harga || 0)}</span>
-                                {hasMore && (
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleExpand(p._id)}
-                                    className="p-0.5 rounded hover:bg-slate-100 text-slate-500"
-                                    title={isExpanded ? 'Tutup' : `Lihat ${list.length} harga`}
-                                  >
-                                    {isExpanded
-                                      ? <ChevronDown size={14} />
-                                      : <ChevronRight size={14} />}
-                                  </button>
-                                )}
-                              </div>
-                              {hasMore && (
-                                <span className="block text-[10px] text-slate-400 mt-0.5">+{list.length - 1} harga lain</span>
-                              )}
-                            </td>
-                            {canEdit && (
-                              <td className="text-center w-[90px]">
-                                <div className="flex gap-1 flex-wrap justify-center">
-                                  <button onClick={() => openEdit(p)}
-                                    className="btn btn-outline py-1 px-2 text-xs" title="Edit">
-                                    <Pencil size={12} />
-                                  </button>
-                                  <button onClick={() => setConfirmDelete(p)}
-                                    className="btn btn-outline py-1 px-2 text-xs text-red-500" title="Hapus">
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                          {isExpanded && hasMore && (
-                            <tr className="bg-slate-50">
-                              <td colSpan={canEdit ? 5 : 4} className="px-4 py-3">
-                                <div className="space-y-1.5">
-                                  {list.map((h, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 text-xs">
-                                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary-100 text-primary-600 font-semibold text-[10px] flex-shrink-0">
-                                        {idx + 1}
-                                      </span>
-                                      <span className="font-bold text-primary-600 min-w-[110px]">{formatRupiah(h.harga || 0)}</span>
-                                      <span className="text-slate-500 truncate">{h.keterangan || '—'}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })
-                  }
-                </tbody>
-              </table>
+          <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
+            <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input className="input pl-9" placeholder="Cari tipe HP..."
+                value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <select className="input sm:w-[180px] flex-shrink-0"
+              value={filterMerek} onChange={e => setFilterMerek(e.target.value)}>
+              <option value="">Semua Merek</option>
+              {merekList.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <button className="btn btn-outline py-2 px-3 text-xs flex-shrink-0" onClick={resetFilter}>
+              <RefreshCw size={14} /> Reset
+            </button>
+            {canEdit && (
+              <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={openNewTipe}>
+                <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Tipe HP
+              </button>
+            )}
+          </div>
+
+          {loading ? <Loader /> : (
+            filteredGroups.length === 0
+              ? <div className="card"><EmptyState message="Belum ada daftar harga" /></div>
+              : <div className="space-y-2">
+                  {filteredGroups.map(g => (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => setSelectedTipe(g.key)}
+                      className="card !p-3 w-full text-left flex items-center gap-3 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-slate-700 truncate">{g.label}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-xs text-slate-500">{g.items.length} kerusakan</span>
+                          {g.mereks.map(m => (
+                            <span key={m} className="inline-block px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                              {m}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <span className="btn btn-outline py-1 px-2 text-xs flex-shrink-0 pointer-events-none">
+                        Lihat <ChevronRight size={12} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+          )}
+        </>
+      ) : (
+        /* ─────── DETAIL VIEW: daftar kerusakan untuk tipe terpilih ─────── */
+        <>
+          {/* Breadcrumb + tombol kembali */}
+          <div className="mb-3 flex items-center flex-wrap gap-2">
+            <button onClick={() => setSelectedTipe(null)}
+              className="btn btn-outline py-1.5 px-2 text-xs flex-shrink-0">
+              <ChevronLeft size={14} /> Kembali
+            </button>
+            <div className="flex items-center gap-1.5 text-sm min-w-0 flex-wrap">
+              <span className="text-slate-400">Daftar Harga</span>
+              <ChevronRight size={12} className="text-slate-300 flex-shrink-0" />
+              <span className="font-semibold text-slate-700 truncate">
+                {currentGroup?.label}
+              </span>
+              <span className="text-xs text-slate-400 flex-shrink-0">
+                ({currentGroup?.items.length} kerusakan)
+              </span>
             </div>
           </div>
 
-          {/* Mobile — kartu */}
-          <div className="sm:hidden space-y-2">
-            {prices.length === 0
-              ? <div className="card"><EmptyState message="Belum ada daftar harga" /></div>
-              : prices.map(p => {
-                const list       = toHargaList(p);
-                const first      = list[0] || { harga: 0, keterangan: '' };
-                const hasMore    = list.length > 1;
-                const isExpanded = expandedId === p._id;
-                return (
-                  <div key={p._id} className="card !p-3">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm text-slate-700 truncate">{p.tipeHP || '—'}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
-                            {p.merek || '—'}
-                          </span>
-                          <span className="text-[11px] text-slate-500 truncate">{p.jenisKerusakan || '—'}</span>
+          {/* Filter + tombol tambah harga */}
+          <div className="card mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:items-center min-w-0">
+            <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input className="input pl-9" placeholder="Cari jenis kerusakan..."
+                value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            {canEdit && (
+              <button className="btn btn-primary py-2 px-3 text-xs flex-shrink-0" onClick={openNewHarga}>
+                <Plus size={14} /> <span className="hidden sm:inline">Tambah </span>Harga
+              </button>
+            )}
+          </div>
+
+          {loading ? <Loader /> : (
+            <>
+              {/* Desktop / tablet — tabel kerusakan */}
+              <div className="card hidden sm:block">
+                <div className="table-wrap">
+                  <table className="table table-fixed w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-left min-w-[200px]">Nama</th>
+                        <th className="text-center w-[160px]">Harga</th>
+                        {canEdit && <th className="text-center w-[90px]">Aksi</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {filteredDetailItems.length === 0
+                        ? <tr><td colSpan={canEdit ? 3 : 2}><EmptyState message="Belum ada kerusakan" /></td></tr>
+                        : filteredDetailItems.map(p => {
+                          const list       = toHargaList(p);
+                          const first      = list[0] || { harga: 0, keterangan: '' };
+                          const hasMore    = list.length > 1;
+                          const isExpanded = expandedId === p._id;
+                          return (
+                            <React.Fragment key={p._id}>
+                              <tr>
+                                <td className="text-left text-sm text-slate-700">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium">{p.jenisKerusakan || '—'}</span>
+                                    {p.merek && (
+                                      <span className="inline-block px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                                        {p.merek}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-sm font-bold text-primary-600">{formatRupiah(first.harga || 0)}</span>
+                                    {hasMore && (
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleExpand(p._id)}
+                                        className="p-0.5 rounded hover:bg-slate-100 text-slate-500"
+                                        title={isExpanded ? 'Tutup' : `Lihat ${list.length} harga`}
+                                      >
+                                        {isExpanded
+                                          ? <ChevronDown size={14} />
+                                          : <ChevronRight size={14} />}
+                                      </button>
+                                    )}
+                                  </div>
+                                  {hasMore && (
+                                    <span className="block text-[10px] text-slate-400 mt-0.5">+{list.length - 1} harga lain</span>
+                                  )}
+                                </td>
+                                {canEdit && (
+                                  <td className="text-center">
+                                    <div className="flex gap-1 flex-wrap justify-center">
+                                      <button onClick={() => openEdit(p)}
+                                        className="btn btn-outline py-1 px-2 text-xs" title="Edit">
+                                        <Pencil size={12} />
+                                      </button>
+                                      <button onClick={() => setConfirmDelete(p)}
+                                        className="btn btn-outline py-1 px-2 text-xs text-red-500" title="Hapus">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                )}
+                              </tr>
+                              {isExpanded && hasMore && (
+                                <tr className="bg-slate-50">
+                                  <td colSpan={canEdit ? 3 : 2} className="px-4 py-3">
+                                    <div className="space-y-1.5">
+                                      {list.map((h, idx) => (
+                                        <div key={idx} className="flex items-center gap-3 text-xs">
+                                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary-100 text-primary-600 font-semibold text-[10px] flex-shrink-0">
+                                            {idx + 1}
+                                          </span>
+                                          <span className="font-bold text-primary-600 min-w-[110px]">{formatRupiah(h.harga || 0)}</span>
+                                          <span className="text-slate-500 truncate">{h.keterangan || '—'}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mobile — kartu kerusakan */}
+              <div className="sm:hidden space-y-2">
+                {filteredDetailItems.length === 0
+                  ? <div className="card"><EmptyState message="Belum ada kerusakan" /></div>
+                  : filteredDetailItems.map(p => {
+                    const list       = toHargaList(p);
+                    const first      = list[0] || { harga: 0, keterangan: '' };
+                    const hasMore    = list.length > 1;
+                    const isExpanded = expandedId === p._id;
+                    return (
+                      <div key={p._id} className="card !p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm text-slate-700 truncate">{p.jenisKerusakan || '—'}</p>
+                            {p.merek && (
+                              <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                                {p.merek}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="flex items-center justify-end gap-1">
+                              <p className="font-bold text-base text-primary-600">{formatRupiah(first.harga || 0)}</p>
+                              {hasMore && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpand(p._id)}
+                                  className="p-0.5 rounded hover:bg-slate-100 text-slate-500"
+                                  title={isExpanded ? 'Tutup' : `Lihat ${list.length} harga`}
+                                >
+                                  {isExpanded
+                                    ? <ChevronDown size={16} />
+                                    : <ChevronRight size={16} />}
+                                </button>
+                              )}
+                            </div>
+                            {hasMore && (
+                              <span className="block text-[10px] text-slate-400">+{list.length - 1} harga lain</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <div className="flex items-center justify-end gap-1">
-                          <p className="font-bold text-base text-primary-600">{formatRupiah(first.harga || 0)}</p>
-                          {hasMore && (
-                            <button
-                              type="button"
-                              onClick={() => toggleExpand(p._id)}
-                              className="p-0.5 rounded hover:bg-slate-100 text-slate-500"
-                              title={isExpanded ? 'Tutup' : `Lihat ${list.length} harga`}
-                            >
-                              {isExpanded
-                                ? <ChevronDown size={16} />
-                                : <ChevronRight size={16} />}
+                        {first.keterangan && !isExpanded && (
+                          <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100 mt-1">{first.keterangan}</p>
+                        )}
+                        {isExpanded && hasMore && (
+                          <div className="pt-2 border-t border-slate-100 mt-1 space-y-1.5">
+                            {list.map((h, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-[11px]">
+                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary-100 text-primary-600 font-semibold text-[9px] flex-shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <span className="font-bold text-primary-600 min-w-[80px]">{formatRupiah(h.harga || 0)}</span>
+                                <span className="text-slate-500 truncate">{h.keterangan || '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {canEdit && (
+                          <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
+                            <button onClick={() => openEdit(p)}
+                              className="btn btn-outline py-1.5 px-2.5 text-xs flex-1">
+                              <Pencil size={13} /> Edit
                             </button>
-                          )}
-                        </div>
-                        {hasMore && (
-                          <span className="block text-[10px] text-slate-400">+{list.length - 1} harga lain</span>
+                            <button onClick={() => setConfirmDelete(p)}
+                              className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         )}
                       </div>
-                    </div>
-                    {first.keterangan && !isExpanded && (
-                      <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100 mt-1">{first.keterangan}</p>
-                    )}
-                    {isExpanded && hasMore && (
-                      <div className="pt-2 border-t border-slate-100 mt-1 space-y-1.5">
-                        {list.map((h, idx) => (
-                          <div key={idx} className="flex items-center gap-2 text-[11px]">
-                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary-100 text-primary-600 font-semibold text-[9px] flex-shrink-0">
-                              {idx + 1}
-                            </span>
-                            <span className="font-bold text-primary-600 min-w-[80px]">{formatRupiah(h.harga || 0)}</span>
-                            <span className="text-slate-500 truncate">{h.keterangan || '—'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {canEdit && (
-                      <div className="flex gap-1 pt-2 mt-2 border-t border-slate-100">
-                        <button onClick={() => openEdit(p)}
-                          className="btn btn-outline py-1.5 px-2.5 text-xs flex-1">
-                          <Pencil size={13} /> Edit
-                        </button>
-                        <button onClick={() => setConfirmDelete(p)}
-                          className="btn btn-outline py-1.5 px-2.5 text-xs text-red-500">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            }
-          </div>
+                    );
+                  })
+                }
+              </div>
+            </>
+          )}
         </>
       )}
 
+      <TipeHPFormModal
+        open={showTipeModal}
+        onClose={() => setShowTipeModal(false)}
+        onSubmit={handleTipeSubmit}
+        merekList={merekList}
+      />
       <ServicePriceModal
         open={showModal} onClose={() => setShowModal(false)}
         onSaved={load} editData={editData}
+        tipeHPList={tipeHPList}
         merekList={merekList} jenisKerusakanList={jenisKerusakanList}
+        lockTipeHP={lockTipeHP}
+        defaultMerek={defaultMerek}
       />
       <ConfirmDialog
         open={!!confirmDelete} onClose={() => setConfirmDelete(null)} onConfirm={handleDelete}
@@ -2981,9 +3211,68 @@ function TabDaftarHarga({ canEdit }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Modal Tambah Tipe HP (hanya tipeHP + merek — kerusakan/harga
+// ditambahkan belakangan dari halaman detail tipe tersebut).
+// ══════════════════════════════════════════════════════════════
+function TipeHPFormModal({ open, onClose, onSubmit, merekList }) {
+  const [form, setForm]     = useState({ tipeHP: '', merek: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) setForm({ tipeHP: '', merek: '' });
+  }, [open]);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  function handleSave() {
+    const tipeHP = form.tipeHP.trim();
+    const merek  = form.merek.trim();
+    if (!tipeHP) return toast.error('Tipe HP wajib diisi');
+    if (!merek)  return toast.error('Merek wajib diisi');
+    setSaving(true);
+    try {
+      onSubmit?.({ tipeHP, merek });
+      onClose();
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Tambah Tipe HP" size="sm">
+      <div className="space-y-3">
+        <div>
+          <label className="label">Tipe HP *</label>
+          <input className="input"
+            placeholder="Oppo A3s, iPhone 11, Samsung A51..."
+            value={form.tipeHP}
+            onChange={e => set('tipeHP', e.target.value)}
+            autoComplete="off" />
+        </div>
+        <div>
+          <label className="label">Merek *</label>
+          <input className="input" list="merekListTambahTipe"
+            placeholder="Apple, Samsung, Xiaomi..."
+            value={form.merek}
+            onChange={e => set('merek', e.target.value)}
+            autoComplete="off" />
+          <datalist id="merekListTambahTipe">
+            {(merekList || []).map(m => <option key={m} value={m} />)}
+          </datalist>
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
+          <button className="btn btn-outline w-full sm:w-auto" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary w-full sm:w-auto" onClick={handleSave} disabled={saving}>
+            {saving ? 'Menyimpan...' : 'Tambahkan'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 // Modal Tambah/Edit Daftar Harga
 // ══════════════════════════════════════════════════════════════
-function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisKerusakanList }) {
+function ServicePriceModal({ open, onClose, onSaved, editData, tipeHPList, merekList, jenisKerusakanList, lockTipeHP, defaultMerek }) {
   const [form, setForm] = useState({
     tipeHP: '', merek: '', jenisKerusakan: '',
     hargaList: [{ harga: 0, keterangan: '' }],
@@ -2995,7 +3284,9 @@ function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisK
       if (editData) {
         const list = toHargaList(editData);
         setForm({
-          tipeHP:         editData.tipeHP         || '',
+          // Saat edit dari dalam detail tipe tertentu, tipeHP dipaksa ke tipe
+          // itu supaya tidak lepas dari konteks grup yang sedang dibuka.
+          tipeHP:         lockTipeHP || editData.tipeHP || '',
           merek:          editData.merek          || '',
           jenisKerusakan: editData.jenisKerusakan || '',
           hargaList: list.length > 0
@@ -3004,12 +3295,14 @@ function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisK
         });
       } else {
         setForm({
-          tipeHP: '', merek: '', jenisKerusakan: '',
+          tipeHP: lockTipeHP || '',
+          merek:  defaultMerek || '',
+          jenisKerusakan: '',
           hargaList: [{ harga: 0, keterangan: '' }],
         });
       }
     }
-  }, [open, editData]);
+  }, [open, editData, lockTipeHP, defaultMerek]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -3060,8 +3353,21 @@ function ServicePriceModal({ open, onClose, onSaved, editData, merekList, jenisK
       <div className="space-y-3">
         <div>
           <label className="label">Tipe HP *</label>
-          <input className="input" placeholder="iPhone 11, Samsung A51..."
-            value={form.tipeHP} onChange={e => set('tipeHP', e.target.value)} />
+          <input
+            className={`input ${lockTipeHP ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
+            list="tipeHPList"
+            placeholder="Oppo A3s, iPhone 11, Samsung A51..."
+            value={form.tipeHP}
+            onChange={e => set('tipeHP', e.target.value)}
+            disabled={!!lockTipeHP}
+            autoComplete="off"
+          />
+          <datalist id="tipeHPList">
+            {(tipeHPList || []).map(t => <option key={t} value={t} />)}
+          </datalist>
+          {lockTipeHP && (
+            <p className="text-[11px] text-slate-400 mt-1">Terkunci ke tipe HP yang sedang dibuka.</p>
+          )}
         </div>
         <div>
           <label className="label">Merek *</label>
