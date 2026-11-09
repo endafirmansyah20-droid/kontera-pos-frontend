@@ -66,6 +66,10 @@ export const ownerAPI = {
   getAbsensiSummary:   (p)  => api.get('/owner/absensi/summary', { params: p }),
   approveAbsensi:      (id, d) => api.patch(`/owner/absensi/${id}/approve`, d),
   approveLembur:       (lemburId, d) => api.patch(`/owner/absensi/lembur/${lemburId}/approve`, d),
+  // Target bulanan per cabang (owner-scoped). Backend meng-upsert dokumen
+  // MonthlyTarget untuk { cabangId, bulan, tahun } berjalan.
+  getCabangTarget:     (id)    => api.get(`/owner/cabang/${id}/target`),
+  setCabangTarget:     (id, d) => api.put(`/owner/cabang/${id}/target`, d),
 };
 
 // ─── Notifications (owner) ───────────────

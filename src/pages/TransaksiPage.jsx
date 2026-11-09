@@ -441,12 +441,24 @@ const JasaForm = memo(({ onAddToCart }) => {
 // role — termasuk karyawan). Item disembunyikan kalau target-nya = 0;
 // widget disembunyikan seluruhnya kalau kedua target belum diset.
 //
+// Sumber target (priority order):
+//   1. useAuth().cabang.targetOmset / targetTransaksi — dari /auth/me,
+//      universal untuk semua role, di-set Owner via halaman detail cabang.
+//   2. /dashboard/target-omset — fallback lama (admin-only; karyawan 403).
+//
 // Pencapaian (omset + jumlah transaksi) dihitung dari transactionAPI.getAll
 // bulan berjalan supaya karyawan juga bisa akses — endpoint /dashboard/*
 // admin-only dan akan 403 untuk karyawan.
 // ══════════════════════════════════════════════════════════════
 function TargetMiniWidget() {
+  const { cabang } = useAuth();
   const [data, setData] = useState(null);
+
+  // Target dari data cabang aktif (primary). Dibaca langsung dari context
+  // supaya tidak perlu fetch tambahan — AuthContext sudah fetch /auth/me.
+  const cabangTargetOmset     = Number(cabang?.targetOmset)     || 0;
+  const cabangTargetTransaksi = Number(cabang?.targetTransaksi) || 0;
+  const needFallbackTarget    = !cabangTargetOmset && !cabangTargetTransaksi;
 
   useEffect(() => {
     let cancelled = false;
@@ -455,7 +467,12 @@ function TargetMiniWidget() {
       const year  = now.getFullYear();
       const month = now.getMonth() + 1;
       const [targetRes, txRes] = await Promise.all([
-        api.get('/dashboard/target-omset').catch(() => null),
+        // Hanya hit endpoint lama kalau data cabang belum punya target —
+        // backward compat untuk tenant yang backend-nya belum push field
+        // targetOmset/targetTransaksi ke /auth/me.
+        needFallbackTarget
+          ? api.get('/dashboard/target-omset').catch(() => null)
+          : Promise.resolve(null),
         transactionAPI.getAll({ year, month, limit: 9999 }, { timeout: 45000 }).catch(() => null),
       ]);
       if (cancelled) return;
@@ -471,16 +488,15 @@ function TargetMiniWidget() {
       const omsetFromTx = monthTxs.reduce((s, x) => s + (Number(x.total) || 0), 0);
       const countFromTx = monthTxs.length;
       setData({
-        targetOmset:       Number(t.targetOmset)     || 0,
-        targetTransaksi:   Number(t.targetTransaksi) || 0,
-        omsetBulanIni:     Number(t.omsetBulanIni ?? omsetFromTx) || 0,
-        transaksiBulanIni: Number(
-          t.transaksiBulanIni ?? t.jumlahTransaksi ?? t.totalTx ?? countFromTx
-        ) || 0,
+        // Prioritaskan nilai dari cabang; fallback ke endpoint lama.
+        targetOmset:       cabangTargetOmset     || Number(t.targetOmset)     || 0,
+        targetTransaksi:   cabangTargetTransaksi || Number(t.targetTransaksi) || 0,
+        omsetBulanIni:     omsetFromTx,
+        transaksiBulanIni: countFromTx,
       });
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [cabangTargetOmset, cabangTargetTransaksi, needFallbackTarget]);
 
   if (!data) return null;
   const { targetOmset, targetTransaksi, omsetBulanIni, transaksiBulanIni } = data;

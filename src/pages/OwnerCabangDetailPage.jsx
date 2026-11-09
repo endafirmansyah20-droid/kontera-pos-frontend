@@ -5,6 +5,7 @@ import {
   DollarSign, TrendingUp, ShoppingCart, Users,
   Power, History, ShoppingBag, ArrowRight,
   CheckCircle2, AlertTriangle, Package, Calculator, Ban,
+  Target, Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api, { ownerAPI } from '../services/api';
@@ -555,6 +556,162 @@ function PembelianTab({ cabangId }) {
   );
 }
 
+// ─── Target Bulanan per Cabang ──────────────────────────────────
+// Owner men-set target omset & transaksi untuk cabang `cabangId` pada
+// bulan berjalan. Backend menyimpan di dokumen MonthlyTarget terpisah
+// (per { cabangId, bulan, tahun }), bukan di dokumen Cabang.
+function TargetCabangSection({ cabangId }) {
+  const [data, setData]     = useState(null);  // null = belum loaded
+  const [omset, setOmset]   = useState('');    // string digit only
+  const [tx,    setTx]      = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+
+  const load = useCallback(async () => {
+    if (!cabangId) return;
+    setLoading(true);
+    try {
+      const r = await ownerAPI.getCabangTarget(cabangId);
+      const d = r?.data?.data || {};
+      setData(d);
+      setOmset(d.targetOmset ? String(d.targetOmset) : '');
+      setTx(d.targetTransaksi ? String(d.targetTransaksi) : '');
+    } catch {
+      setData({});
+    } finally { setLoading(false); }
+  }, [cabangId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async () => {
+    const valOmset = parseInt(omset.replace(/\D/g, ''), 10) || 0;
+    const valTx    = parseInt(tx.replace(/\D/g, ''), 10) || 0;
+    if (!valOmset && !valTx) {
+      toast.error('Isi minimal salah satu target');
+      return;
+    }
+    setSaving(true);
+    try {
+      await ownerAPI.setCabangTarget(cabangId, {
+        targetOmset:     valOmset,
+        targetTransaksi: valTx,
+      });
+      toast.success('Target cabang disimpan');
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menyimpan target');
+    } finally { setSaving(false); }
+  };
+
+  const fmtDigit = (s) => {
+    const n = parseInt((s || '').replace(/\D/g, ''), 10);
+    return Number.isFinite(n) ? new Intl.NumberFormat('id-ID').format(n) : '';
+  };
+
+  const inputStyle = {
+    width: '100%',
+    background: 'rgba(255,255,255,0.08)',
+    border: '0.5px solid rgba(255,255,255,0.15)',
+    color: '#fff', borderRadius: 10,
+    padding: '9px 12px', fontSize: 13, fontWeight: 600,
+    outline: 'none', colorScheme: 'dark',
+  };
+  const inputRpStyle = { ...inputStyle, paddingLeft: 34 };
+
+  const existingOmset = Number(data?.targetOmset)     || 0;
+  const existingTx    = Number(data?.targetTransaksi) || 0;
+  const bulan         = data?.bulan || '';
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.06)',
+      border: '0.5px solid rgba(255,255,255,0.10)',
+      borderRadius: 12, padding: 16, marginBottom: 16,
+    }}>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <div style={{
+            width: 32, height: 32, borderRadius: 10,
+            background: 'rgba(127,119,221,0.22)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Target size={15} style={{ color: '#AFA9EC' }} />
+          </div>
+          <div>
+            <p style={{ margin: 0, color: '#fff', fontSize: 13, fontWeight: 700 }}>Target Bulanan</p>
+            <p style={{ margin: '2px 0 0', color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>
+              {bulan ? `Berlaku untuk ${bulan}` : 'Berlaku untuk bulan berjalan'}
+            </p>
+          </div>
+        </div>
+        {!loading && (existingOmset > 0 || existingTx > 0) && (
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>
+            Terakhir diset:
+            {' '}<span style={{ color: '#AFA9EC', fontWeight: 600 }}>{fmtRp(existingOmset)}</span>
+            {' / '}
+            <span style={{ color: '#FDBA74', fontWeight: 600 }}>{existingTx.toLocaleString('id-ID')} tx</span>
+          </p>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ height: 76, borderRadius: 10, background: 'rgba(255,255,255,0.04)' }} className="animate-pulse" />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
+                Target Omset
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{
+                  position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                  color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, pointerEvents: 'none',
+                }}>Rp</span>
+                <input
+                  type="text" inputMode="numeric" placeholder="0"
+                  value={fmtDigit(omset)}
+                  onChange={e => setOmset(e.target.value.replace(/\D/g, ''))}
+                  style={inputRpStyle}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 11, fontWeight: 600, marginBottom: 6 }}>
+                Target Transaksi
+              </label>
+              <input
+                type="text" inputMode="numeric" placeholder="0"
+                value={fmtDigit(tx)}
+                onChange={e => setTx(e.target.value.replace(/\D/g, ''))}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                padding: '8px 14px', borderRadius: 10,
+                background: saving ? 'rgba(127,119,221,0.25)' : 'linear-gradient(135deg, #7F77DD 0%, #5D54C5 100%)',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                fontSize: 12, fontWeight: 700,
+                opacity: saving ? 0.7 : 1,
+              }}>
+              <Save size={13} /> {saving ? 'Menyimpan...' : 'Simpan Target'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main ───────────────────────────────────────────────────────
 export default function OwnerCabangDetailPage() {
   const { user } = useAuth();
@@ -761,6 +918,9 @@ export default function OwnerCabangDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Target Bulanan */}
+      <TargetCabangSection cabangId={id} />
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
