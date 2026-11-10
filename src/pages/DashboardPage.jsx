@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import ReactDOM from 'react-dom';
 import { dashboardAPI, cabangAPI, transactionAPI } from '../services/api';
 import { formatRupiah, formatNumber } from '../utils/helpers';
 import { Loader, EmptyState } from '../components/UI';
@@ -9,7 +8,7 @@ import {
   TrendingUp, TrendingDown, ShoppingCart,
   AlertTriangle, DollarSign, RefreshCw, Building2,
   BarChart2, Users, BarChart3,
-  Target, Edit2, Sparkles, ArrowUpRight,
+  Target, Sparkles, ArrowUpRight,
   Calendar, Clock, Star, CreditCard
 } from 'lucide-react';
 import api from '../services/api';
@@ -17,7 +16,6 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
-import toast from 'react-hot-toast';
 
 const R = (v) => formatRupiah(v || 0);
 const PALETTE = ['#6366f1','#22c55e','#f59e0b','#ec4899','#14b8a6','#f97316','#8b5cf6'];
@@ -290,48 +288,20 @@ function SuperAdminDashboard({ subscriptions, cabangList, loading, onRefresh }) 
 }
 
 // ── Target Omset Widget ───────────────────────────────────────────────────
-// Sumber target (priority):
-//   1. useAuth().cabang.targetOmset — di-set Owner via halaman detail cabang,
-//      di-populate backend ke response /auth/me.
-//   2. /dashboard/target-omset — fallback legacy. Pencapaian (omsetBulanIni,
-//      bulan, sisaHari) tetap dari endpoint karena cabang hanya expose target.
-function TargetOmsetWidget() {
-  const { isAdmin, cabang } = useAuth();
-  const [target, setTarget]     = useState(null);
-  const [showEdit, setShowEdit] = useState(false);
-  const [inputVal, setInputVal] = useState('');
-  const [saving, setSaving]     = useState(false);
+// Sumber target: HANYA useAuth().cabang.targetOmset — di-set Owner via
+// halaman detail cabang, di-populate backend ke response /auth/me. Tidak
+// ada fetch tambahan ke /dashboard/target-omset: dua sumber yang bersaing
+// bikin nilai tidak stabil (fetch async overwrite target yang sudah benar).
+// Pencapaian omset bulan ini di-passing dari parent (data.month.revenue).
+function TargetOmsetWidget({ monthRevenue = 0 }) {
+  const { cabang } = useAuth();
+  const now = new Date();
+  const bulan    = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const sisaHari = Math.max(lastDay - now.getDate(), 0);
 
-  const load = useCallback(async () => {
-    try { const r = await api.get('/dashboard/target-omset'); setTarget(r.data.data); }
-    catch { setTarget({}); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleSave = async () => {
-    const val = parseInt(inputVal.replace(/\D/g, '')) || 0;
-    if (!val) return toast.error('Masukkan nominal target terlebih dahulu');
-    setSaving(true);
-    try {
-      await api.post('/dashboard/target-omset', { targetOmset: val });
-      toast.success('Target omset disimpan!');
-      setShowEdit(false); setInputVal('');
-      setTarget(null); await load();
-    } catch (err) { toast.error(err.response?.data?.message || 'Gagal menyimpan target'); }
-    finally { setSaving(false); }
-  };
-
-  if (!target) return <div className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse" />;
-
-  const cabangTargetOmset   = Number(cabang?.targetOmset)  || 0;
-  const endpointTargetOmset = Number(target?.targetOmset)  || 0;
-  // Prioritaskan target dari cabang (owner-managed); fallback ke endpoint legacy.
-  const targetOmset   = cabangTargetOmset || endpointTargetOmset;
-  const omsetBulanIni = Number(target?.omsetBulanIni) || 0;
-  const sisaHari      = target?.sisaHari ?? 0;
-  const bulan         = target?.bulan    ?? '';
-  // Hitung ulang persentase karena effective target bisa beda dari endpoint.
+  const targetOmset   = Number(cabang?.targetOmset) || 0;
+  const omsetBulanIni = Number(monthRevenue)        || 0;
   const pct = targetOmset > 0
     ? Math.min(Math.round((omsetBulanIni / targetOmset) * 100), 999)
     : 0;
@@ -339,144 +309,64 @@ function TargetOmsetWidget() {
   const barGradient = pct>=100?'from-emerald-400 to-emerald-500':pct>=70?'from-blue-400 to-blue-500':pct>=40?'from-amber-400 to-amber-500':'from-red-400 to-red-500';
 
   return (
-    <>
-      <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-2xl border border-slate-100 shadow-sm p-5 h-full">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-              <Target size={18} className="text-blue-600" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-700 text-sm">Target Omset</p>
-              <p className="text-xs text-slate-400">{bulan} · {sisaHari} hari lagi</p>
-            </div>
+    <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-2xl border border-slate-100 shadow-sm p-5 h-full">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
+            <Target size={18} className="text-blue-600" />
           </div>
-          {isAdmin && (
-            <button onClick={() => { setInputVal(targetOmset?.toString()||''); setShowEdit(true); }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-xl transition-all">
-              <Edit2 size={12} /> {targetOmset>0?'Ubah':'Set Target'}
-            </button>
-          )}
+          <div>
+            <p className="font-bold text-slate-700 text-sm">Target Omset</p>
+            <p className="text-xs text-slate-400">{bulan} · {sisaHari} hari lagi</p>
+          </div>
         </div>
-
-        {targetOmset > 0 ? (
-          <>
-            <div className="flex items-end justify-between mb-3">
-              <div>
-                <p className="text-2xl font-black text-slate-800">{R(omsetBulanIni)}</p>
-                <p className="text-xs text-slate-400 mt-0.5">dari target {R(targetOmset)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-black" style={{color:barColor}}>{pct}%</p>
-                <p className="text-xs text-slate-400">tercapai</p>
-              </div>
-            </div>
-            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-1000`}
-                style={{width:`${Math.min(pct,100)}%`}} />
-            </div>
-            <p className="text-xs text-slate-400 mt-2">
-              {pct>=100 ? '🎉 Target bulan ini tercapai!' : `Kurang ${R(targetOmset-omsetBulanIni)} lagi`}
-            </p>
-          </>
-        ) : (
-          <div className="text-center py-3">
-            <p className="text-sm text-slate-400 mb-2">Belum ada target omset yang ditetapkan</p>
-            {isAdmin && (
-              <button onClick={()=>setShowEdit(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-xl transition-all">
-                <Target size={12} /> Set Target Sekarang
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {showEdit && ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <h3 className="font-bold text-slate-800 mb-1">Set Target Omset</h3>
-            <p className="text-xs text-slate-400 mb-4">Target omset untuk {bulan}</p>
-            <div className="mb-4">
-              <label className="label">Nominal Target (Rp)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">Rp</span>
-                <input className="input pl-10" inputMode="numeric" placeholder="0"
-                  value={inputVal ? new Intl.NumberFormat('id-ID').format(parseInt(inputVal.replace(/\D/g,'')||'0')) : ''}
-                  onChange={e => setInputVal(e.target.value.replace(/\D/g,''))} autoFocus />
-              </div>
-              <p className="text-xs text-slate-400 mt-1">Contoh: 10.000.000 untuk target Rp 10 juta</p>
+      {targetOmset > 0 ? (
+        <>
+          <div className="flex items-end justify-between mb-3">
+            <div>
+              <p className="text-2xl font-black text-slate-800">{R(omsetBulanIni)}</p>
+              <p className="text-xs text-slate-400 mt-0.5">dari target {R(targetOmset)}</p>
             </div>
-            <div className="flex gap-2">
-              <button className="btn btn-outline flex-1" onClick={()=>setShowEdit(false)}>Batal</button>
-              <button className="btn btn-primary flex-1" onClick={handleSave} disabled={saving}>
-                {saving ? 'Menyimpan...' : 'Simpan'}
-              </button>
+            <div className="text-right">
+              <p className="text-2xl font-black" style={{color:barColor}}>{pct}%</p>
+              <p className="text-xs text-slate-400">tercapai</p>
             </div>
           </div>
-        </div>,
-        document.body
+          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-1000`}
+              style={{width:`${Math.min(pct,100)}%`}} />
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            {pct>=100 ? '🎉 Target bulan ini tercapai!' : `Kurang ${R(targetOmset-omsetBulanIni)} lagi`}
+          </p>
+        </>
+      ) : (
+        <div className="text-center py-3">
+          <p className="text-sm font-semibold text-slate-500">Target belum diset</p>
+          <p className="text-xs text-slate-400 mt-1">Hubungi owner untuk menetapkan target omset cabang</p>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
 // ── Target Transaksi Widget ───────────────────────────────────────────────
-// Sumber target (priority):
-//   1. useAuth().cabang.targetTransaksi — di-set Owner via halaman detail cabang,
-//      di-populate backend ke response /auth/me.
-//   2. /dashboard/target-omset (field targetTransaksi) — fallback legacy.
-// Pencapaian (transaksiBulanIni) tetap dari endpoint, fallback ke prop
-// monthTransactions dari dashboard summary.
+// Sumber target: HANYA useAuth().cabang.targetTransaksi — di-set Owner via
+// halaman detail cabang, di-populate backend ke response /auth/me. Tidak
+// ada fetch tambahan ke /dashboard/target-omset: dua sumber yang bersaing
+// bikin nilai tidak stabil (fetch async overwrite target yang sudah benar).
+// Pencapaian di-passing dari parent (data.month.transactions).
 function TargetTransaksiWidget({ monthTransactions = 0 }) {
-  const { isAdmin, cabang } = useAuth();
-  const [target, setTarget]     = useState(null);
-  const [loaded, setLoaded]     = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [inputVal, setInputVal] = useState('');
-  const [saving, setSaving]     = useState(false);
+  const { cabang } = useAuth();
+  const now = new Date();
+  const bulan    = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const sisaHari = Math.max(lastDay - now.getDate(), 0);
 
-  const load = useCallback(async () => {
-    try {
-      const r = await api.get('/dashboard/target-omset');
-      setTarget(r.data?.data || {});
-    } catch {
-      // Jangan biarkan widget stuck di skeleton kalau endpoint error — set
-      // target={} supaya main render tetap jalan dan menampilkan state
-      // "belum diset".
-      setTarget({});
-    } finally { setLoaded(true); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleSave = async () => {
-    const val = parseInt(inputVal.replace(/\D/g, '')) || 0;
-    if (!val) return toast.error('Masukkan jumlah target terlebih dahulu');
-    setSaving(true);
-    try {
-      // Kirim ke endpoint yang sama dengan Target Omset — backend diharapkan
-      // merge field targetTransaksi ke dokumen target bulan ini.
-      await api.post('/dashboard/target-omset', { targetTransaksi: val });
-      toast.success('Target transaksi disimpan!');
-      setShowEdit(false); setInputVal('');
-      await load();
-    } catch (err) { toast.error(err.response?.data?.message || 'Gagal menyimpan target'); }
-    finally { setSaving(false); }
-  };
-
-  if (!loaded) return <div className="bg-white rounded-2xl border border-slate-100 h-24 animate-pulse" />;
-
-  const cabangTargetTransaksi   = Number(cabang?.targetTransaksi)  || 0;
-  const endpointTargetTransaksi = Number(target?.targetTransaksi)  || 0;
-  // Prioritaskan target dari cabang (owner-managed); fallback ke endpoint legacy.
-  const targetTransaksi = cabangTargetTransaksi || endpointTargetTransaksi;
-  // Backend boleh kirim transaksiBulanIni/jumlahTransaksi/totalTx di payload;
-  // kalau tidak ada, pakai count dari data dashboard (data.month.transactions).
-  const transaksiBulanIni = Number(
-    target?.transaksiBulanIni ?? target?.jumlahTransaksi ?? target?.totalTx ?? monthTransactions
-  ) || 0;
-  const sisaHari = target?.sisaHari ?? 0;
-  const bulan    = target?.bulan    ?? '';
+  const targetTransaksi   = Number(cabang?.targetTransaksi) || 0;
+  const transaksiBulanIni = Number(monthTransactions)       || 0;
   const pct = targetTransaksi > 0
     ? Math.min(Math.round((transaksiBulanIni / targetTransaksi) * 100), 999)
     : 0;
@@ -484,83 +374,46 @@ function TargetTransaksiWidget({ monthTransactions = 0 }) {
   const barGradient = pct>=100?'from-emerald-400 to-emerald-500':pct>=70?'from-blue-400 to-blue-500':pct>=40?'from-amber-400 to-amber-500':'from-red-400 to-red-500';
 
   return (
-    <>
-      <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-2xl border border-slate-100 shadow-sm p-5 h-full">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
-              <ShoppingCart size={18} className="text-violet-600" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-700 text-sm">Target Transaksi</p>
-              <p className="text-xs text-slate-400">
-                {bulan ? `${bulan} · ${sisaHari} hari lagi` : 'Bulan ini'}
-              </p>
-            </div>
+    <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-2xl border border-slate-100 shadow-sm p-5 h-full">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
+            <ShoppingCart size={18} className="text-violet-600" />
           </div>
-          {isAdmin && (
-            <button onClick={() => { setInputVal(targetTransaksi?.toString()||''); setShowEdit(true); }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-violet-600 hover:bg-violet-50 px-3 py-1.5 rounded-xl transition-all">
-              <Edit2 size={12} /> {targetTransaksi>0?'Ubah':'Set Target'}
-            </button>
-          )}
+          <div>
+            <p className="font-bold text-slate-700 text-sm">Target Transaksi</p>
+            <p className="text-xs text-slate-400">{bulan} · {sisaHari} hari lagi</p>
+          </div>
         </div>
-
-        {targetTransaksi > 0 ? (
-          <>
-            <div className="flex items-end justify-between mb-3">
-              <div>
-                <p className="text-2xl font-black text-slate-800">{formatNumber(transaksiBulanIni)} <span className="text-base font-bold text-slate-500">transaksi</span></p>
-                <p className="text-xs text-slate-400 mt-0.5">dari target {formatNumber(targetTransaksi)} transaksi</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-black" style={{color:barColor}}>{pct}%</p>
-                <p className="text-xs text-slate-400">tercapai</p>
-              </div>
-            </div>
-            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-1000`}
-                style={{width:`${Math.min(pct,100)}%`}} />
-            </div>
-            <p className="text-xs text-slate-400 mt-2">
-              {pct>=100 ? '🎉 Target bulan ini tercapai!' : `Kurang ${formatNumber(Math.max(targetTransaksi-transaksiBulanIni,0))} transaksi lagi`}
-            </p>
-          </>
-        ) : (
-          <div className="text-center py-3">
-            <p className="text-sm text-slate-400 mb-2">Belum ada target transaksi yang ditetapkan</p>
-            {isAdmin && (
-              <button onClick={()=>setShowEdit(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 hover:bg-violet-50 px-3 py-1.5 rounded-xl transition-all">
-                <Target size={12} /> Set Target Sekarang
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      {showEdit && ReactDOM.createPortal(
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <h3 className="font-bold text-slate-800 mb-1">Set Target Transaksi</h3>
-            <p className="text-xs text-slate-400 mb-4">Target jumlah transaksi untuk {bulan}</p>
-            <div className="mb-4">
-              <label className="label">Jumlah Transaksi</label>
-              <input className="input" inputMode="numeric" placeholder="0"
-                value={inputVal ? new Intl.NumberFormat('id-ID').format(parseInt(inputVal.replace(/\D/g,'')||'0')) : ''}
-                onChange={e => setInputVal(e.target.value.replace(/\D/g,''))} autoFocus />
-              <p className="text-xs text-slate-400 mt-1">Contoh: 500 untuk target 500 transaksi</p>
+      {targetTransaksi > 0 ? (
+        <>
+          <div className="flex items-end justify-between mb-3">
+            <div>
+              <p className="text-2xl font-black text-slate-800">{formatNumber(transaksiBulanIni)} <span className="text-base font-bold text-slate-500">transaksi</span></p>
+              <p className="text-xs text-slate-400 mt-0.5">dari target {formatNumber(targetTransaksi)} transaksi</p>
             </div>
-            <div className="flex gap-2">
-              <button className="btn btn-outline flex-1" onClick={()=>setShowEdit(false)}>Batal</button>
-              <button className="btn btn-primary flex-1" onClick={handleSave} disabled={saving}>
-                {saving ? 'Menyimpan...' : 'Simpan'}
-              </button>
+            <div className="text-right">
+              <p className="text-2xl font-black" style={{color:barColor}}>{pct}%</p>
+              <p className="text-xs text-slate-400">tercapai</p>
             </div>
           </div>
-        </div>,
-        document.body
+          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full bg-gradient-to-r ${barGradient} transition-all duration-1000`}
+              style={{width:`${Math.min(pct,100)}%`}} />
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            {pct>=100 ? '🎉 Target bulan ini tercapai!' : `Kurang ${formatNumber(Math.max(targetTransaksi-transaksiBulanIni,0))} transaksi lagi`}
+          </p>
+        </>
+      ) : (
+        <div className="text-center py-3">
+          <p className="text-sm font-semibold text-slate-500">Target belum diset</p>
+          <p className="text-xs text-slate-400 mt-1">Hubungi owner untuk menetapkan target transaksi cabang</p>
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -675,7 +528,7 @@ function NormalDashboard({ data, onRefresh, loading }) {
 
       {/* Target */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-        <TargetOmsetWidget />
+        <TargetOmsetWidget monthRevenue={data?.month?.revenue || 0} />
         <TargetTransaksiWidget monthTransactions={data?.month?.transactions || 0} />
       </div>
 
