@@ -1,10 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { financeAPI, brankasAPI, transactionAPI, saldoAPI } from '../services/api';
 import api from '../services/api';
 import { formatRupiah, formatDate, FINANCE_TYPE_LABELS } from '../utils/helpers';
 import { Modal, PageHeader, EmptyState, Loader, StatCard, ConfirmDialog } from '../components/UI';
-import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, AlertCircle, DollarSign, Vault, RefreshCw, Building2, Wallet, Banknote, ArrowRightLeft, Lock, CreditCard, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, AlertCircle, DollarSign, Vault, RefreshCw, Building2, Wallet, Banknote, ArrowRightLeft, Lock, CreditCard, CheckCircle, Archive, FileSpreadsheet, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -454,6 +457,272 @@ const bulanIniRange = () => {
   };
 };
 
+const BULAN_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+// Daftar 24 bulan sebelum bulan ini — pakai komponen tanggal lokal biar
+// konsisten sama bulanIniRange() (hindari shift UTC di TZ +7).
+const pastMonths = (count = 24) => {
+  const now = new Date();
+  const out = [];
+  for (let i = 1; i <= count; i++) {
+    const d    = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y    = d.getFullYear();
+    const m0   = d.getMonth();
+    const mm   = String(m0 + 1).padStart(2, '0');
+    const last = new Date(y, m0 + 1, 0).getDate();
+    out.push({
+      key:        `${y}-${mm}`,
+      label:      `${BULAN_ID[m0]} ${y}`,
+      bulanName:  BULAN_ID[m0],
+      year:       y,
+      startDate:  `${y}-${mm}-01`,
+      endDate:    `${y}-${mm}-${String(last).padStart(2, '0')}`,
+    });
+  }
+  return out;
+};
+
+// ── Arsip: catatan keuangan bulan-bulan lampau + export Excel / PDF ─
+function ArsipKeuangan({ cabangId = null, variant = 'light' }) {
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [records, setRecords]             = useState([]);
+  const [loading, setLoading]             = useState(false);
+  const months = useMemo(() => pastMonths(24), []);
+  const selected = months.find(m => m.key === selectedMonth);
+  const isDark = variant === 'dark';
+
+  useEffect(() => {
+    if (!selected) { setRecords([]); return; }
+    setLoading(true);
+    const params = {
+      startDate: selected.startDate,
+      endDate:   selected.endDate,
+      limit:     500,
+      ...(cabangId ? { cabang: cabangId } : {}),
+    };
+    api.get('/finance', { params })
+      .then(r => setRecords(r.data.data || []))
+      .catch(() => toast.error('Gagal memuat data arsip'))
+      .finally(() => setLoading(false));
+  }, [selectedMonth, cabangId]);
+
+  const fileBase = selected ? `Keuangan_${selected.bulanName}_${selected.year}` : 'Keuangan';
+
+  const exportExcel = () => {
+    if (!selected || records.length === 0) return toast.error('Tidak ada data untuk diexport');
+    const rows = records.map(r => ({
+      Tanggal:       formatDate(r.date),
+      Tipe:          FINANCE_TYPE_LABELS[r.type] || r.type,
+      Kategori:      r.category,
+      Deskripsi:     r.description,
+      'Pihak Terkait': r.relatedParty || '',
+      Nominal:       r.amount,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Keuangan');
+    XLSX.writeFile(wb, `${fileBase}.xlsx`);
+  };
+
+  const exportPDF = () => {
+    if (!selected || records.length === 0) return toast.error('Tidak ada data untuk diexport');
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(`Laporan Keuangan — ${selected.label}`, 14, 15);
+    autoTable(doc, {
+      startY: 22,
+      head: [['Tanggal','Tipe','Kategori','Deskripsi','Pihak','Nominal']],
+      body: records.map(r => [
+        formatDate(r.date),
+        FINANCE_TYPE_LABELS[r.type] || r.type,
+        r.category,
+        r.description,
+        r.relatedParty || '-',
+        formatRupiah(r.amount),
+      ]),
+      styles:     { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [99, 102, 241], textColor: 255 },
+    });
+    doc.save(`${fileBase}.pdf`);
+  };
+
+  // ── Dark variant (Owner) ───────────────────────────────────────
+  if (isDark) {
+    return (
+      <div className="animate-fade-in-up">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '0.5px solid rgba(255,255,255,0.15)',
+              color: '#fff', borderRadius: 10,
+              padding: '8px 12px', fontSize: 13,
+              cursor: 'pointer', outline: 'none',
+              minWidth: 200,
+            }}>
+            <option value="" style={{ color: '#1e293b' }}>-- Pilih bulan --</option>
+            {months.map(m => (
+              <option key={m.key} value={m.key} style={{ color: '#1e293b' }}>{m.label}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 sm:ml-auto">
+            <button onClick={exportExcel} disabled={records.length === 0}
+              style={{
+                padding: '8px 12px', borderRadius: 10,
+                background: records.length === 0 ? 'rgba(255,255,255,0.05)' : '#10B981',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                color: records.length === 0 ? 'rgba(255,255,255,0.3)' : '#fff',
+                fontSize: 12, fontWeight: 600,
+                cursor: records.length === 0 ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+              <FileSpreadsheet size={14} /> Export Excel
+            </button>
+            <button onClick={exportPDF} disabled={records.length === 0}
+              style={{
+                padding: '8px 12px', borderRadius: 10,
+                background: records.length === 0 ? 'rgba(255,255,255,0.05)' : '#EF4444',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                color: records.length === 0 ? 'rgba(255,255,255,0.3)' : '#fff',
+                fontSize: 12, fontWeight: 600,
+                cursor: records.length === 0 ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+              <FileText size={14} /> Export PDF
+            </button>
+          </div>
+        </div>
+
+        {!selected ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-10" style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '0.5px solid rgba(255,255,255,0.10)',
+            borderRadius: 12,
+          }}>
+            <Archive size={28} style={{ color: 'rgba(255,255,255,0.25)' }} />
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Pilih bulan untuk melihat arsip
+            </p>
+          </div>
+        ) : loading ? <Loader /> : (
+          <div style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '0.5px solid rgba(255,255,255,0.10)',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    {['Tanggal','Tipe','Kategori','Deskripsi','Pihak','Nominal'].map(h => (
+                      <th key={h} style={{
+                        padding: '12px 16px', textAlign: 'left',
+                        fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: 'rgba(255,255,255,0.55)',
+                        whiteSpace: 'nowrap',
+                        borderBottom: '1px solid rgba(255,255,255,0.10)',
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {records.length === 0 ? (
+                    <tr><td colSpan={6} style={{ padding: 32 }}>
+                      <div className="flex flex-col items-center justify-center gap-2 py-6">
+                        <Archive size={28} style={{ color: 'rgba(255,255,255,0.25)' }} />
+                        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                          Tidak ada catatan di {selected.label}
+                        </p>
+                      </div>
+                    </td></tr>
+                  ) : records.map(r => (
+                    <tr key={r._id} style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <td style={cellStyleDark} className="text-xs">{formatDate(r.date)}</td>
+                      <td style={cellStyleDark}><span className={`badge ${TYPE_COLORS[r.type]}`}>{FINANCE_TYPE_LABELS[r.type]}</span></td>
+                      <td style={{ ...cellStyleDark, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{r.category}</td>
+                      <td style={{ ...cellStyleDark, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{r.description}</td>
+                      <td style={{ ...cellStyleDark, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{r.relatedParty || '-'}</td>
+                      <td style={{
+                        ...cellStyleDark, fontWeight: 700,
+                        color: r.type === 'pemasukan' ? '#6EE7B7'
+                             : r.type === 'pengeluaran' ? '#F87171'
+                             : '#fff',
+                      }}>
+                        {r.type==='pemasukan'?'+':r.type==='pengeluaran'?'-':''}{formatRupiah(r.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Light variant (Admin default) ──────────────────────────────
+  return (
+    <div className="animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
+        <select
+          className="input sm:max-w-xs"
+          value={selectedMonth}
+          onChange={e => setSelectedMonth(e.target.value)}
+        >
+          <option value="">-- Pilih bulan --</option>
+          {months.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+        </select>
+        <div className="flex gap-2 sm:ml-auto">
+          <button className="btn btn-success py-2 px-3 text-xs sm:text-sm"
+            onClick={exportExcel} disabled={records.length === 0}>
+            <FileSpreadsheet size={16} /> Export Excel
+          </button>
+          <button className="btn btn-danger py-2 px-3 text-xs sm:text-sm"
+            onClick={exportPDF} disabled={records.length === 0}>
+            <FileText size={16} /> Export PDF
+          </button>
+        </div>
+      </div>
+
+      {!selected ? (
+        <EmptyState message="Pilih bulan untuk melihat arsip" />
+      ) : loading ? <Loader /> : records.length === 0 ? (
+        <EmptyState message={`Tidak ada catatan di ${selected.label}`} />
+      ) : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr><th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Deskripsi</th><th>Pihak</th><th>Nominal</th></tr>
+            </thead>
+            <tbody className="bg-white">
+              {records.map(r => (
+                <tr key={r._id}>
+                  <td className="text-xs">{formatDate(r.date)}</td>
+                  <td><span className={`badge ${TYPE_COLORS[r.type]}`}>{FINANCE_TYPE_LABELS[r.type]}</span></td>
+                  <td className="text-slate-500 text-xs">{r.category}</td>
+                  <td className="font-medium text-slate-700">{r.description}</td>
+                  <td className="text-slate-500 text-xs">{r.relatedParty || '-'}</td>
+                  <td className={`font-bold ${r.type === 'pemasukan' ? 'text-green-600' : r.type === 'pengeluaran' ? 'text-red-500' : 'text-slate-700'}`}>
+                    {r.type === 'pemasukan' ? '+' : r.type === 'pengeluaran' ? '-' : ''}{formatRupiah(r.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ── Owner: Keuangan Per Cabang ─────────────────────────────────
 function KeuanganOwner() {
@@ -465,6 +734,7 @@ function KeuanganOwner() {
   const [loadingRec, setLoadingRec]     = useState(false);
   const [typeFilter, setTypeFilter]     = useState('');
   const [currentPage, setCurrentPage]   = useState(1);
+  const [activeMainTab, setActiveMainTab] = useState('catatan');
   const [showModal, setShowModal]       = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editRecord, setEditRecord]     = useState(null);
@@ -599,18 +869,49 @@ function KeuanganOwner() {
               <option key={c._id} value={c._id} style={{ color: '#1e293b' }}>{c.nama}</option>
             ))}
           </select>
-          <button type="button" onClick={openAdd}
-            style={{
-              padding: '7px 12px', borderRadius: 10,
-              background: '#7F77DD',
-              border: '0.5px solid rgba(255,255,255,0.15)',
-              color: '#fff', display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            }}>
-            <Plus size={14} /> Catat
-          </button>
+          {activeMainTab === 'catatan' && (
+            <button type="button" onClick={openAdd}
+              style={{
+                padding: '7px 12px', borderRadius: 10,
+                background: '#7F77DD',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                color: '#fff', display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}>
+              <Plus size={14} /> Catat
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Main tabs: Catatan / Arsip */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap">
+        {[['catatan','Catatan', DollarSign], ['arsip','Arsip', Archive]].map(([val, label, Icon]) => {
+          const active = activeMainTab === val;
+          return (
+            <button key={val} onClick={() => setActiveMainTab(val)}
+              style={{
+                padding: '7px 14px', borderRadius: 999,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: active ? '#7F77DD' : 'rgba(255,255,255,0.06)',
+                border: active ? '0.5px solid #7F77DD' : '0.5px solid rgba(255,255,255,0.15)',
+                color: active ? '#fff' : 'rgba(255,255,255,0.7)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}>
+              <Icon size={14} /> {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab: Arsip */}
+      {activeMainTab === 'arsip' && selectedCabang && (
+        <ArsipKeuangan cabangId={selectedCabang} variant="dark" />
+      )}
+
+      {/* Tab: Catatan (default view) */}
+      {activeMainTab === 'catatan' && (<>
 
       {/* Brankas per cabang — dark variant */}
       {selectedCabang && <BrankasSection isAdmin={true} cabangId={selectedCabang} variant="dark" />}
@@ -768,6 +1069,8 @@ function KeuanganOwner() {
         </div>
       )}
 
+      </>)}
+
       {/* Modal Add/Edit */}
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editRecord ? 'Edit Catatan' : `Catat Keuangan — ${cabangNama}`} size="md">
         <div className="space-y-4">
@@ -874,7 +1177,7 @@ function KeuanganOwner() {
 }
 
 export default function KeuanganPage() {
-  const { isAdmin, isSuperAdmin, isOwner } = useAuth();
+  const { isAdmin, isSuperAdmin, isOwner, user } = useAuth();
   if (isSuperAdmin) return <KeuanganSuperAdmin />;
   if (isOwner) return <KeuanganOwner />;
 
@@ -1046,6 +1349,11 @@ export default function KeuanganPage() {
         <button onClick={() => setActiveMainTab('hutang')} className={`btn flex-shrink-0 whitespace-nowrap ${activeMainTab === 'hutang' ? 'btn-primary' : 'btn-outline'}`}>
           <CreditCard size={16} /> Hutang Pelanggan
         </button>
+        {user?.role === 'admin' && (
+          <button onClick={() => setActiveMainTab('arsip')} className={`btn flex-shrink-0 whitespace-nowrap ${activeMainTab === 'arsip' ? 'btn-primary' : 'btn-outline'}`}>
+            <Archive size={16} /> Arsip
+          </button>
+        )}
       </div>
 
       {/* Tab Hutang */}
@@ -1186,6 +1494,11 @@ export default function KeuanganPage() {
             </>
           )}
         </div>
+      )}
+
+      {/* Tab Arsip */}
+      {activeMainTab === 'arsip' && user?.role === 'admin' && (
+        <ArsipKeuangan />
       )}
 
       {/* Modal Add/Edit */}
