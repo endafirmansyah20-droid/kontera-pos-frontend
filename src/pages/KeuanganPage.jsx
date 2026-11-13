@@ -439,6 +439,21 @@ const cellStyleDark = {
 
 const defaultForm = { type: 'pengeluaran', category: '', description: '', amount: '', date: new Date().toISOString().slice(0,10), relatedParty: '', dueDate: '', isPaid: false, sumberDana: '', sumberDanaName: '' };
 
+// Range default halaman keuangan: tanggal 1 s/d akhir bulan ini, lokal.
+// Pakai komponen lokal (y/m/d), bukan toISOString().slice(0,10) — di TZ +7
+// konversi UTC bikin start-of-month mundur 1 hari.
+const bulanIniRange = () => {
+  const now  = new Date();
+  const y    = now.getFullYear();
+  const m0   = now.getMonth();
+  const mm   = String(m0 + 1).padStart(2, '0');
+  const last = new Date(y, m0 + 1, 0).getDate();
+  return {
+    startDate: `${y}-${mm}-01`,
+    endDate:   `${y}-${mm}-${String(last).padStart(2, '0')}`,
+  };
+};
+
 
 // ── Owner: Keuangan Per Cabang ─────────────────────────────────
 function KeuanganOwner() {
@@ -449,6 +464,7 @@ function KeuanganOwner() {
   const [loading, setLoading]           = useState(true);
   const [loadingRec, setLoadingRec]     = useState(false);
   const [typeFilter, setTypeFilter]     = useState('');
+  const [currentPage, setCurrentPage]   = useState(1);
   const [showModal, setShowModal]       = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editRecord, setEditRecord]     = useState(null);
@@ -477,9 +493,10 @@ function KeuanganOwner() {
     if (!selectedCabang) return;
     setLoadingRec(true);
     try {
+      const range = bulanIniRange();
       const [r, s, sl] = await Promise.all([
-        api.get('/finance', { params: { cabang: selectedCabang, ...(typeFilter ? { type: typeFilter } : {}) } }),
-        api.get('/finance/summary', { params: { cabang: selectedCabang } }),
+        api.get('/finance', { params: { cabang: selectedCabang, ...range, limit: 50, page: currentPage, ...(typeFilter ? { type: typeFilter } : {}) } }),
+        api.get('/finance/summary', { params: { cabang: selectedCabang, ...range } }),
         api.get('/saldo', { params: { cabang: selectedCabang, _t: Date.now() } })
       ]);
       setRecords(r.data.data || []);
@@ -487,7 +504,7 @@ function KeuanganOwner() {
       setSaldos((sl.data.data || []).filter(a => a.akunId !== 'brankas' && a.isActive));
     } catch { toast.error('Gagal memuat data keuangan'); }
     finally { setLoadingRec(false); }
-  }, [selectedCabang, typeFilter]);
+  }, [selectedCabang, typeFilter, currentPage]);
 
   useEffect(() => { loadRecords(); }, [loadRecords]);
 
@@ -570,7 +587,7 @@ function KeuanganOwner() {
         <div className="flex items-center gap-2 shrink-0">
           <select
             value={selectedCabang || ''}
-            onChange={e => { setSelectedCabang(e.target.value); setTypeFilter(''); }}
+            onChange={e => { setSelectedCabang(e.target.value); setTypeFilter(''); setCurrentPage(1); }}
             style={{
               background: 'rgba(255,255,255,0.08)',
               border: '0.5px solid rgba(255,255,255,0.15)',
@@ -613,7 +630,7 @@ function KeuanganOwner() {
         {['', ...FINANCE_TYPES].map(t => {
           const active = typeFilter === t;
           return (
-            <button key={t} onClick={() => setTypeFilter(t)}
+            <button key={t} onClick={() => { setTypeFilter(t); setCurrentPage(1); }}
               style={{
                 padding: '7px 14px', borderRadius: 999,
                 fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -713,6 +730,40 @@ function KeuanganOwner() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center justify-between" style={{
+            padding: '10px 16px',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+              Halaman {currentPage}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1 || loadingRec}
+                style={{
+                  padding: '6px 12px', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '0.5px solid rgba(255,255,255,0.15)',
+                  color: currentPage === 1 ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: (currentPage === 1 || loadingRec) ? 'not-allowed' : 'pointer',
+                }}
+              >← Sebelumnya</button>
+              <button
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={records.length < 50 || loadingRec}
+                style={{
+                  padding: '6px 12px', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '0.5px solid rgba(255,255,255,0.15)',
+                  color: records.length < 50 ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: (records.length < 50 || loadingRec) ? 'not-allowed' : 'pointer',
+                }}
+              >Berikutnya →</button>
+            </div>
           </div>
         </div>
       )}
@@ -831,6 +882,7 @@ export default function KeuanganPage() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
@@ -924,23 +976,13 @@ export default function KeuanganPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Filter summary "bulan ini" (kalender lokal — tanggal 1 s/d akhir bulan).
-      // Sengaja tidak pakai .toISOString().slice(0,10) karena itu convert ke UTC
-      // dulu, dan di TZ +7 (Jakarta) start-of-month lokal jadi mundur 1 hari →
-      // range akhirnya shift 1 hari & terlihat seperti "rolling 30 hari".
-      // Format YYYY-MM-DD dari komponen lokal biar konsisten dengan Owner /
-      // Laporan Bulanan.
-      const now  = new Date();
-      const y    = now.getFullYear();
-      const m0   = now.getMonth();                            // 0-indexed
-      const mm   = String(m0 + 1).padStart(2, '0');
-      const last = new Date(y, m0 + 1, 0).getDate();          // hari terakhir bulan ini
-      const startBulan = `${y}-${mm}-01`;
-      const endBulan   = `${y}-${mm}-${String(last).padStart(2, '0')}`;
+      // Default halaman: catatan + summary bulan ini (tgl 1 s/d akhir bulan,
+      // kalender lokal). Lihat bulanIniRange() untuk alasan tidak pakai UTC.
+      const range = bulanIniRange();
 
       const [r, s, sl] = await Promise.all([
-        financeAPI.getAll(typeFilter ? { type: typeFilter } : {}),
-        financeAPI.getSummary({ startDate: startBulan, endDate: endBulan }),
+        financeAPI.getAll({ ...range, limit: 50, page: currentPage, ...(typeFilter ? { type: typeFilter } : {}) }),
+        financeAPI.getSummary(range),
         saldoAPI.getAll()
       ]);
       setRecords(r.data.data || []);
@@ -949,7 +991,7 @@ export default function KeuanganPage() {
       setSaldos((sl.data.data || []).filter(a => a.akunId !== 'brankas' && a.isActive));
     } catch { toast.error('Gagal memuat data keuangan'); }
     finally { setLoading(false); }
-  }, [typeFilter]);
+  }, [typeFilter, currentPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1066,12 +1108,13 @@ export default function KeuanganPage() {
           )}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap min-w-0 max-w-full">
             {['', ...FINANCE_TYPES].map(t => (
-              <button key={t} onClick={() => setTypeFilter(t)} className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>
+              <button key={t} onClick={() => { setTypeFilter(t); setCurrentPage(1); }} className={`btn ${typeFilter === t ? 'btn-primary' : 'btn-outline'} py-2 text-xs sm:text-sm flex-shrink-0 whitespace-nowrap`}>
                 {t ? FINANCE_TYPE_LABELS[t] : 'Semua'}
               </button>
             ))}
           </div>
           {loading ? <Loader /> : (
+            <>
             <div className="table-wrap">
               <table className="table">
                 <thead>
@@ -1125,6 +1168,22 @@ export default function KeuanganPage() {
                 </tbody>
               </table>
             </div>
+            <div className="flex items-center justify-between mt-3 px-1">
+              <span className="text-xs text-slate-500">Halaman {currentPage}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1 || loading}
+                  className="btn btn-outline py-1.5 px-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >← Sebelumnya</button>
+                <button
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={records.length < 50 || loading}
+                  className="btn btn-outline py-1.5 px-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >Berikutnya →</button>
+              </div>
+            </div>
+            </>
           )}
         </div>
       )}
