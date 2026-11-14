@@ -607,11 +607,21 @@ export default function TransaksiPage() {
   const [sheetDragY, setSheetDragY] = useState(0);
   const sheetDragStartY = useRef(null);
 
-  // Riwayat
+  // Riwayat — default filter tanggal: tgl 1 bulan ini s/d hari ini (lokal,
+  // bukan UTC, biar nggak shift 1 hari di TZ +7).
+  const txDateDefaults = (() => {
+    const d  = new Date();
+    const y  = d.getFullYear();
+    const m  = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return { startDate: `${y}-${m}-01`, endDate: `${y}-${m}-${dd}` };
+  })();
   const [transactions, setTransactions] = useState([]);
   const [txLoading, setTxLoading] = useState(false);
   const [txSearch, setTxSearch] = useState('');
   const [txPage, setTxPage] = useState(1);
+  const [txStartDate, setTxStartDate] = useState(txDateDefaults.startDate);
+  const [txEndDate, setTxEndDate]     = useState(txDateDefaults.endDate);
   const [profitMinusFilter, setProfitMinusFilter] = useState(false);
   const [marqueeSettings, setMarqueeSettings] = useState({ enabled: true, speed: 28, messages: [
     '💪 Semangat bekerja! Kejujuran adalah aset terbaik kita',
@@ -773,7 +783,14 @@ export default function TransaksiPage() {
   const loadTransactions = useCallback(async () => {
     setTxLoading(true);
     try {
-      const { data } = await transactionAPI.getAll({ search: txSearch, page: txPage, limit: 15, ...(profitMinusFilter ? { profitMinus: 'true' } : {}) });
+      const { data } = await transactionAPI.getAll({
+        search: txSearch,
+        page: txPage,
+        limit: 15,
+        startDate: txStartDate,
+        endDate: txEndDate,
+        ...(profitMinusFilter ? { profitMinus: 'true' } : {}),
+      });
       const txData = data.data || [];
       setTransactions(txData);
       setTxTotal(data.total || 0);
@@ -781,7 +798,7 @@ export default function TransaksiPage() {
       setTxTotalItems(txData.reduce((s, tx) => s + (tx.items?.length || 0), 0));
     } catch { toast.error('Gagal memuat riwayat'); }
     finally { setTxLoading(false); }
-  }, [txSearch, txPage, profitMinusFilter]);
+  }, [txSearch, txPage, profitMinusFilter, txStartDate, txEndDate]);
 
   const loadVoidedTransactions = useCallback(async () => {
     setVoidedLoading(true);
@@ -1729,6 +1746,29 @@ export default function TransaksiPage() {
                 </button>
               </div>
             )}
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-2">
+              <div>
+                <label className="label text-xs">Dari Tanggal</label>
+                <input type="date" className="input" value={txStartDate} max={txEndDate}
+                  onChange={e => { setTxStartDate(e.target.value); setTxPage(1); }} />
+              </div>
+              <div>
+                <label className="label text-xs">Sampai Tanggal</label>
+                <input type="date" className="input" value={txEndDate} min={txStartDate}
+                  onChange={e => { setTxEndDate(e.target.value); setTxPage(1); }} />
+              </div>
+              <div className="flex items-end">
+                <button type="button"
+                  onClick={() => {
+                    setTxStartDate(txDateDefaults.startDate);
+                    setTxEndDate(txDateDefaults.endDate);
+                    setTxPage(1);
+                  }}
+                  className="btn btn-outline py-2 px-3 text-xs sm:text-sm w-full sm:w-auto">
+                  Bulan Ini
+                </button>
+              </div>
+            </div>
             <SearchInput value={txSearch} onChange={v => { setTxSearch(v); setTxPage(1); }} placeholder="Cari nomor faktur atau nama pelanggan..." />
           </div>
           {txLoading ? <Loader /> : (
